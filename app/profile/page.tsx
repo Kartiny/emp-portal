@@ -57,12 +57,10 @@ interface EmployeeProfile {
   department_id: [number, string];
   parent_id: [number, string];
   work_location_id: [number, string];
-  joined_date: string;
   // Other Details
   bank_account_id: [number, string];
   identification_id: string;
-  skills: string;
-  languages: string;
+  lang: string;
 }
 
 export default function ProfilePage() {
@@ -130,8 +128,7 @@ export default function ProfilePage() {
       private_street: profile.private_street,
       emergency_contact: profile.emergency_contact,
       emergency_phone: profile.emergency_phone,
-      skills: profile.skills,
-      languages: profile.languages,
+      lang: profile.lang,
     });
   };
 

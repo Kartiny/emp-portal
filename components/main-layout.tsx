@@ -22,7 +22,6 @@ export function MainLayout({ children }: MainLayoutProps) {
     { name: "Dashboard", href: "/dashboard", icon: Home },
     { name: "Attendance", href: "/attendance", icon: Clock },
     { name: "Leave", href: "/leave", icon: Calendar },
-    { name: "Payslip", href: "/payslip", icon: Receipt },
     { name: "Profile", href: "/profile", icon: User },
   ]
 

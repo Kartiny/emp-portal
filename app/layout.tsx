@@ -7,8 +7,8 @@ import { ThemeProvider } from "@/components/theme-provider"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "KPRJ Management System",
-  description: "KPRJ Management System",
+  title: "Employee Portal",
+  description: "Employee Portal",
   icons: {
     icon: [
       {

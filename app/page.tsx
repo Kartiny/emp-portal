@@ -12,9 +12,9 @@ export default function LandingPage() {
           <div className="flex items-center space-x-4">
             <Image
               src="/logo.png"
-              alt="KPRJ Logo"
-              width={100}
-              height={100}
+              alt="E-Global Logo"
+              width={150}
+              height={150}
               className="rounded-lg"
             />
           </div>
@@ -26,7 +26,7 @@ export default function LandingPage() {
             <div className="flex flex-col items-center justify-center space-y-4 text-center">
               <div className="space-y-2">
                 <h3 className="text-2xl font-bold tracking-tighter sm:text-3xl md:text-4xl lg:text-5xl">
-                  KPRJ Management System
+                  Employee Portal
                 </h3>
               </div>
               <div className="space-x-4">

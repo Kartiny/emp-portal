@@ -5,40 +5,53 @@ import { ODOO_CONFIG } from './config';
 const COMMON_ENDPOINT = `${ODOO_CONFIG.BASE_URL}/xmlrpc/2/common`;
 const OBJECT_ENDPOINT = `${ODOO_CONFIG.BASE_URL}/xmlrpc/2/object`;
 
+/** Simple promise wrapper around xmlrpc.methodCall */
 function xmlRpcCall(client: any, method: string, params: any[]): Promise<any> {
   return new Promise((resolve, reject) => {
     client.methodCall(method, params, (err: any, value: any) => {
-      if (err) return reject(err);
-      resolve(value);
+      if (err) reject(err);
+      else resolve(value);
     });
   });
 }
 
 export class OdooClient {
-  private commonClient = xmlrpc.createSecureClient({ url: COMMON_ENDPOINT });
-  private objectClient = xmlrpc.createSecureClient({ url: OBJECT_ENDPOINT });
+  private common = xmlrpc.createSecureClient({ url: COMMON_ENDPOINT });
+  private object = xmlrpc.createSecureClient({ url: OBJECT_ENDPOINT });
   private adminUid: number | null = null;
 
-  private async authenticateAdmin(): Promise<number> {
-    if (this.adminUid) return this.adminUid;
-    const uid = await xmlRpcCall(
-      this.commonClient,
-      'login',
-      [ODOO_CONFIG.DB_NAME, ODOO_CONFIG.ADMIN_USER, ODOO_CONFIG.ADMIN_PWD]
-    );
-    if (!uid) throw new Error('Admin authentication failed');
-    this.adminUid = uid;
+  /** User login via XML-RPC; returns the UID on success */
+  async login(email: string, password: string): Promise<number> {
+    const uid = await xmlRpcCall(this.common, 'login', [
+      ODOO_CONFIG.DB_NAME,
+      email,
+      password,
+    ]);
+    if (!uid) {
+      throw new Error('Invalid credentials');
+    }
     return uid;
   }
 
+  /** Internal: authenticate as admin for execute_kw calls */
+  private async authenticateAdmin(): Promise<number> {
+    if (this.adminUid) return this.adminUid;
+    this.adminUid = await this.login(
+      ODOO_CONFIG.ADMIN_USER,
+      ODOO_CONFIG.ADMIN_PWD
+    );
+    return this.adminUid;
+  }
+
+  /** Generic execute_kw wrapper */
   private async execute(
     model: string,
     method: string,
     args: any[] = [],
     kwargs: Record<string, any> = {}
-  ) {
+  ): Promise<any> {
     const uid = await this.authenticateAdmin();
-    return xmlRpcCall(this.objectClient, 'execute_kw', [
+    return xmlRpcCall(this.object, 'execute_kw', [
       ODOO_CONFIG.DB_NAME,
       uid,
       ODOO_CONFIG.ADMIN_PWD,
@@ -50,10 +63,11 @@ export class OdooClient {
   }
 
   /**
-   * Fetch the merged res.users + hr.employee record for a given user UID
+   * Reads res.users + hr.employee for a given user UID,
+   * merges them, and returns a flat object of all fields.
    */
-  async getFullUserProfile(uid: number) {
-    // 1) Read the basic user fields
+  async getFullUserProfile(uid: number): Promise<Record<string, any>> {
+    // 1) Basic user info
     const [user] = await this.execute('res.users', 'read', [
       [uid],
       ['name', 'login', 'image_1920'],
@@ -62,55 +76,82 @@ export class OdooClient {
       throw new Error('User not found');
     }
 
-    // 2) Find the hr.employee record whose user_id is this UID
-    const employees = await this.execute(
+    // 2) Search the employee linked by user_id
+    const [emp] = await this.execute(
       'hr.employee',
       'search_read',
-      [
-        [['user_id', '=', uid]],    // domain
-      ],
+      [[['user_id', '=', uid]]],
       {
         fields: [
+          'id',
           'name',
+          'image_1920',
+
+          // Work info
           'job_title',
           'department_id',
+          'parent_id',
+          'work_location_id',
           'work_email',
           'work_phone',
           'mobile_phone',
+          'first_contract_date',
+
+          // Personal info
           'gender',
           'birthday',
-        
+          'country_id',
           'marital',
           'identification_id',
           'passport_id',
           'bank_account_id',
-          'image_1920',
-    
+
+          // Private Info tab
+          'private_street',
+          'private_email',
+          'private_phone',
+          'emergency_contact',
+          'emergency_phone',
+
+          // Education & other
           'lang',
+          'certificate',
+          'study_field',
+          'study_school',
         ],
         limit: 1,
       }
     );
 
-    if (!employees.length) {
+    if (!emp) {
       throw new Error('No employee record linked to this user');
     }
-    const employee = employees[0];
 
-    // 3) Merge and return
-    return {
-      ...user,
-      ...employee,
-    };
+    // 3) Combine and return
+    return { ...user, ...emp };
   }
 }
 
-let _client: OdooClient;
-export function getOdooClient() {
-  if (!_client) _client = new OdooClient();
+// Singleton factory
+let _client: OdooClient | null = null;
+export function getOdooClient(): OdooClient {
+  if (!_client) {
+    _client = new OdooClient();
+  }
   return _client;
 }
 
-export async function getFullUserProfile(uid: number) {
-  return getOdooClient().getFullUserProfile(uid);
+/** Top-level helper for your login API route */
+export async function loginToOdoo(
+  email: string,
+  password: string
+): Promise<number> {
+  const client = getOdooClient();
+  return client.login(email, password);
+}
+
+/** Top-level helper for your profile API route */
+export async function getFullUserProfile(uid: number): Promise<Record<string, any>> {
+  const client = getOdooClient();
+  return client.getFullUserProfile(uid);
 }
