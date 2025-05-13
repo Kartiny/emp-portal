@@ -56,6 +56,7 @@ interface EmployeeProfile {
   job_title: string;
   department_id: [number, string];
   parent_id: [number, string];
+  start_date: [number, string];
   work_location_id: [number, string];
   // Other Details
   bank_account_id: [number, string];
@@ -128,6 +129,7 @@ export default function ProfilePage() {
       private_street: profile.private_street,
       emergency_contact: profile.emergency_contact,
       emergency_phone: profile.emergency_phone,
+      start_date: profile.start_date,
       lang: profile.lang,
     });
   };
@@ -168,6 +170,7 @@ export default function ProfilePage() {
       setIsSaving(false);
     }
   };
+
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -251,143 +254,230 @@ export default function ProfilePage() {
 
         {/* Only render profile details if profile is loaded */}
         {profile && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Basic Information</CardTitle>
-              <CardDescription>Your personal details</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Profile Picture */}
-              <div className="flex flex-col items-center space-y-4">
-                <div className="relative">
-                  <Avatar className="h-24 w-24">
-                    <AvatarImage
-                      src={profile.image_1920 ? `data:image/jpeg;base64,${profile.image_1920}` : undefined}
-                      alt={profile.name}
-                    />
-                    <AvatarFallback>{profile.name.charAt(0)}</AvatarFallback>
-                  </Avatar>
-                  <div className="absolute bottom-0 right-0">
-                    <label htmlFor="avatar-upload">
-                      <Button size="icon" variant="secondary" asChild disabled={isSaving}>
-                        <div>
-                          <Camera className="h-4 w-4" />
-                          <input
-                            id="avatar-upload"
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={handleImageUpload}
-                          />
-                        </div>
-                      </Button>
-                    </label>
+          <>
+            <Card>
+              <CardHeader>
+                <CardTitle>Basic Information</CardTitle>
+                <CardDescription>Your personal details</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Profile Picture */}
+                <div className="flex flex-col items-center space-y-4">
+                  <div className="relative">
+                    <Avatar className="h-24 w-24">
+                      <AvatarImage
+                        src={profile.image_1920 ? `data:image/jpeg;base64,${profile.image_1920}` : undefined}
+                        alt={profile.name}
+                      />
+                      <AvatarFallback>{profile.name.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div className="absolute bottom-0 right-0">
+                      <label htmlFor="avatar-upload">
+                        <Button size="icon" variant="secondary" asChild disabled={isSaving}>
+                          <div>
+                            <Camera className="h-4 w-4" />
+                            <input
+                              id="avatar-upload"
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={handleImageUpload}
+                            />
+                          </div>
+                        </Button>
+                      </label>
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <h3 className="text-xl font-semibold">{profile.name}</h3>
                   </div>
                 </div>
-                <div className="text-center">
-                  <h3 className="text-xl font-semibold">{profile.name}</h3>
-                </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Gender */}
-                <div className="space-y-2">
-                  <Label htmlFor="gender">Gender</Label>
-                  {isEditing ? (
-                    <Select
-                      value={editedProfile.gender || ''}
-                      onValueChange={(v) =>
-                        setEditedProfile((p) => ({ ...p, gender: v as Gender }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select gender" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {GENDER_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Gender */}
+                  <div className="space-y-2">
+                    <Label htmlFor="gender">Gender</Label>
+                    {isEditing ? (
+                      <Select
+                        value={editedProfile.gender || ''}
+                        onValueChange={(v) =>
+                          setEditedProfile((p) => ({ ...p, gender: v as Gender }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select gender" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {GENDER_OPTIONS.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        id="gender"
+                        value={GENDER_OPTIONS.find((o) => o.value === profile.gender)?.label || ''}
+                        readOnly
+                        className="bg-muted"
+                      />
+                    )}
+                  </div>
+
+                  {/* Birthday */}
+                  <div className="space-y-2">
+                    <Label htmlFor="birthday">Date of Birth</Label>
                     <Input
-                      id="gender"
-                      value={GENDER_OPTIONS.find((o) => o.value === profile.gender)?.label || ''}
+                      id="birthday"
+                      type={isEditing ? 'date' : 'text'}
+                      value={
+                        isEditing
+                          ? editedProfile.birthday || ''
+                          : profile.birthday
+                          ? format(new Date(profile.birthday), 'dd/MM/yyyy')
+                          : ''
+                      }
+                      onChange={(e) =>
+                        setEditedProfile((p) => ({ ...p, birthday: e.target.value }))
+                      }
+                      readOnly={!isEditing}
+                      className={!isEditing ? 'bg-muted' : ''}
+                    />
+                  </div>
+
+                  {/* Marital Status */}
+                  <div className="space-y-2">
+                    <Label htmlFor="marital">Marital Status</Label>
+                    {isEditing ? (
+                      <Select
+                        value={editedProfile.marital || ''}
+                        onValueChange={(v) =>
+                          setEditedProfile((p) => ({ ...p, marital: v as MaritalStatus }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select marital status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {MARITAL_OPTIONS.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        id="marital"
+                        value={MARITAL_OPTIONS.find((o) => o.value === profile.marital)?.label || ''}
+                        readOnly
+                        className="bg-muted"
+                      />
+                    )}
+                  </div>
+
+                  {/* Nationality */}
+                  <div className="space-y-2">
+                    <Label htmlFor="nationality">Nationality</Label>
+                    <Input
+                      id="nationality"
+                      value={profile.country_id?.[1] || ''}
                       readOnly
                       className="bg-muted"
                     />
-                  )}
+                  </div>
                 </div>
+              </CardContent>
+            </Card>
 
-                {/* Birthday */}
+            {/* Contact Info Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Contact Information</CardTitle>
+                <CardDescription>How to reach you</CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="birthday">Date of Birth</Label>
-                  <Input
-                    id="birthday"
-                    type={isEditing ? 'date' : 'text'}
-                    value={
-                      isEditing
-                        ? editedProfile.birthday || ''
-                        : profile.birthday
-                        ? format(new Date(profile.birthday), 'dd/MM/yyyy')
-                        : ''
-                    }
-                    onChange={(e) =>
-                      setEditedProfile((p) => ({ ...p, birthday: e.target.value }))
-                    }
-                    readOnly={!isEditing}
-                    className={!isEditing ? 'bg-muted' : ''}
-                  />
+                  <Label>Work Email</Label>
+                  <Input value={profile.work_email || ''} readOnly className="bg-muted" />
                 </div>
+                <div className="space-y-2">
+                  <Label>Mobile Phone</Label>
+                  <Input value={profile.mobile_phone || ''} readOnly className="bg-muted" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Emergency Contact Name</Label>
+                  <Input value={profile.emergency_contact || ''} readOnly className="bg-muted" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Work Phone</Label>
+                  <Input value={profile.work_phone || ''} readOnly className="bg-muted" />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Home Address</Label>
+                  <Input value={profile.private_street || ''} readOnly className="bg-muted" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Emergency Contact Phone</Label>
+                  <Input value={profile.emergency_phone || ''} readOnly className="bg-muted" />
+                </div>
+              </CardContent>
+            </Card>
 
-                {/* Marital Status */}
+            {/* Job Info Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Job Information</CardTitle>
+                <CardDescription>Your employment details</CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="marital">Marital Status</Label>
-                  {isEditing ? (
-                    <Select
-                      value={editedProfile.marital || ''}
-                      onValueChange={(v) =>
-                        setEditedProfile((p) => ({ ...p, marital: v as MaritalStatus }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select marital status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {MARITAL_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <Input
-                      id="marital"
-                      value={MARITAL_OPTIONS.find((o) => o.value === profile.marital)?.label || ''}
-                      readOnly
-                      className="bg-muted"
-                    />
-                  )}
+                  <Label>Job Title</Label>
+                  <Input value={profile.job_title || ''} readOnly className="bg-muted" />
                 </div>
+                <div className="space-y-2">
+                  <Label>Manager/Supervisor</Label>
+                  <Input value={profile.parent_id?.[1] || ''} readOnly className="bg-muted" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Department</Label>
+                  <Input value={profile.department_id?.[1] || ''} readOnly className="bg-muted" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Work Location</Label>
+                  <Input value={profile.work_location_id?.[1] || ''} readOnly className="bg-muted" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Employee ID</Label>
+                  <Input value={profile.id || ''} readOnly className="bg-muted" />
+                </div>
+              </CardContent>
+            </Card>
 
-                {/* Nationality */}
+            {/* Other Details Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Other Details</CardTitle>
+                <CardDescription>Additional information</CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="nationality">Nationality</Label>
-                  <Input
-                    id="nationality"
-                    value={profile.country_id?.[1] || ''}
-                    readOnly
-                    className="bg-muted"
-                  />
+                  <Label>Bank Account</Label>
+                  <Input value={profile.bank_account_id?.[1] || ''} readOnly className="bg-muted" />
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+                <div className="space-y-2">
+                  <Label>IC Number</Label>
+                  <Input value={profile.identification_id || ''} readOnly className="bg-muted" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Language</Label>
+                  <Input value={profile.lang || ''} readOnly className="bg-muted" />
+                </div>
+              </CardContent>
+            </Card>
+          </>
         )}
-        {/* ...and so on for Contact Info, Job Info, Other Details using the same pattern */}
       </div>
     </MainLayout>
   );

@@ -95,7 +95,6 @@ export class OdooClient {
           'work_email',
           'work_phone',
           'mobile_phone',
-          'first_contract_date',
 
           // Personal info
           'gender',
