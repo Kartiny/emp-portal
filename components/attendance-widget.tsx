@@ -87,42 +87,42 @@ export default function AttendanceWidget() {
   };
 
   // Decide which button to show
-  const renderButton = () => {
+  const renderButtons = () => {
     if (!today) {
-      return <Button disabled>Loading…</Button>;
+      return (
+        <div className="flex gap-2">
+          <Button disabled>Clock In</Button>
+          <Button disabled>Clock Out</Button>
+        </div>
+      );
     }
-    // never clock in/out if error
     if (error) {
-      return <Button disabled>Error</Button>;
+      return (
+        <div className="flex gap-2">
+          <Button disabled>Clock In</Button>
+          <Button disabled>Clock Out</Button>
+        </div>
+      );
     }
     const { lastClockIn, lastClockOut } = today;
-    if (!lastClockIn) {
-      return (
-        <Button
-          onClick={handleClockIn}
-        >
+    const canClockIn = !lastClockIn || (lastClockIn && lastClockOut);
+    const canClockOut = lastClockIn && !lastClockOut;
+    return (
+      <div className="flex gap-2">
+        <Button onClick={handleClockIn} disabled={!canClockIn || loading}>
           Clock In
         </Button>
-      );
-    }
-    if (lastClockIn && !lastClockOut) {
-      return (
-        <Button
-          variant="destructive"
-          onClick={handleClockOut}
-        >
+        <Button onClick={handleClockOut} disabled={!canClockOut || loading} variant="destructive">
           Clock Out
         </Button>
-      );
-    }
-    // Already clocked in & out
-    return <Button disabled>Done for Today</Button>;
+      </div>
+    );
   };
 
   return (
     <div className="space-y-2 p-4 border rounded-lg">
       <h3 className="text-lg font-medium">Quick Clock</h3>
-      {renderButton()}
+      {renderButtons()}
       {today && (
         <div className="text-sm text-muted-foreground pt-2">
           {today.lastClockIn && <div>In: {new Date(today.lastClockIn).toLocaleTimeString()}</div>}
