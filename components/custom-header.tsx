@@ -20,8 +20,8 @@ export function CustomHeader() {
       return;
     }
 
-    // Fetch user profile
-    fetch('/api/profile', {
+    // Fetch user profile from the correct endpoint
+    fetch('/api/odoo/auth/profile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ uid: Number(uid) }),
@@ -29,7 +29,11 @@ export function CustomHeader() {
       .then(res => res.json())
       .then(data => {
         if (data.user) {
-          setProfile(data.user);
+          setProfile({
+            name: data.user.name,
+            email: data.user.work_email || data.user.email || '',
+            image: data.user.image_1920 ? `data:image/jpeg;base64,${data.user.image_1920}` : undefined,
+          });
         }
       })
       .catch(console.error)

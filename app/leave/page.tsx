@@ -14,7 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { format } from 'date-fns';
 import { Calendar as CalendarIcon, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { LeaveType, LeaveAllocation, LeaveRequest } from '@/lib/odooXml';
+import { LeaveType, LeaveRequest } from '@/lib/odooXml';
 import { toast } from 'sonner';
 
 interface LeaveBalance {
@@ -24,9 +24,23 @@ interface LeaveBalance {
   remaining: number;
 }
 
+// Extend the LeaveAllocation type for UI fields
+interface LeaveAllocationUI {
+  id: number;
+  holiday_status_id: [number, string];
+  number_of_days?: number;
+  number_of_days_display?: number;
+  leaves_taken?: number;
+  state?: string;
+  date_from?: string;
+  date_to?: string;
+  manager_id?: [number, string];
+  notes?: string;
+}
+
 export default function LeavePage() {
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
-  const [leaveAllocations, setLeaveAllocations] = useState<LeaveAllocation[]>([]);
+  const [leaveAllocations, setLeaveAllocations] = useState<LeaveAllocationUI[]>([]);
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -58,17 +72,17 @@ export default function LeavePage() {
 
         // Fetch all leave-related data
         const [types, allocations, requests] = await Promise.all([
-          fetch('/api/leave/types', {
+          fetch('/api/odoo/leave/types', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ uid })
           }).then(res => res.json()),
-          fetch('/api/leave/allocations', {
+          fetch('/api/odoo/leave/allocation', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ uid })
           }).then(res => res.json()),
-          fetch('/api/leave/requests', {
+          fetch('/api/odoo/leave/requests', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -87,7 +101,7 @@ export default function LeavePage() {
         if (requests.error) throw new Error(requests.error);
 
         setLeaveTypes(types);
-        setLeaveAllocations(allocations);
+        setLeaveAllocations(allocations.allocations || []);
         setLeaveRequests(requests);
       } catch (err) {
         console.error('Error fetching leave data:', err);
@@ -220,16 +234,20 @@ export default function LeavePage() {
             <Card key={allocation.id}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium">
-                  {allocation.holiday_status_id[1]}
+                  {allocation.holiday_status_id?.[1] || '—'}
                 </CardTitle>
+                <CardDescription className="text-xs text-muted-foreground">
+                  {allocation.state ? `Status: ${allocation.state}` : ''}
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
-                  {allocation.number_of_days_remaining}/{allocation.number_of_days} days
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <div>Allocated: {allocation.number_of_days_display ?? allocation.number_of_days ?? '-'} days</div>
+                  <div>Used: {allocation.leaves_taken ?? '-'} days</div>
+                  <div>From: {allocation.date_from || '-'} To: {allocation.date_to || '-'}</div>
+                  <div>Manager: {allocation.manager_id?.[1] || '-'}</div>
+                  <div>Notes: {allocation.notes || '-'}</div>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Used: {allocation.number_of_days_used} days
-                </p>
               </CardContent>
             </Card>
           ))}
@@ -341,7 +359,7 @@ export default function LeavePage() {
                     </div>
                   </div>
 
-                  {selectedLeaveType && selectedLeaveType.request_unit !== 'day' && (
+                  {selectedType && selectedType.request_unit !== 'day' && (
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Duration</label>
                       <Select value={duration} onValueChange={setDuration}>
@@ -349,7 +367,7 @@ export default function LeavePage() {
                           <SelectValue placeholder="Select duration" />
                         </SelectTrigger>
                         <SelectContent>
-                          {selectedLeaveType.request_unit === 'half_day' ? (
+                          {selectedType.request_unit === 'half_day' ? (
                             <>
                               <SelectItem value="morning">Morning</SelectItem>
                               <SelectItem value="afternoon">Afternoon</SelectItem>
@@ -367,7 +385,7 @@ export default function LeavePage() {
                     </div>
                   )}
 
-                  {selectedLeaveType?.support_document && (
+                  {selectedType?.support_document && (
                     <div className="space-y-2">
                       <label className="text-sm font-medium">
                         Supporting Document
@@ -390,7 +408,7 @@ export default function LeavePage() {
                     />
                   </div>
 
-                  {selectedLeaveType?.unpaid && (
+                  {selectedType?.unpaid && (
                     <div className="rounded-md bg-yellow-50 p-4">
                       <div className="flex">
                         <div className="flex-shrink-0">
