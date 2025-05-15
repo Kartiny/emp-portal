@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { Clock } from 'lucide-react';
 
 // Simple type for today's attendance payload
 interface TodayAttendance {
@@ -86,49 +87,26 @@ export default function AttendanceWidget() {
     }
   };
 
-  // Decide which button to show
-  const renderButtons = () => {
-    if (!today) {
-      return (
-        <div className="flex gap-2">
-          <Button disabled>Clock In</Button>
-          <Button disabled>Clock Out</Button>
-        </div>
-      );
-    }
-    if (error) {
-      return (
-        <div className="flex gap-2">
-          <Button disabled>Clock In</Button>
-          <Button disabled>Clock Out</Button>
-        </div>
-      );
-    }
-    const { lastClockIn, lastClockOut } = today;
-    const canClockIn = !lastClockIn || (lastClockIn && lastClockOut);
-    const canClockOut = lastClockIn && !lastClockOut;
-    return (
-      <div className="flex gap-2">
-        <Button onClick={handleClockIn} disabled={!canClockIn || loading}>
-          Clock In
+  return (
+    <div className="bg-white rounded-lg shadow p-6 flex flex-col items-center w-full max-w-md mx-auto">
+      <h3 className="text-xl font-bold mb-2 text-[#1d1a4e]">Quick Clock</h3>
+      <div className="flex gap-4 mb-2 w-full justify-center">
+        <Button onClick={handleClockIn} disabled={!(today && !error && (!today.lastClockIn || (today.lastClockIn && today.lastClockOut))) || loading} size="lg" className="flex items-center gap-2">
+          <Clock className="w-5 h-5" /> Clock In
         </Button>
-        <Button onClick={handleClockOut} disabled={!canClockOut || loading} variant="destructive">
-          Clock Out
+        <Button onClick={handleClockOut} disabled={!(today && !error && (today.lastClockIn && !today.lastClockOut)) || loading} size="lg" variant="destructive" className="flex items-center gap-2">
+          <Clock className="w-5 h-5" /> Clock Out
         </Button>
       </div>
-    );
-  };
-
-  return (
-    <div className="space-y-2 p-4 border rounded-lg">
-      <h3 className="text-lg font-medium">Quick Clock</h3>
-      {renderButtons()}
-      {today && (
-        <div className="text-sm text-muted-foreground pt-2">
-          {today.lastClockIn && <div>In: {new Date(today.lastClockIn).toLocaleTimeString()}</div>}
-          {today.lastClockOut && <div>Out: {new Date(today.lastClockOut).toLocaleTimeString()}</div>}
-        </div>
-      )}
+      <div className="flex flex-col items-center text-xs text-muted-foreground mt-2">
+        {today && (
+          <>
+            <div>Last Clock In: <span className="font-medium">{today.lastClockIn ? new Date(today.lastClockIn).toLocaleTimeString() : '-'}</span></div>
+            <div>Last Clock Out: <span className="font-medium">{today.lastClockOut ? new Date(today.lastClockOut).toLocaleTimeString() : '-'}</span></div>
+          </>
+        )}
+        {error && <div className="text-red-500 mt-1">{error}</div>}
+      </div>
     </div>
   );
 }

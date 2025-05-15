@@ -2,10 +2,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MainLayout } from "@/components/main-layout";
 import AttendanceWidget from '@/components/attendance-widget';
+import { LeaveBalanceCard } from '@/components/leave-balance-card';
+import { format } from 'date-fns';
 
 interface UserProfile {
   name: string;
@@ -25,6 +27,9 @@ export default function DashboardPage() {
   const [profile, setProfile] = useState<any | null>(null);
   const [leaveAllocations, setLeaveAllocations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [totalHours, setTotalHours] = useState<number>(0);
+  const [attendanceRate, setAttendanceRate] = useState<number>(0);
+  const [pendingRequests, setPendingRequests] = useState<number>(0);
 
   useEffect(() => {
     const uid = localStorage.getItem('uid');
@@ -57,6 +62,32 @@ export default function DashboardPage() {
       .then(data => {
         setLeaveAllocations(data.allocations || []);
       })
+      .catch(console.error);
+
+    // Fetch attendance summary (total hours, attendance rate)
+    const now = new Date();
+    fetch('/api/odoo/auth/attendance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid: Number(uid), range: 'monthly', customDate: format(now, 'yyyy-MM-dd') }),
+    })
+      .then(res => res.json())
+      .then(data => {
+        setTotalHours(data.totalHours || 0);
+        setAttendanceRate(data.rate || 0);
+      })
+      .catch(console.error);
+
+    // Fetch pending leave requests
+    fetch('/api/odoo/leave/requests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid: Number(uid), filters: { status: 'confirm' } }),
+    })
+      .then(res => res.json())
+      .then(data => {
+        setPendingRequests(Array.isArray(data) ? data.length : 0);
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
@@ -73,46 +104,59 @@ export default function DashboardPage() {
           <p className="text-gray-500 mt-2">Overview of your attendance and leave management</p>
         </div>
 
-        {/* Profile Overview */}
-        {profile && (
-          <Card className="mb-4">
+        {/* Top Row: Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card>
             <CardHeader>
-              <CardTitle className="text-lg font-semibold">Welcome, {profile.name}</CardTitle>
-              <p className="text-sm text-gray-500">{profile.job_title} {profile.department_id ? `- ${Array.isArray(profile.department_id) ? profile.department_id[1] : profile.department_id}` : ''}</p>
+              <CardTitle className="text-lg">Total Hours</CardTitle>
+              <p className="text-sm text-muted-foreground">This month</p>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-col md:flex-row gap-4 items-center">
-                <div>
-                  <div><strong>Email:</strong> {profile.work_email || profile.login}</div>
-                  <div><strong>Phone:</strong> {profile.work_phone || profile.mobile_phone || '-'}</div>
-                </div>
+              <div className="text-3xl font-bold">{Math.round(totalHours)}h</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Attendance Rate</CardTitle>
+              <p className="text-sm text-muted-foreground">This month</p>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{Math.round(attendanceRate)}%</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Pending Requests</CardTitle>
+              <p className="text-sm text-muted-foreground">Leave applications</p>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{pendingRequests}</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Second Row: Today's Attendance and Leave Balance */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+          <AttendanceWidget />
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl font-bold">Leave Balance</CardTitle>
+              <CardDescription>Track your available leave</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {leaveAllocations.map((alloc: any) => (
+                  <LeaveBalanceCard
+                    key={alloc.id}
+                    type={alloc.holiday_status_id?.[1] || 'Leave'}
+                    used={alloc.leaves_taken ?? 0}
+                    total={alloc.number_of_days_display ?? alloc.max_leaves ?? 0}
+                    color="bg-blue-600"
+                  />
+                ))}
               </div>
             </CardContent>
           </Card>
-        )}
-
-        {/* Leave Allocations Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {leaveAllocations.map((alloc: any) => (
-            <Card key={alloc.id}>
-              <CardHeader>
-                <CardTitle className="text-sm font-medium">{alloc.holiday_status_id?.[1] || 'Leave'}</CardTitle>
-                <p className="text-xs text-gray-500">{alloc.state ? `Status: ${alloc.state}` : ''}</p>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{alloc.number_of_days_display ?? alloc.max_leaves ?? 0} days</div>
-                <p className="text-xs text-gray-500">Used {alloc.leaves_taken ?? 0} days</p>
-                {alloc.date_from && alloc.date_to && (
-                  <p className="text-xs text-gray-400">{alloc.date_from} to {alloc.date_to}</p>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Today's Attendance and Leave Balance */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-          <AttendanceWidget />
         </div>
       </div>
     </MainLayout>
