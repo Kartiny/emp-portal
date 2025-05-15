@@ -60,6 +60,16 @@ export interface LeaveRequest {
   user_id:           [number,string];
 }
 
+interface UserProfile {
+  name: string;
+  email: string;
+  image_1920?: string | null;
+  job_title: string;
+  department: string;
+  phone: string;
+  // ...other fields
+}
+
 //
 // ── OdooClient ────────────────────────────────────────────────────────────────
 //
@@ -318,14 +328,14 @@ export class OdooClient {
       [[]],
       {
         fields:[
-          'id','name','requires_allocation','virtual_remaining_leaves',
+          'id','display_name','requires_allocation','virtual_remaining_leaves',
           'color','request_unit','support_document','unpaid'
         ]
       }
     );
     return raw.map(r=>({
       id: r.id,
-      name: r.name,
+      name: r.display_name,
       requires_allocation: r.requires_allocation,
       virtual_remaining_leaves: r.virtual_remaining_leaves,
       color: r.color,
@@ -401,25 +411,30 @@ export class OdooClient {
   /** Create a new leave request */
   async createLeaveRequest(
     uid: number,
-    data:{
-      leaveTypeId:number;
-      startDate:  string;
-      endDate:    string;
-      reason:     string;
+    data: {
+      leaveTypeId: number;
+      startDate: string;
+      endDate: string;
+      reason: string;
+      request_unit?: string;
+      request_unit_half_day?: string;
+      request_unit_hours?: number;
     }
   ): Promise<number> {
     const prof = await this.getFullUserProfile(uid);
     const empId = prof.id;
-    // @ts-ignore
     const newId: number = await this.execute(
       'hr.leave',
       'create',
       [{
-        employee_id:       empId,
+        employee_id: empId,
         holiday_status_id: data.leaveTypeId,
         request_date_from: data.startDate,
-        request_date_to:   data.endDate,
-        name:              data.reason,
+        request_date_to: data.endDate,
+        name: data.reason,
+        ...(data.request_unit && { request_unit: data.request_unit }),
+        ...(data.request_unit_half_day && { request_unit_half_day: data.request_unit_half_day }),
+        ...(data.request_unit_hours && { request_unit_hours: data.request_unit_hours }),
       }]
     );
     return newId;

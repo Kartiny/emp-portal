@@ -125,7 +125,7 @@ export default function LeavePage() {
       if (!rawUid) throw new Error('Not logged in');
       const uid = Number(rawUid);
 
-      const response = await fetch('/api/leave/request', {
+      const response = await fetch('/api/odoo/leave/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -145,7 +145,7 @@ export default function LeavePage() {
       toast.success('Leave request submitted successfully');
       setIsRequestOpen(false);
       // Refresh leave requests
-      const newRequests = await fetch('/api/leave/requests', {
+      const newRequests = await fetch('/api/odoo/leave/requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ uid })
@@ -199,6 +199,15 @@ export default function LeavePage() {
     const type = leaveTypes.find(t => t.id.toString() === selectedLeaveTypeId);
     setSelectedType(type || null);
   }, [selectedLeaveTypeId, leaveTypes]);
+
+  // Set default leave type to 'Annual Leave' if available
+  useEffect(() => {
+    if (leaveTypes.length > 0 && !selectedLeaveTypeId) {
+      const annual = leaveTypes.find(t => t.name.toLowerCase().includes('annual'));
+      if (annual) setSelectedLeaveTypeId(annual.id.toString());
+      else setSelectedLeaveTypeId(leaveTypes[0].id.toString());
+    }
+  }, [leaveTypes]);
 
   if (loading) {
     return (
@@ -275,30 +284,22 @@ export default function LeavePage() {
                     <SelectValue placeholder="Select leave type" />
                   </SelectTrigger>
                   <SelectContent>
-                    {leaveTypes.map((type) => {
-                      const isNoLimit = type.requires_allocation === 'no';
-                      const hasRemainingDays = type.virtual_remaining_leaves > 0;
-                      const isAllowed = isNoLimit || hasRemainingDays;
-                      
-                      if (!isAllowed) return null;
-
-                      return (
-                        <SelectItem 
-                          key={type.id} 
-                          value={type.id.toString()}
-                          className={type.color ? `text-[#${type.color.toString(16)}]` : ''}
-                        >
-                          <div className="flex justify-between items-center w-full">
-                            <span>{type.name}</span>
-                            {!isNoLimit && (
-                              <span className="text-sm text-gray-500">
-                                ({type.virtual_remaining_leaves} days remaining)
-                              </span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      );
-                    })}
+                    {leaveTypes.map((type) => (
+                      <SelectItem 
+                        key={type.id} 
+                        value={type.id.toString()}
+                        className={type.color ? `text-[#${type.color.toString(16)}]` : ''}
+                      >
+                        <div className="flex justify-between items-center w-full">
+                          <span>{type.name}</span>
+                          {type.virtual_remaining_leaves !== undefined && (
+                            <span className="text-sm text-gray-500">
+                              ({type.virtual_remaining_leaves} days remaining)
+                            </span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -359,33 +360,41 @@ export default function LeavePage() {
                     </div>
                   </div>
 
-                  {selectedType && selectedType.request_unit !== 'day' && (
+                  {/* Day Duration: Only show if half_day or hour */}
+                  {selectedType.request_unit === 'half_day' && (
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Duration</label>
+                      <label className="text-sm font-medium">Day Duration</label>
                       <Select value={duration} onValueChange={setDuration}>
                         <SelectTrigger>
                           <SelectValue placeholder="Select duration" />
                         </SelectTrigger>
                         <SelectContent>
-                          {selectedType.request_unit === 'half_day' ? (
-                            <>
-                              <SelectItem value="morning">Morning</SelectItem>
-                              <SelectItem value="afternoon">Afternoon</SelectItem>
-                            </>
-                          ) : (
-                            // For hourly leaves, show options from 1 to 8 hours
-                            Array.from({ length: 8 }, (_, i) => (
-                              <SelectItem key={i + 1} value={(i + 1).toString()}>
-                                {i + 1} hour{i > 0 ? 's' : ''}
-                              </SelectItem>
-                            ))
-                          )}
+                          <SelectItem value="morning">Morning</SelectItem>
+                          <SelectItem value="afternoon">Afternoon</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  {selectedType.request_unit === 'hour' && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Hour Duration</label>
+                      <Select value={duration} onValueChange={setDuration}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select hours" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 8 }, (_, i) => (
+                            <SelectItem key={i + 1} value={(i + 1).toString()}>
+                              {i + 1} hour{i > 0 ? 's' : ''}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
                   )}
 
-                  {selectedType?.support_document && (
+                  {/* Supporting Document */}
+                  {selectedType.support_document && (
                     <div className="space-y-2">
                       <label className="text-sm font-medium">
                         Supporting Document
@@ -399,6 +408,7 @@ export default function LeavePage() {
                     </div>
                   )}
 
+                  {/* Reason */}
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Reason</label>
                     <Textarea
@@ -489,6 +499,34 @@ export default function LeavePage() {
             </div>
           </CardContent>
         </Card>
+
+{/* Request Status Cards */}
+<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+  {leaveRequests.map((req) => (
+    <Card key={req.id} className="border-l-4
+      {req.state === 'validate' ? 'border-green-500' :
+       req.state === 'refuse'   ? 'border-red-500' :
+       'border-yellow-500'}">
+      <CardHeader>
+        <CardTitle className="text-sm font-medium">{req.holiday_status_id[1]}</CardTitle>
+        <CardDescription className="text-xs">
+          {format(new Date(req.request_date_from), 'dd/MM')} – {format(new Date(req.request_date_to), 'dd/MM')}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-2 text-sm">
+        <div>
+          Status: <span className={
+            req.state === 'validate' ? 'text-green-600' :
+            req.state === 'refuse'   ? 'text-red-600' :
+            'text-yellow-600'
+          }>
+            {getStatusText(req.state)}
+          </span>
+        </div>
+      </CardContent>
+    </Card>
+  ))}
+</div>
 
         {/* Leave History Table */}
         <Card>
