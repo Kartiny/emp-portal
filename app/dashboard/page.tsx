@@ -8,6 +8,7 @@ import { MainLayout } from "@/components/main-layout";
 import AttendanceWidget from '@/components/attendance-widget';
 import { LeaveBalanceCard } from '@/components/leave-balance-card';
 import { format } from 'date-fns';
+import { ShiftCodes } from '@/components/ui/shift-codes';
 
 interface UserProfile {
   name: string;
@@ -30,6 +31,8 @@ export default function DashboardPage() {
   const [totalHours, setTotalHours] = useState<number>(0);
   const [attendanceRate, setAttendanceRate] = useState<number>(0);
   const [pendingRequests, setPendingRequests] = useState<number>(0);
+  const [overtimeRequests, setOvertimeRequests] = useState<number>(0);
+  const [claimRequests, setClaimRequests] = useState<number>(0);
 
   useEffect(() => {
     const uid = localStorage.getItem('uid');
@@ -105,7 +108,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Top Row: Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Total Hours</CardTitle>
@@ -133,6 +136,24 @@ export default function DashboardPage() {
               <div className="text-3xl font-bold">{pendingRequests}</div>
             </CardContent>
           </Card>
+          <Card className="cursor-pointer hover:shadow-lg transition" onClick={() => {}}>
+            <CardHeader>
+              <CardTitle className="text-lg">Overtime Requests</CardTitle>
+              <p className="text-sm text-muted-foreground">This month</p>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{overtimeRequests}</div>
+            </CardContent>
+          </Card>
+          <Card className="cursor-pointer hover:shadow-lg transition" onClick={() => {}}>
+            <CardHeader>
+              <CardTitle className="text-lg">Claim Requests</CardTitle>
+              <p className="text-sm text-muted-foreground">This month</p>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{claimRequests}</div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Second Row: Today's Attendance and Leave Balance */}
@@ -157,6 +178,11 @@ export default function DashboardPage() {
               </div>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Third Row: Shift Codes */}
+        <div className="mt-6">
+          <ShiftCodes />
         </div>
       </div>
     </MainLayout>

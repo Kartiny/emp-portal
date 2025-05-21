@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Clock } from 'lucide-react';
+import { format } from 'date-fns';
 
 // Simple type for today's attendance payload
 interface TodayAttendance {
@@ -11,10 +12,19 @@ interface TodayAttendance {
   lastClockOut: string | null;
 }
 
+interface ShiftInfo {
+  code: string | null;
+  start: string | null;
+  end: string | null;
+}
+
 export default function AttendanceWidget() {
   const [today, setToday] = useState<TodayAttendance | null>(null);
+  const [shift, setShift] = useState<ShiftInfo | null>(null);
   const [loading, setLoading] = useState(false);
+  const [shiftLoading, setShiftLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [shiftError, setShiftError] = useState<string | null>(null);
 
   // Helper to fetch today's attendance
   const fetchToday = async () => {
@@ -37,8 +47,32 @@ export default function AttendanceWidget() {
     }
   };
 
+  // Fetch shift info
+  const fetchShift = async () => {
+    setShiftError(null);
+    setShiftLoading(true);
+    try {
+      const uidStr = localStorage.getItem('uid');
+      if (!uidStr) throw new Error('Not logged in');
+      const res = await fetch('/api/odoo/auth/attendance/shift', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: Number(uidStr) }),
+      });
+      if (!res.ok) throw new Error(`(${res.status}) ${await res.text()}`);
+      const data: ShiftInfo = await res.json();
+      setShift(data);
+    } catch (err: any) {
+      console.error('❌ Failed to fetch shift info:', err);
+      setShiftError(err.message);
+    } finally {
+      setShiftLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchToday();
+    fetchShift();
   }, []);
 
   // Clock In handler
@@ -87,10 +121,41 @@ export default function AttendanceWidget() {
     }
   };
 
+  // Calculate worked hours for today
+  let workedHours = 0;
+  if (today && today.lastClockIn && today.lastClockOut) {
+    const inDate = new Date(today.lastClockIn);
+    const outDate = new Date(today.lastClockOut);
+    workedHours = Math.max(0, (outDate.getTime() - inDate.getTime()) / (1000 * 60 * 60));
+  }
+
+  // Today's date formatted
+  const todayStr = format(new Date(), 'EEEE, d MMMM yyyy');
+
   return (
-    <div className="bg-white rounded-lg shadow p-6 flex flex-col items-center w-full max-w-md mx-auto">
-      <h3 className="text-xl font-bold mb-2 text-[#1d1a4e]">Quick Clock</h3>
-      <div className="flex gap-4 mb-2 w-full justify-center">
+    <div className="bg-white rounded-lg shadow p-6 flex flex-col w-full text-left max-w-xl min-w-[320px]" style={{ minWidth: '320px', maxWidth: '480px' }}>
+      <div className="mb-2">
+        <h3 className="text-xl font-bold text-[#1d1a4e]">{todayStr}</h3>
+        <div className="text-sm text-blue-800 font-medium mt-1">
+          {shiftLoading ? 'Loading shift...' : shiftError ? <span className="text-red-500">{shiftError}</span> : shift && shift.code ? (
+            <>
+              Shift: <span className="font-semibold">{shift.code}</span>
+              {shift.start && shift.end && (
+                <span className="ml-2">({shift.start} - {shift.end})</span>
+              )}
+            </>
+          ) : <span>No shift info</span>}
+        </div>
+      </div>
+      <div className="mb-2">
+        <div className="text-sm font-semibold">Last Clock In</div>
+        <div className="mb-1">{today?.lastClockIn ? new Date(today.lastClockIn).toLocaleTimeString() : '-'}</div>
+        <div className="text-sm font-semibold">Last Clock Out</div>
+        <div className="mb-1">{today?.lastClockOut ? new Date(today.lastClockOut).toLocaleTimeString() : '-'}</div>
+        <div className="text-sm font-semibold">Hours Today</div>
+        <div className="mb-1">{workedHours ? `${Math.floor(workedHours)}h ${Math.round((workedHours%1)*60)}m` : '0h 0m'}</div>
+      </div>
+      <div className="flex gap-4 mt-2">
         <Button onClick={handleClockIn} disabled={!(today && !error && (!today.lastClockIn || (today.lastClockIn && today.lastClockOut))) || loading} size="lg" className="flex items-center gap-2">
           <Clock className="w-5 h-5" /> Clock In
         </Button>
@@ -98,15 +163,7 @@ export default function AttendanceWidget() {
           <Clock className="w-5 h-5" /> Clock Out
         </Button>
       </div>
-      <div className="flex flex-col items-center text-xs text-muted-foreground mt-2">
-        {today && (
-          <>
-            <div>Last Clock In: <span className="font-medium">{today.lastClockIn ? new Date(today.lastClockIn).toLocaleTimeString() : '-'}</span></div>
-            <div>Last Clock Out: <span className="font-medium">{today.lastClockOut ? new Date(today.lastClockOut).toLocaleTimeString() : '-'}</span></div>
-          </>
-        )}
-        {error && <div className="text-red-500 mt-1">{error}</div>}
-      </div>
+      {error && <div className="text-red-500 mt-2">{error}</div>}
     </div>
   );
 }

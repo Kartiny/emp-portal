@@ -81,10 +81,11 @@ export class OdooClient {
 
   /** Login as given user/admin */
   async login(email: string, password: string): Promise<number> {
-    const uid = await xmlRpcCall(this.common, 'login', [
+    const uid = await xmlRpcCall(this.common, 'authenticate', [
       ODOO_CONFIG.DB_NAME,
       email,
       password,
+      {},
     ]);
     if (!uid) throw new Error('Invalid credentials');
     return uid;
@@ -145,7 +146,8 @@ export class OdooClient {
           'country_of_birth','marital','identification_id','passport_id',
           'bank_account_id','certificate','study_field','study_school',
           'private_street','emergency_contact','emergency_phone',
-          'lang'
+          'lang',
+          'resource_calendar_id'
         ],
         limit: 1
       }
@@ -439,6 +441,62 @@ export class OdooClient {
     );
     return newId;
   }
+
+  /**
+   * Fetch the employee's shift code and today's start/end time
+   */
+  async getEmployeeShiftInfo(uid: number): Promise<{ code: string|null, start: string|null, end: string|null }> {
+    const profile = await this.getFullUserProfile(uid);
+    const calendar = profile.resource_calendar_id;
+    if (!calendar || !Array.isArray(calendar) || !calendar[0]) {
+      return { code: null, start: null, end: null };
+    }
+    const calendarId = calendar[0];
+    // Fetch calendar info including code and attendance_ids
+    const [calendarData] = await this.execute(
+      'resource.calendar',
+      'read',
+      [[calendarId], ['name', 'attendance_ids']]
+    );
+    let code = calendarData?.name || null;
+    let start: string|null = null;
+    let end: string|null = null;
+    // Fetch today's attendance line (shift times)
+    if (calendarData && Array.isArray(calendarData.attendance_ids) && calendarData.attendance_ids.length > 0) {
+      // Fetch all attendance lines
+      const attendanceLines = await this.execute(
+        'resource.calendar.attendance',
+        'read',
+        [calendarData.attendance_ids, ['dayofweek', 'hour_from', 'hour_to']]
+      );
+      // Find today's dayofweek (0=Monday, 6=Sunday in Odoo)
+      const today = new Date();
+      const jsDay = today.getDay(); // 0=Sunday, 6=Saturday
+      const odooDay = jsDay === 0 ? 6 : jsDay - 1; // Odoo: 0=Monday, JS: 0=Sunday
+      const todayLines = attendanceLines.filter((l: any) => Number(l.dayofweek) === odooDay);
+      if (todayLines.length > 0) {
+        // Use the earliest start and latest end for today
+        const minFrom = Math.min(...todayLines.map((l: any) => l.hour_from));
+        const maxTo = Math.max(...todayLines.map((l: any) => l.hour_to));
+        // Format as HH:mm
+        start = `${String(Math.floor(minFrom)).padStart(2, '0')}:${String(Math.round((minFrom%1)*60)).padStart(2, '0')}`;
+        end = `${String(Math.floor(maxTo)).padStart(2, '0')}:${String(Math.round((maxTo%1)*60)).padStart(2, '0')}`;
+      }
+    }
+    return { code, start, end };
+  }
+
+  /**
+   * Get all resource.calendar.attendance records with schedule_code_id, hour_from, hour_to
+   */
+  async getAllShiftAttendances(): Promise<any[]> {
+    return await this.execute(
+      'resource.calendar.attendance',
+      'search_read',
+      [[]],
+      { fields: ['id', 'schedule_code_id', 'hour_from', 'hour_to'] }
+    );
+  }
 }
 
 // ── single instance & top‐level helpers ────────────────────────────────────────
@@ -482,4 +540,10 @@ export async function createLeaveRequest(
   uid:number,data:{leaveTypeId:number;startDate:string;endDate:string;reason:string}
 ) {
   return getOdooClient().createLeaveRequest(uid,data);
+}
+export async function getEmployeeShiftInfo(uid:number) {
+  return getOdooClient().getEmployeeShiftInfo(uid);
+}
+export async function getAllShiftAttendances() {
+  return await getOdooClient().getAllShiftAttendances();
 }

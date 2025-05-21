@@ -54,6 +54,8 @@ export default function LeavePage() {
   const [reason, setReason] = useState('');
   const [duration, setDuration] = useState('');
   const [document, setDocument] = useState<File | null>(null);
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
   
   // Filters state
   const [yearFilter, setYearFilter] = useState(new Date().getFullYear().toString());
@@ -253,6 +255,15 @@ export default function LeavePage() {
                 <div className="text-xs text-muted-foreground space-y-1">
                   <div>Allocated: {allocation.number_of_days_display ?? allocation.number_of_days ?? '-'} days</div>
                   <div>Used: {allocation.leaves_taken ?? '-'} days</div>
+                  {(() => {
+                    const alloc = allocation;
+                    const allocated = alloc?.number_of_days_display ?? alloc?.number_of_days;
+                    if (alloc && typeof allocated === 'number' && typeof alloc.leaves_taken === 'number') {
+                      return <div>Remaining: {allocated - alloc.leaves_taken} days</div>;
+                    } else {
+                      return <div>Remaining: - days</div>;
+                    }
+                  })()}
                   <div>From: {allocation.date_from || '-'} To: {allocation.date_to || '-'}</div>
                   <div>Manager: {allocation.manager_id?.[1] || '-'}</div>
                   <div>Notes: {allocation.notes || '-'}</div>
@@ -285,20 +296,15 @@ export default function LeavePage() {
                   </SelectTrigger>
                   <SelectContent>
                     {leaveTypes.map((type) => (
-                      <SelectItem 
-                        key={type.id} 
-                        value={type.id.toString()}
-                        className={type.color ? `text-[#${type.color.toString(16)}]` : ''}
-                      >
-                        <div className="flex justify-between items-center w-full">
-                          <span>{type.name}</span>
-                          {type.virtual_remaining_leaves !== undefined && (
-                            <span className="text-sm text-gray-500">
-                              ({type.virtual_remaining_leaves} days remaining)
-                            </span>
-                          )}
-                        </div>
-                      </SelectItem>
+                        <SelectItem 
+                          key={type.id} 
+                          value={type.id.toString()}
+                          className={type.color ? `text-[#${type.color.toString(16)}]` : ''}
+                        >
+                          <div className="flex justify-between items-center w-full">
+                            <span>{type.name}</span>
+                          </div>
+                        </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -331,6 +337,21 @@ export default function LeavePage() {
                           />
                         </PopoverContent>
                       </Popover>
+                      {/* Remaining Days */}
+                      {selectedLeaveTypeId && (() => {
+                        const alloc = leaveAllocations.find(a => a.holiday_status_id?.[0]?.toString() === selectedLeaveTypeId);
+                        const allocated = alloc?.number_of_days_display ?? alloc?.number_of_days;
+                        const used = alloc?.leaves_taken;
+                        let remaining = '-';
+                        if (typeof allocated === 'number' && typeof used === 'number') {
+                          remaining = String(allocated - used);
+                        }
+                        return (
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Remaining days: {remaining}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     <div className="space-y-2">
@@ -360,36 +381,55 @@ export default function LeavePage() {
                     </div>
                   </div>
 
-                  {/* Day Duration: Only show if half_day or hour */}
-                  {selectedType.request_unit === 'half_day' && (
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Day Duration</label>
-                      <Select value={duration} onValueChange={setDuration}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select duration" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="morning">Morning</SelectItem>
-                          <SelectItem value="afternoon">Afternoon</SelectItem>
-                        </SelectContent>
-                      </Select>
+                  {/* Tickboxes for duration selection */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Duration</label>
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-1 text-xs">
+                        <input
+                          type="checkbox"
+                          checked={duration === 'hour'}
+                          onChange={() => setDuration(duration === 'hour' ? '' : 'hour')}
+                        />
+                        Hour
+                      </label>
+                      <label className="flex items-center gap-1 text-xs">
+                        <input
+                          type="checkbox"
+                          checked={duration === 'first_half'}
+                          onChange={() => setDuration(duration === 'first_half' ? '' : 'first_half')}
+                        />
+                        First Half Day (0.5 day)
+                      </label>
+                      <label className="flex items-center gap-1 text-xs">
+                        <input
+                          type="checkbox"
+                          checked={duration === 'second_half'}
+                          onChange={() => setDuration(duration === 'second_half' ? '' : 'second_half')}
+                        />
+                        Second Half Day (0.5 day)
+                      </label>
                     </div>
-                  )}
-                  {selectedType.request_unit === 'hour' && (
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Hour Duration</label>
-                      <Select value={duration} onValueChange={setDuration}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select hours" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Array.from({ length: 8 }, (_, i) => (
-                            <SelectItem key={i + 1} value={(i + 1).toString()}>
-                              {i + 1} hour{i > 0 ? 's' : ''}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                  </div>
+                  {/* Time pickers for hour selection */}
+                  {duration === 'hour' && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Start Time</label>
+                        <Input
+                          type="time"
+                          value={startTime}
+                          onChange={e => setStartTime(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">End Time</label>
+                        <Input
+                          type="time"
+                          value={endTime}
+                          onChange={e => setEndTime(e.target.value)}
+                        />
+                      </div>
                     </div>
                   )}
 
@@ -500,34 +540,6 @@ export default function LeavePage() {
           </CardContent>
         </Card>
 
-{/* Request Status Cards */}
-<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-  {leaveRequests.map((req) => (
-    <Card key={req.id} className="border-l-4
-      {req.state === 'validate' ? 'border-green-500' :
-       req.state === 'refuse'   ? 'border-red-500' :
-       'border-yellow-500'}">
-      <CardHeader>
-        <CardTitle className="text-sm font-medium">{req.holiday_status_id[1]}</CardTitle>
-        <CardDescription className="text-xs">
-          {format(new Date(req.request_date_from), 'dd/MM')} – {format(new Date(req.request_date_to), 'dd/MM')}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-2 text-sm">
-        <div>
-          Status: <span className={
-            req.state === 'validate' ? 'text-green-600' :
-            req.state === 'refuse'   ? 'text-red-600' :
-            'text-yellow-600'
-          }>
-            {getStatusText(req.state)}
-          </span>
-        </div>
-      </CardContent>
-    </Card>
-  ))}
-</div>
-
         {/* Leave History Table */}
         <Card>
           <CardHeader>
@@ -544,6 +556,7 @@ export default function LeavePage() {
                   <TableHead>Status</TableHead>
                   <TableHead>Reason</TableHead>
                   <TableHead>Approved By</TableHead>
+                  <TableHead>Remarks</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

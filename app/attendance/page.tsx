@@ -42,6 +42,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { toZonedTime } from 'date-fns-tz';
+import { ShiftCodes } from '@/components/ui/shift-codes';
 
 const WORK_START_HOUR = 7; // 7 AM
 const WORK_END_HOUR = 19;  // 7 PM
@@ -256,14 +257,14 @@ export default function AttendancePage() {
         {/* Widgets */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <AttendanceWidget />
-
+          
           <Card>
             <CardHeader>
               <CardTitle>Today's Attendance</CardTitle>
               <CardDescription>Current attendance status</CardDescription>
             </CardHeader>
             <CardContent>
-              {todayData?.lastClockIn ? (
+              {todayData ? (
                 <div className="space-y-4">
                   <div>
                     <p className="text-sm">Check-in Status</p>
@@ -295,6 +296,11 @@ export default function AttendancePage() {
               )}
             </CardContent>
           </Card>
+        </div>
+
+        {/* Shift Codes */}
+        <div className="mt-6">
+          <ShiftCodes />
         </div>
 
         {/* Summary */}
@@ -381,6 +387,7 @@ export default function AttendancePage() {
                   <TableHead>Check Out</TableHead>
                   <TableHead>Worked Hours</TableHead>
                   <TableHead>Overtime</TableHead>
+                  <TableHead>Overtime Approved Hour(s)</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -408,6 +415,9 @@ export default function AttendancePage() {
                         {overtime ? formatHours(overtime) : '-'}
                       </TableCell>
                       <TableCell>
+                        {'-'}
+                      </TableCell>
+                      <TableCell>
                         <div className="text-sm space-y-1">
                           {late.isLate && (
                             <div className="text-yellow-600">{late.status}</div>
@@ -428,7 +438,7 @@ export default function AttendancePage() {
                 {(!attendanceData?.records ||
                   attendanceData.records.length === 0) && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center">
+                    <TableCell colSpan={7} className="text-center">
                       No attendance records found
                     </TableCell>
                   </TableRow>
@@ -440,4 +450,4 @@ export default function AttendancePage() {
       </div>
     </MainLayout>
   );
-}
+} 

@@ -1,14 +1,10 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  images: {
-    unoptimized: true,
-  },
-}
+// next.config.mjs
+import withPWA from 'next-pwa';
 
-export default nextConfig
+const config = withPWA({
+  dest: 'public',
+  register: true,
+  skipWaiting: true,
+});
+
+export default config;
