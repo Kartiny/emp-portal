@@ -71,6 +71,19 @@ interface UserProfile {
 }
 
 //
+// ── EXPENSE (CLAIM) MODULE ─────────────────────────────────────────────
+//
+
+export interface ExpenseRequest {
+  id: number;
+  name: string;
+  date: string;
+  payment_mode: string;
+  total_amount: number;
+  state: string;
+}
+
+//
 // ── OdooClient ────────────────────────────────────────────────────────────────
 //
 
@@ -497,6 +510,52 @@ export class OdooClient {
       { fields: ['id', 'schedule_code_id', 'hour_from', 'hour_to'] }
     );
   }
+
+  //
+  // ── EXPENSE (CLAIM) MODULE ─────────────────────────────────────────────
+  //
+
+  /** Get expense (claim) requests for a user */
+  async getExpenseRequests(uid: number): Promise<ExpenseRequest[]> {
+    const profile = await this.getFullUserProfile(uid);
+    const empId = profile.id;
+    const domain = [['employee_id', '=', empId]];
+    const raw: any[] = await this.execute(
+      'hr.expense',
+      'search_read',
+      [domain],
+      {
+        fields: ['id', 'name', 'date', 'payment_mode', 'total_amount', 'state'],
+        order: 'date desc'
+      }
+    );
+    return raw.map(r => ({
+      id: r.id,
+      name: r.name,
+      date: r.date,
+      payment_mode: r.payment_mode,
+      total_amount: r.total_amount,
+      state: r.state,
+    }));
+  }
+
+  /** Create a new expense (claim) request */
+  async createExpenseRequest(uid: number, data: { name: string; date: string; payment_mode: string; total_amount: number; }): Promise<number> {
+    const profile = await this.getFullUserProfile(uid);
+    const empId = profile.id;
+    const newId: number = await this.execute(
+      'hr.expense',
+      'create',
+      [{
+        employee_id: empId,
+        name: data.name,
+        date: data.date,
+        payment_mode: data.payment_mode,
+        total_amount: data.total_amount,
+      }]
+    );
+    return newId;
+  }
 }
 
 // ── single instance & top‐level helpers ────────────────────────────────────────
@@ -546,4 +605,10 @@ export async function getEmployeeShiftInfo(uid:number) {
 }
 export async function getAllShiftAttendances() {
   return await getOdooClient().getAllShiftAttendances();
+}
+export async function getExpenseRequests(uid: number) {
+  return getOdooClient().getExpenseRequests(uid);
+}
+export async function createExpenseRequest(uid: number, data: { name: string; date: string; payment_mode: string; total_amount: number; }) {
+  return getOdooClient().createExpenseRequest(uid, data);
 }

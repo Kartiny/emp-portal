@@ -9,6 +9,9 @@ import AttendanceWidget from '@/components/attendance-widget';
 import { LeaveBalanceCard } from '@/components/leave-balance-card';
 import { format } from 'date-fns';
 import { ShiftCodes } from '@/components/ui/shift-codes';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface UserProfile {
   name: string;
@@ -33,6 +36,15 @@ export default function DashboardPage() {
   const [pendingRequests, setPendingRequests] = useState<number>(0);
   const [overtimeRequests, setOvertimeRequests] = useState<number>(0);
   const [claimRequests, setClaimRequests] = useState<number>(0);
+  const [claimDialogOpen, setClaimDialogOpen] = useState(false);
+  const [claims, setClaims] = useState<any[]>([]);
+  const [claimForm, setClaimForm] = useState({
+    name: '',
+    date: '',
+    payment_mode: '',
+    total_amount: '',
+  });
+  const [claimFormLoading, setClaimFormLoading] = useState(false);
 
   useEffect(() => {
     const uid = localStorage.getItem('uid');
@@ -93,7 +105,69 @@ export default function DashboardPage() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
+
+    fetch(`/api/odoo/expense?uid=${uid}`)
+      .then(res => res.json())
+      .then(data => {
+        setClaims(data.claims || []);
+        setClaimRequests(Array.isArray(data.claims) ? data.claims.length : 0);
+      })
+      .catch(console.error);
   }, []);
+
+  const refreshClaims = async () => {
+    const uid = localStorage.getItem('uid');
+    if (!uid) return;
+    const res = await fetch(`/api/odoo/expense?uid=${uid}`);
+    const data = await res.json();
+    setClaims(data.claims || []);
+    setClaimRequests(Array.isArray(data.claims) ? data.claims.length : 0);
+  };
+
+  const handleClaimFormChange = (field: string, value: string) => {
+    setClaimForm(f => ({ ...f, [field]: value }));
+  };
+
+  const handleClaimSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setClaimFormLoading(true);
+    const uid = localStorage.getItem('uid');
+    if (!uid) return;
+    const payload = {
+      uid: Number(uid),
+      data: {
+        name: claimForm.name,
+        date: claimForm.date,
+        payment_mode: claimForm.payment_mode,
+        total_amount: parseFloat(claimForm.total_amount),
+      },
+    };
+    const res = await fetch('/api/odoo/expense', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    setClaimFormLoading(false);
+    if (res.ok) {
+      setClaimForm({ name: '', date: '', payment_mode: '', total_amount: '' });
+      await refreshClaims();
+    }
+  };
+
+  // Helper for payment mode label
+  const paymentModeLabel = (mode: string) => {
+    if (mode === 'own_account') return 'Employee';
+    if (mode === 'company_account') return 'Company';
+    return mode;
+  };
+  // Helper for state label
+  const stateLabel = (state: string) => {
+    if (state === 'draft') return 'To Approve';
+    if (!state) return '';
+    return state.charAt(0).toUpperCase() + state.slice(1);
+  };
+  // Helper for name label
+  const nameLabel = (name: string) => name;
 
   if (loading) {
     return <div>Loading...</div>;
@@ -145,7 +219,7 @@ export default function DashboardPage() {
               <div className="text-3xl font-bold">{overtimeRequests}</div>
             </CardContent>
           </Card>
-          <Card className="cursor-pointer hover:shadow-lg transition" onClick={() => {}}>
+          <Card className="cursor-pointer hover:shadow-lg transition" onClick={() => setClaimDialogOpen(true)}>
             <CardHeader>
               <CardTitle className="text-lg">Claim Requests</CardTitle>
               <p className="text-sm text-muted-foreground">This month</p>
@@ -185,6 +259,43 @@ export default function DashboardPage() {
           <ShiftCodes />
         </div>
       </div>
+      <Dialog open={claimDialogOpen} onOpenChange={setClaimDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Claim Requests</DialogTitle>
+          </DialogHeader>
+          <div className="mt-6">
+            <h3 className="font-semibold mb-2">Your Claims</h3>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm border">
+                <thead>
+                  <tr className="bg-gray-100">
+                    <th className="px-2 py-1 border">Name</th>
+                    <th className="px-2 py-1 border">Date</th>
+                    <th className="px-2 py-1 border">Payment Mode</th>
+                    <th className="px-2 py-1 border">Total Amount</th>
+                    <th className="px-2 py-1 border">State</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {claims.map((c, i) => (
+                    <tr key={c.id || i}>
+                      <td className="px-2 py-1 border">{nameLabel(c.name)}</td>
+                      <td className="px-2 py-1 border">{c.date ? format(new Date(c.date), 'dd-MM-yyyy') : '-'}</td>
+                      <td className="px-2 py-1 border">{paymentModeLabel(c.payment_mode)}</td>
+                      <td className="px-2 py-1 border">{c.total_amount}</td>
+                      <td className="px-2 py-1 border">{stateLabel(c.state)}</td>
+                    </tr>
+                  ))}
+                  {claims.length === 0 && (
+                    <tr><td colSpan={5} className="text-center py-2">No claims found</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }
