@@ -12,25 +12,32 @@ export async function POST(req: Request) {
     // 1) create hr.leave record
     const newRequestId = await createLeaveRequest(uid, {
       leaveTypeId:       request.leaveTypeId,
-      startDate:         request.startDate,
-      endDate:           request.endDate,
+      request_date_from: request.request_date_from,
+      request_date_to:   request.request_date_to,
       reason:            request.reason,
-      // half-day/hour fields if present:
-      ...(request.requestUnit && { request_unit: request.requestUnit }),
-      ...(request.requestUnitHalfDay && { request_unit_half_day: request.requestUnitHalfDay }),
-      ...(request.requestUnitHours    && { request_unit_hours: request.requestUnitHours }),
+      ...(request.request_unit && { request_unit: request.request_unit }),
+      ...(request.request_unit_half_day && { request_unit_half_day: request.request_unit_half_day }),
+      ...(typeof request.request_unit_hours !== 'undefined' && { request_unit_hours: request.request_unit_hours }),
+      ...(request.request_hour_from && { request_hour_from: request.request_hour_from }),
+      ...(request.request_hour_to && { request_hour_to: request.request_hour_to }),
+      ...(typeof request.number_of_days_display !== 'undefined' && { number_of_days_display: request.number_of_days_display }),
     });
 
     // 2) post a chatter message on that leave so followers (HR) get notified
     const client = getOdooClient();
+    let body = `<b>New leave request</b><br/>
+               Employee UID: ${uid}<br/>
+               From: ${request.request_date_from} To: ${request.request_date_to}<br/>`;
+    if (request.request_unit_hours) {
+      body += `Time: ${request.request_hour_from || '-'} to ${request.request_hour_to || '-'}<br/>`;
+      body += `Hours: ${request.number_of_days_display || '-'}<br/>`;
+    }
+    body += `Reason: ${request.reason}`;
     await client['execute'](
       'hr.leave',
       'message_post',
       [[newRequestId], {
-        body: `<b>New leave request</b><br/>
-               Employee UID: ${uid}<br/>
-               From: ${request.startDate} To: ${request.endDate}<br/>
-               Reason: ${request.reason}`
+        body
       }]
     );
 

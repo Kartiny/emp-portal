@@ -12,6 +12,7 @@ import { ShiftCodes } from '@/components/ui/shift-codes';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from 'sonner';
 
 interface UserProfile {
   name: string;
@@ -45,6 +46,7 @@ export default function DashboardPage() {
     total_amount: '',
   });
   const [claimFormLoading, setClaimFormLoading] = useState(false);
+  const [missedClockOut, setMissedClockOut] = useState(false);
 
   useEffect(() => {
     const uid = localStorage.getItem('uid');
@@ -111,6 +113,31 @@ export default function DashboardPage() {
       .then(data => {
         setClaims(data.claims || []);
         setClaimRequests(Array.isArray(data.claims) ? data.claims.length : 0);
+      })
+      .catch(console.error);
+
+    // Check for missed clock-out yesterday
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yDate = yesterday.toISOString().slice(0, 10);
+
+    fetch('/api/odoo/auth/attendance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid: Number(uid), range: 'day', customDate: yDate }),
+    })
+      .then(res => res.json())
+      .then(data => {
+        // Adjust this logic based on your API response structure
+        if (Array.isArray(data.attendance)) {
+          const missed = data.attendance.some(
+            (rec: any) => rec.check_in && !rec.check_out
+          );
+          setMissedClockOut(missed);
+          if (missed) {
+            toast.warning('You forgot to clock out yesterday. Please contact HR or your manager.');
+          }
+        }
       })
       .catch(console.error);
   }, []);
@@ -258,6 +285,12 @@ export default function DashboardPage() {
         <div className="mt-6">
           <ShiftCodes />
         </div>
+
+        {missedClockOut && (
+          <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4 rounded">
+            <strong>Reminder:</strong> You forgot to clock out yesterday. Please contact HR or your manager to correct your attendance.
+          </div>
+        )}
       </div>
       <Dialog open={claimDialogOpen} onOpenChange={setClaimDialogOpen}>
         <DialogContent className="max-w-2xl">

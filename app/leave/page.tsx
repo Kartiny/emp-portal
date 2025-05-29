@@ -16,6 +16,8 @@ import { Calendar as CalendarIcon, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { LeaveType, LeaveRequest } from '@/lib/odooXml';
 import { toast } from 'sonner';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { useRouter } from 'next/navigation';
 
 interface LeaveBalance {
   type: string;
@@ -61,6 +63,8 @@ export default function LeavePage() {
   const [yearFilter, setYearFilter] = useState(new Date().getFullYear().toString());
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+
+  const router = useRouter();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -122,23 +126,51 @@ export default function LeavePage() {
       return;
     }
 
+    // Helper to calculate hours difference
+    function calculateHours(start: string, end: string) {
+      if (!start || !end) return 0;
+      const [sh, sm] = start.split(':').map(Number);
+      const [eh, em] = end.split(':').map(Number);
+      return Math.max(0, (eh + em / 60) - (sh + sm / 60));
+    }
+
+    // Helper to convert 'HH:mm' to float (e.g., '07:30' -> 7.5)
+    function timeStringToFloat(time: string) {
+      if (!time) return undefined;
+      const [h, m] = time.split(':').map(Number);
+      return h + (m / 60);
+    }
+
     try {
       const rawUid = localStorage.getItem('uid');
       if (!rawUid) throw new Error('Not logged in');
       const uid = Number(rawUid);
 
+      // Build request payload
+      const payload: any = {
+        uid,
+        request: {
+          leaveTypeId: parseInt(selectedLeaveTypeId),
+          request_date_from: format(startDate, 'yyyy-MM-dd'),
+          request_date_to: format(endDate, 'yyyy-MM-dd'),
+          reason,
+        },
+      };
+
+      if (duration === 'hour') {
+        payload.request.request_unit_hours = true;
+        payload.request.request_hour_from = timeStringToFloat(startTime);
+        payload.request.request_hour_to = timeStringToFloat(endTime);
+        payload.request.number_of_days_display = calculateHours(startTime, endTime);
+      }
+
+      // Debug: print payload before sending
+      console.log('Payload for leave request:', payload);
+
       const response = await fetch('/api/odoo/leave/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          uid,
-          request: {
-            leaveTypeId: parseInt(selectedLeaveTypeId),
-            startDate: format(startDate, 'yyyy-MM-dd'),
-            endDate: format(endDate, 'yyyy-MM-dd'),
-            reason
-          }
-        })
+        body: JSON.stringify(payload),
       });
 
       const result = await response.json();
@@ -211,6 +243,14 @@ export default function LeavePage() {
     }
   }, [leaveTypes]);
 
+  // Helper to format float hour to 'HH:mm'
+  function floatToTimeString(val?: number) {
+    if (typeof val !== 'number' || isNaN(val)) return '-';
+    const h = Math.floor(val);
+    const m = Math.round((val - h) * 60);
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  }
+
   if (loading) {
     return (
       <MainLayout>
@@ -234,361 +274,18 @@ export default function LeavePage() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Leave Management</h1>
-          <p className="text-muted-foreground">View and manage your leave requests</p>
-        </div>
-
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {leaveAllocations.map((allocation) => (
-            <Card key={allocation.id}>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">
-                  {allocation.holiday_status_id?.[1] || '—'}
-                </CardTitle>
-                <CardDescription className="text-xs text-muted-foreground">
-                  {allocation.state ? `Status: ${allocation.state}` : ''}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-xs text-muted-foreground space-y-1">
-                  <div>Allocated: {allocation.number_of_days_display ?? allocation.number_of_days ?? '-'} days</div>
-                  <div>Used: {allocation.leaves_taken ?? '-'} days</div>
-                  {(() => {
-                    const alloc = allocation;
-                    const allocated = alloc?.number_of_days_display ?? alloc?.number_of_days;
-                    if (alloc && typeof allocated === 'number' && typeof alloc.leaves_taken === 'number') {
-                      return <div>Remaining: {allocated - alloc.leaves_taken} days</div>;
-                    } else {
-                      return <div>Remaining: - days</div>;
-                    }
-                  })()}
-                  <div>From: {allocation.date_from || '-'} To: {allocation.date_to || '-'}</div>
-                  <div>Manager: {allocation.manager_id?.[1] || '-'}</div>
-                  <div>Notes: {allocation.notes || '-'}</div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Leave Request Button and Dialog */}
-        <Dialog open={isRequestOpen} onOpenChange={setIsRequestOpen}>
-          <DialogTrigger asChild>
-            <Button size="lg" className="w-full md:w-auto">
-              Apply for Leave
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>New Leave Request</DialogTitle>
-              <DialogDescription>
-                Submit a new leave request. Please fill in all required fields.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Leave Type</label>
-                <Select value={selectedLeaveTypeId} onValueChange={setSelectedLeaveTypeId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select leave type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {leaveTypes.map((type) => (
-                        <SelectItem 
-                          key={type.id} 
-                          value={type.id.toString()}
-                          className={type.color ? `text-[#${type.color.toString(16)}]` : ''}
-                        >
-                          <div className="flex justify-between items-center w-full">
-                            <span>{type.name}</span>
-                          </div>
-                        </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {selectedType && (
-                <>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Start Date</label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "w-full justify-start text-left font-normal",
-                              !startDate && "text-muted-foreground"
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {startDate ? format(startDate, "PPP") : "Pick a date"}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={startDate}
-                            onSelect={setStartDate}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      {/* Remaining Days */}
-                      {selectedLeaveTypeId && (() => {
-                        const alloc = leaveAllocations.find(a => a.holiday_status_id?.[0]?.toString() === selectedLeaveTypeId);
-                        const allocated = alloc?.number_of_days_display ?? alloc?.number_of_days;
-                        const used = alloc?.leaves_taken;
-                        let remaining = '-';
-                        if (typeof allocated === 'number' && typeof used === 'number') {
-                          remaining = String(allocated - used);
-                        }
-                        return (
-                          <div className="text-xs text-muted-foreground mt-1">
-                            Remaining days: {remaining}
-                          </div>
-                        );
-                      })()}
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">End Date</label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "w-full justify-start text-left font-normal",
-                              !endDate && "text-muted-foreground"
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {endDate ? format(endDate, "PPP") : "Pick a date"}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={endDate}
-                            onSelect={setEndDate}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                  </div>
-
-                  {/* Tickboxes for duration selection */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Duration</label>
-                    <div className="flex gap-4">
-                      <label className="flex items-center gap-1 text-xs">
-                        <input
-                          type="checkbox"
-                          checked={duration === 'hour'}
-                          onChange={() => setDuration(duration === 'hour' ? '' : 'hour')}
-                        />
-                        Hour
-                      </label>
-                      <label className="flex items-center gap-1 text-xs">
-                        <input
-                          type="checkbox"
-                          checked={duration === 'first_half'}
-                          onChange={() => setDuration(duration === 'first_half' ? '' : 'first_half')}
-                        />
-                        First Half Day (0.5 day)
-                      </label>
-                      <label className="flex items-center gap-1 text-xs">
-                        <input
-                          type="checkbox"
-                          checked={duration === 'second_half'}
-                          onChange={() => setDuration(duration === 'second_half' ? '' : 'second_half')}
-                        />
-                        Second Half Day (0.5 day)
-                      </label>
-                    </div>
-                  </div>
-                  {/* Time pickers for hour selection */}
-                  {duration === 'hour' && (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Start Time</label>
-                        <Input
-                          type="time"
-                          value={startTime}
-                          onChange={e => setStartTime(e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">End Time</label>
-                        <Input
-                          type="time"
-                          value={endTime}
-                          onChange={e => setEndTime(e.target.value)}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Supporting Document */}
-                  {selectedType.support_document && (
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">
-                        Supporting Document
-                        <span className="text-red-500">*</span>
-                      </label>
-                      <Input
-                        type="file"
-                        onChange={(e) => setDocument(e.target.files?.[0] || null)}
-                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                      />
-                    </div>
-                  )}
-
-                  {/* Reason */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Reason</label>
-                    <Textarea
-                      value={reason}
-                      onChange={(e) => setReason(e.target.value)}
-                      placeholder="Enter reason for leave"
-                    />
-                  </div>
-
-                  {selectedType?.unpaid && (
-                    <div className="rounded-md bg-yellow-50 p-4">
-                      <div className="flex">
-                        <div className="flex-shrink-0">
-                          <AlertTriangle className="h-5 w-5 text-yellow-400" />
-                        </div>
-                        <div className="ml-3">
-                          <h3 className="text-sm font-medium text-yellow-800">
-                            Unpaid Leave Notice
-                          </h3>
-                          <div className="mt-2 text-sm text-yellow-700">
-                            <p>
-                              This is an unpaid leave type. Your salary will be adjusted accordingly.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <Button 
-                    onClick={handleLeaveRequest} 
-                    className="w-full"
-                    disabled={!isValid()}
-                  >
-                    Submit Request
-                  </Button>
-                </>
-              )}
+        <Tabs defaultValue="calendar" className="w-full">
+          <TabsList>
+            <TabsTrigger value="calendar">Calendar</TabsTrigger>
+            <TabsTrigger value="history" onClick={() => router.push('/leave/history')}>Leave History</TabsTrigger>
+          </TabsList>
+          <TabsContent value="calendar">
+            {/* Calendar view here (example below) */}
+            <div className="flex justify-center">
+              <Calendar mode="multiple" numberOfMonths={3} />
             </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Filters */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Filters</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-4">
-              <Select value={yearFilter} onValueChange={setYearFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Select year" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((year) => (
-                    <SelectItem key={year} value={year.toString()}>
-                      {year}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Leave type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  {leaveTypes.map((type) => (
-                    <SelectItem key={type.id} value={type.id.toString()}>
-                      {type.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="validate">Approved</SelectItem>
-                  <SelectItem value="refuse">Rejected</SelectItem>
-                  <SelectItem value="confirm">Pending</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Leave History Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Leave History</CardTitle>
-            <CardDescription>Your leave requests and their status</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date Range</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Days</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Reason</TableHead>
-                  <TableHead>Approved By</TableHead>
-                  <TableHead>Remarks</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {leaveRequests.map((request) => (
-                  <TableRow key={request.id}>
-                    <TableCell>
-                      {format(new Date(request.request_date_from), 'dd/MM/yyyy')} - {format(new Date(request.request_date_to), 'dd/MM/yyyy')}
-                    </TableCell>
-                    <TableCell>{request.holiday_status_id[1]}</TableCell>
-                    <TableCell>{request.number_of_days}</TableCell>
-                    <TableCell>
-                      <span className={getStatusColor(request.state)}>
-                        {getStatusText(request.state)}
-                      </span>
-                    </TableCell>
-                    <TableCell>{request.name}</TableCell>
-                    <TableCell>
-                      {request.state === 'validate' ? request.user_id[1] : '-'}
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {leaveRequests.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center">
-                      No leave requests found
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </MainLayout>
   );

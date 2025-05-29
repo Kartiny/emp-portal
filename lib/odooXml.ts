@@ -58,6 +58,8 @@ export interface LeaveRequest {
   state:             string;
   name:              string;
   user_id:           [number,string];
+  request_hour_from?: number;
+  request_hour_to?: number;
 }
 
 interface UserProfile {
@@ -428,12 +430,15 @@ export class OdooClient {
     uid: number,
     data: {
       leaveTypeId: number;
-      startDate: string;
-      endDate: string;
+      request_date_from: string;
+      request_date_to: string;
       reason: string;
       request_unit?: string;
       request_unit_half_day?: string;
-      request_unit_hours?: number;
+      request_unit_hours?: boolean;
+      request_hour_from?: string;
+      request_hour_to?: string;
+      number_of_days_display?: number;
     }
   ): Promise<number> {
     const prof = await this.getFullUserProfile(uid);
@@ -444,12 +449,15 @@ export class OdooClient {
       [{
         employee_id: empId,
         holiday_status_id: data.leaveTypeId,
-        request_date_from: data.startDate,
-        request_date_to: data.endDate,
+        request_date_from: data.request_date_from,
+        request_date_to: data.request_date_to,
         name: data.reason,
         ...(data.request_unit && { request_unit: data.request_unit }),
         ...(data.request_unit_half_day && { request_unit_half_day: data.request_unit_half_day }),
-        ...(data.request_unit_hours && { request_unit_hours: data.request_unit_hours }),
+        ...(typeof data.request_unit_hours !== 'undefined' && { request_unit_hours: data.request_unit_hours }),
+        ...(data.request_hour_from && { request_hour_from: data.request_hour_from }),
+        ...(data.request_hour_to && { request_hour_to: data.request_hour_to }),
+        ...(typeof data.number_of_days_display !== 'undefined' && { number_of_days_display: data.number_of_days_display }),
       }]
     );
     return newId;
@@ -596,7 +604,19 @@ export async function getLeaveRequests(
   return getOdooClient().getLeaveRequests(uid,filters);
 }
 export async function createLeaveRequest(
-  uid:number,data:{leaveTypeId:number;startDate:string;endDate:string;reason:string}
+  uid:number,
+  data:{
+    leaveTypeId:number;
+    request_date_from:string;
+    request_date_to:string;
+    reason:string;
+    request_unit?:string;
+    request_unit_half_day?:string;
+    request_unit_hours?:boolean;
+    request_hour_from?:string;
+    request_hour_to?:string;
+    number_of_days_display?:number;
+  }
 ) {
   return getOdooClient().createLeaveRequest(uid,data);
 }
