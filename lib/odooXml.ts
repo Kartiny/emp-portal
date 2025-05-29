@@ -564,6 +564,33 @@ export class OdooClient {
     );
     return newId;
   }
+
+  /**
+   * Fetch all discuss.channel records (channels and direct messages) the user belongs to
+   */
+  async getDiscussChannels(uid: number): Promise<any[]> {
+    // Get the user's partner_id (needed for discuss.channel)
+    const [user] = await this.execute(
+      'res.users',
+      'read',
+      [[uid], ['partner_id']]
+    );
+    if (!user || !user.partner_id) throw new Error('User not found or missing partner_id');
+    const partnerId = Array.isArray(user.partner_id) ? user.partner_id[0] : user.partner_id;
+    const partnerIdList = [partnerId]; // always wrap in array
+
+    // Find channels the user belongs to
+    const channels = await this.execute(
+      'discuss.channel',
+      'search_read',
+      [[['channel_partner_ids', 'in', partnerIdList]]],
+      {
+        fields: ['id', 'name', 'channel_type', 'channel_partner_ids'],
+        order: 'name asc'
+      }
+    );
+    return channels;
+  }
 }
 
 // ── single instance & top‐level helpers ────────────────────────────────────────
@@ -631,4 +658,7 @@ export async function getExpenseRequests(uid: number) {
 }
 export async function createExpenseRequest(uid: number, data: { name: string; date: string; payment_mode: string; total_amount: number; }) {
   return getOdooClient().createExpenseRequest(uid, data);
+}
+export async function getDiscussChannels(uid: number) {
+  return getOdooClient().getDiscussChannels(uid);
 }

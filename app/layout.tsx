@@ -3,7 +3,6 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
-import { MainLayout } from "@/components/main-layout";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -37,28 +36,6 @@ export default function RootLayout({
         {/* Icons */}
         <link rel="icon" href="/favicon.png" type="image/png" />
         <link rel="apple-touch-icon" href="/favicon.png" />
-
-        {/* PWA Manifest */}
-        <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#000000" />
-        
-        {/* Service Worker Registration */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-            if ('serviceWorker' in navigator) {
-              window.addEventListener('load', function() {
-                navigator.serviceWorker.register('/service-worker.js')
-                  .then(function(registration) {
-                    console.log('ServiceWorker registration successful with scope: ', registration.scope);
-                  }).catch(function(err) {
-                    console.log('ServiceWorker registration failed: ', err);
-                  });
-              });
-            }
-            `,
-          }}
-        />
       </head>
       <body className={inter.className}>
         <ThemeProvider
@@ -67,9 +44,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <MainLayout>
-            {children}
-          </MainLayout>
+          {children}
         </ThemeProvider>
       </body>
     </html>

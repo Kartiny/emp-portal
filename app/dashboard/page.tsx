@@ -8,7 +8,6 @@ import { MainLayout } from "@/components/main-layout";
 import AttendanceWidget from '@/components/attendance-widget';
 import { LeaveBalanceCard } from '@/components/leave-balance-card';
 import { format } from 'date-fns';
-import { ShiftCodes } from '@/components/ui/shift-codes';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -282,10 +281,6 @@ export default function DashboardPage() {
         </div>
 
         {/* Third Row: Shift Codes */}
-        <div className="mt-6">
-          <ShiftCodes />
-        </div>
-
         {missedClockOut && (
           <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4 rounded">
             <strong>Reminder:</strong> You forgot to clock out yesterday. Please contact HR or your manager to correct your attendance.

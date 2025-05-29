@@ -1,10 +1,5 @@
 // next.config.mjs
-import withPWA from 'next-pwa';
 
-const config = withPWA({
-  dest: 'public',
-  register: true,
-  skipWaiting: true,
-});
-
-export default config;
+export default {
+  // Add your Next.js config options here if needed
+};
