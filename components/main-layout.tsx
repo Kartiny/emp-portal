@@ -7,7 +7,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Calendar, Clock, FileText, Home, LogOut, Menu, Receipt, Settings, User } from "lucide-react"
+import { Calendar, Clock, FileText, Home, LogOut, Menu, Receipt, Settings, User, MessageCircle } from "lucide-react"
 import { CustomHeader } from "@/components/custom-header"
 
 interface MainLayoutProps {
@@ -20,6 +20,7 @@ export function MainLayout({ children }: MainLayoutProps) {
 
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: Home },
+    { name: "Discuss", href: "/discuss", icon: MessageCircle },
     { name: "Attendance", href: "/attendance", icon: Clock },
     { name: "Leave", href: "/leave", icon: Calendar },
     { name: "Expenses", href: "/expenses", icon: Receipt },
