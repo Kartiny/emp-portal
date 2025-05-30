@@ -14,17 +14,16 @@ export async function GET(req: NextRequest, { params }: { params: { channelId: s
       'discuss.channel',
       'read',
       [[channelId], [
-        'id', 'name', 'channel_type', 'channel_partner_ids', 'mail_channel_id', 'uuid', 'public', 'description', 'create_uid', 'write_uid', 'create_date', 'write_date'
+        'id', 'name', 'channel_type', 'channel_partner_ids', 'message_ids', 'description', 'create_uid', 'write_uid', 'create_date', 'write_date'
       ]]
     );
 
-    // Fetch messages for this channel (mail.message model, res_id = channelId, model = 'mail.channel')
-    // In Odoo Discuss, messages are usually linked to mail.channel, but in v17, discuss.channel is used for frontend, but messages are still in mail.message with model 'mail.channel'.
+    // Fetch messages for this channel (mail.message model, res_id = channelId, model = 'discuss.channel')
     const messages = await client['execute'](
       'mail.message',
       'search_read',
       [
-        [['model', '=', 'mail.channel'], ['res_id', '=', channelId]],
+        [['model', '=', 'discuss.channel'], ['res_id', '=', channelId]],
         ['id', 'author_id', 'body', 'date', 'message_type']
       ],
       { order: 'date asc', limit: 50 }
