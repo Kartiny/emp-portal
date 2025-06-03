@@ -1,7 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { Video } from "lucide-react";
+import { DiscussWebSocket } from "@/lib/utils/websocket";
 
 interface Channel {
   id: number;
@@ -14,30 +15,36 @@ export function DiscussSidebar() {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const wsRef = useRef<DiscussWebSocket | null>(null);
 
   function startMeeting() {
     alert("Meeting started!");
   }
 
   useEffect(() => {
+    setLoading(true);
+    setError(null);
     const uid = localStorage.getItem("uid");
     if (!uid) {
       setError("Not logged in");
       setLoading(false);
       return;
     }
-    fetch("/api/discuss/channels", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ uid: Number(uid) })
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.error) setError(data.error);
-        else setChannels(data.channels || []);
-      })
-      .catch((err) => setError(err.message || "Failed to fetch channels"))
-      .finally(() => setLoading(false));
+    // Connect to WebSocket for channels
+    const wsUrl = `ws://localhost:3000/ws/discuss/channels?uid=${uid}`;
+    wsRef.current = new DiscussWebSocket(wsUrl, (data) => {
+      if (data.type === "channels") {
+        setChannels(data.channels || []);
+        setLoading(false);
+      } else if (data.type === "error") {
+        setError(data.error || "Failed to fetch channels");
+        setLoading(false);
+      }
+    });
+    wsRef.current.connect();
+    return () => {
+      wsRef.current?.disconnect();
+    };
   }, []);
 
   const publicChannels = channels.filter((c) => c.type !== "direct");
