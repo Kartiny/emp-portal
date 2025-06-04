@@ -22,7 +22,7 @@ export function MainLayout({ children }: MainLayoutProps) {
     { name: "Dashboard", href: "/dashboard", icon: Home },
     { name: "Discuss", href: "/discuss", icon: MessageCircle },
     { name: "Attendance", href: "/attendance", icon: Clock },
-    { name: "Leave", href: "/leave", icon: Calendar },
+    { name: "Time-Off", href: "/leave", icon: Calendar },
     { name: "Expenses", href: "/expenses", icon: Receipt },
     { name: "Profile", href: "/profile", icon: User },
   ]

@@ -120,7 +120,7 @@ export default function LeaveHistoryPage() {
         <Tabs defaultValue="history" className="w-full">
           <TabsList>
             <TabsTrigger value="calendar" onClick={() => router.push('/leave')}>Calendar</TabsTrigger>
-            <TabsTrigger value="history" onClick={() => router.push('/leave/history')}>Leave History</TabsTrigger>
+            <TabsTrigger value="history" onClick={() => router.push('/leave/history')}>My Allocations</TabsTrigger>
           </TabsList>
         </Tabs>
         <Card>
@@ -170,7 +170,7 @@ export default function LeaveHistoryPage() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Leave History</CardTitle>
+            <CardTitle>My Allocations</CardTitle>
             <CardDescription>Your leave requests and their status</CardDescription>
           </CardHeader>
           <CardContent>
