@@ -44,8 +44,8 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { toZonedTime } from 'date-fns-tz';
 import { ShiftCodes } from '@/components/ui/shift-codes';
 
-const WORK_START_HOUR = 7; // 7 AM
-const WORK_END_HOUR = 19;  // 7 PM
+const WORK_START_HOUR = 9; // 9 AM
+const WORK_END_HOUR = 18;  // 6 PM
 const STANDARD_HOURS = 12; // 7am to 7pm = 12 hours
 
 type ViewType = 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'custom';
@@ -195,11 +195,16 @@ export default function AttendancePage() {
       const d = toZonedTime(new Date(checkIn), 'Asia/Kuala_Lumpur');
       const ref = new Date(d); ref.setHours(WORK_START_HOUR, 0, 0, 0);
       const mins = differenceInMinutes(d, ref);
-      if (mins <= 0) return { isLate: false, status: 'On time' };
-      if (mins < 60)  return { isLate: true,  status: `Late by ${mins}m` };
-      return { isLate: true, status: `Late by ${Math.floor(mins/60)}h ${mins%60}m` };
+      const absMins = Math.abs(mins);
+      const h = Math.floor(absMins / 60);
+      const m = absMins % 60;
+      const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
+      if (mins === 0) return { isLate: false, isEarly: false, status: 'On time' };
+      if (mins > 0)  return { isLate: true, isEarly: false, status: `Late by ${timeStr}` };
+      if (mins < 0)  return { isLate: false, isEarly: true, status: `Clocked in ${timeStr} early` };
+      return { isLate: false, isEarly: false, status: 'On time' };
     } catch {
-      return { isLate: false, status: 'N/A' };
+      return { isLate: false, isEarly: false, status: 'N/A' };
     }
   };
   const calculateEarlyLeaveStatus = (checkOut: string, late: boolean) => {
@@ -207,9 +212,14 @@ export default function AttendancePage() {
       const d = toZonedTime(new Date(checkOut), 'Asia/Kuala_Lumpur');
       const ref = new Date(d); ref.setHours(WORK_END_HOUR, 0, 0, 0);
       const mins = differenceInMinutes(ref, d);
-      if (mins <= 0)  return { isEarly: false, status: late ? 'Left on time' : 'Full day' };
-      if (mins < 60)  return { isEarly: true,  status: `Left early by ${mins}m` };
-      return { isEarly: true, status: `Left early by ${Math.floor(mins/60)}h ${mins%60}m` };
+      const absMins = Math.abs(mins);
+      const h = Math.floor(absMins / 60);
+      const m = absMins % 60;
+      const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
+      if (mins === 0)  return { isEarly: false, status: late ? 'Left on time' : 'Full day' };
+      if (mins > 0)   return { isEarly: true,  status: `Left early by ${timeStr}` };
+      if (mins < 0)   return { isEarly: false, status: `Left late by ${timeStr}` };
+      return { isEarly: false, status: 'N/A' };
     } catch {
       return { isEarly: false, status: 'N/A' };
     }
@@ -268,16 +278,26 @@ export default function AttendancePage() {
                 <div className="space-y-4">
                   <div>
                     <p className="text-sm">Check-in Status</p>
-                    <p className={calculateLateStatus(todayData.lastClockIn).isLate ? 'text-yellow-600' : 'text-green-600'}>
-                      {calculateLateStatus(todayData.lastClockIn).status}
+                    <p className={
+                      !todayData.lastClockIn
+                        ? 'text-red-600'
+                        : calculateLateStatus(todayData.lastClockIn || '').isLate
+                          ? 'text-yellow-600'
+                          : calculateLateStatus(todayData.lastClockIn || '').isEarly
+                            ? 'text-blue-600'
+                            : 'text-green-600'
+                    }>
+                      {!todayData.lastClockIn
+                        ? 'Not clocked in today'
+                        : calculateLateStatus(todayData.lastClockIn || '').status}
                     </p>
                   </div>
                   {todayData.lastClockOut && (
                     <>
                       <div>
                         <p className="text-sm">Check-out Status</p>
-                        <p className={calculateEarlyLeaveStatus(todayData.lastClockOut, calculateLateStatus(todayData.lastClockIn).isLate).isEarly ? 'text-red-600' : 'text-green-600'}>
-                          {calculateEarlyLeaveStatus(todayData.lastClockOut, calculateLateStatus(todayData.lastClockIn).isLate).status}
+                        <p className={calculateEarlyLeaveStatus(todayData.lastClockOut || '', calculateLateStatus(todayData.lastClockIn || '').isLate).isEarly ? 'text-red-600' : 'text-green-600'}>
+                          {calculateEarlyLeaveStatus(todayData.lastClockOut || '', calculateLateStatus(todayData.lastClockIn || '').isLate).status}
                         </p>
                       </div>
                       {calculateOvertimeHours(todayData.lastClockOut) > 0 && (
@@ -297,12 +317,7 @@ export default function AttendancePage() {
             </CardContent>
           </Card>
         </div>
-
-        {/* Shift Codes */}
-        <div className="mt-6">
-          <ShiftCodes />
-        </div>
-
+        
         {/* Summary */}
         <Card>
           <CardHeader>
@@ -418,17 +433,25 @@ export default function AttendancePage() {
                         {'-'}
                       </TableCell>
                       <TableCell>
-                        <div className="text-sm space-y-1">
-                          {late.isLate && (
-                            <div className="text-yellow-600">{late.status}</div>
+                        <div className="text-sm">
+                          {!rec.checkIn ? (
+                            <span className="text-red-600">Not clocked in</span>
+                          ) : late.isLate ? (
+                            <span className="text-yellow-600">{late.status}</span>
+                          ) : late.isEarly ? (
+                            <span className="text-blue-600">{late.status}</span>
+                          ) : (
+                            <span className="text-green-600">{late.status}</span>
                           )}
-                          {early?.isEarly && (
-                            <div className="text-red-600">{early.status}</div>
-                          )}
-                          {!late.isLate && !early?.isEarly && (
-                            <div className="text-green-600">
-                              {early?.status || 'On time'}
-                            </div>
+                          {rec.checkOut && (
+                            <>
+                              <br />
+                              {early?.isEarly ? (
+                                <span className="text-red-600">{early.status}</span>
+                              ) : early && early.status && early.status !== 'Full day' && early.status !== 'Left on time' ? (
+                                <span className="text-green-600">{early.status}</span>
+                              ) : null}
+                            </>
                           )}
                         </div>
                       </TableCell>
