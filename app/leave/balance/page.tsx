@@ -60,6 +60,14 @@ export default function LeaveBalancePage() {
           </TabsList>
         </Tabs>
       </div>
+      <div className="flex justify-end mb-4">
+        <button
+          className="px-4 py-2 bg-blue-900 text-white rounded hover:bg-blue-800 transition-colors"
+          onClick={() => router.push('/leave?request=1')}
+        >
+          Request Time-Off
+        </button>
+      </div>
       <div className="w-full py-8 px-4">
         {loading ? (
           <div className="text-center py-8">Loading leave allocations...</div>

@@ -116,6 +116,14 @@ export default function LeaveHistoryPage() {
   }
   return (
     <MainLayout>
+      <div className="flex justify-end mb-4">
+        <button
+          className="px-4 py-2 bg-blue-900 text-white rounded hover:bg-blue-800 transition-colors"
+          onClick={() => router.push('/leave?request=1')}
+        >
+          Request Time-Off
+        </button>
+      </div>
       <div className="space-y-6">
         <Tabs defaultValue="history" className="w-full">
           <TabsList>

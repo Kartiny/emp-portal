@@ -1,4 +1,3 @@
-// lib/odooXml.ts
 import xmlrpc from 'xmlrpc';
 import { ODOO_CONFIG } from './config';
 import {
@@ -10,7 +9,7 @@ import { toZonedTime } from 'date-fns-tz';
 
 const COMMON_ENDPOINT = `${ODOO_CONFIG.BASE_URL}/xmlrpc/2/common`;
 const OBJECT_ENDPOINT = `${ODOO_CONFIG.BASE_URL}/xmlrpc/2/object`;
-const STANDARD_HOURS  = 12; // for attendance rate (7 AM–7 PM)
+const STANDARD_HOURS = 12; // for attendance rate (7 AM–7 PM)
 
 /** Wrapper for xmlrpc.methodCall → Promise */
 function xmlRpcCall(client: any, method: string, params: any[]): Promise<any> {
@@ -26,7 +25,7 @@ function xmlRpcCall(client: any, method: string, params: any[]): Promise<any> {
 //
 
 /** Date range options for attendance queries */
-export type DateRange = 'daily'|'weekly'|'biweekly'|'monthly'|'custom';
+export type DateRange = 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'custom';
 
 /** Leave type record */
 export interface LeaveType {
@@ -35,7 +34,7 @@ export interface LeaveType {
   requires_allocation: string;
   virtual_remaining_leaves: number;
   color?: number;
-  request_unit: string;
+  request_unit: 'day' | 'hour';
   support_document: boolean;
   unpaid: boolean;
 }
@@ -43,25 +42,34 @@ export interface LeaveType {
 /** Leave allocation record */
 export interface LeaveAllocation {
   id: number;
-  holiday_status_id: [number,string];
+  holiday_status_id: [number, string];
   number_of_days: number;
   leaves_taken: number;
+  date_from: string;
+  date_to: string;
+  state: string;
+  manager_id?: [number, string];
+  department_id?: [number, string];
+  allocation_type?: string;
 }
 
 /** Leave request record */
 export interface LeaveRequest {
   id: number;
-  holiday_status_id: [number,string];
+  holiday_status_id: [number, string];
   request_date_from: string;
-  request_date_to:   string;
-  number_of_days:    number;
-  state:             string;
-  name:              string;
-  user_id:           [number,string];
+  request_date_to: string;
+  number_of_days: number;
+  number_of_days_display?: number;
+  state: string;
+  name: string;
+  user_id: [number, string];
+  request_unit_hours?: boolean;
   request_hour_from?: number;
   request_hour_to?: number;
 }
 
+/** User profile combining res.users and hr.employee */
 interface UserProfile {
   name: string;
   email: string;
@@ -69,11 +77,12 @@ interface UserProfile {
   job_title: string;
   department: string;
   phone: string;
+  resource_calendar_id: [number, string];
   // ...other fields
 }
 
 //
-// ── EXPENSE (CLAIM) MODULE ─────────────────────────────────────────────
+// ── EXPENSE (CLAIM) MODULE ────────────────────────────────────────────────────
 //
 
 export interface ExpenseRequest {
@@ -142,37 +151,56 @@ export class OdooClient {
   /** Read res.users + linked hr.employee (Odoo 17 uses hr.employee.user_id) */
   async getFullUserProfile(uid: number): Promise<any> {
     // 1) Basic user
-    const [user] = await this.execute(
-      'res.users',
-      'read',
-      [[uid], ['name','login','image_1920']]
-    );
+    const [user] = await this.execute('res.users', 'read', [[uid], ['name', 'login', 'image_1920']]);
     if (!user) throw new Error('User not found');
 
     // 2) Employee by user_id back-relation
     const [emp] = await this.execute(
       'hr.employee',
       'search_read',
-      [[['user_id','=',uid]]],
+      [[['user_id', '=', uid]]],
       {
         fields: [
-          'id','name','job_title','department_id','work_email','work_phone',
-          'mobile_phone','gender','birthday','country_id','place_of_birth',
-          'country_of_birth','marital','identification_id','passport_id',
-          'bank_account_id','certificate','study_field','study_school',
-          'private_street','emergency_contact','emergency_phone',
+          'id',
+          'name',
+          'job_title',
+          'department_id',
+          'work_email',
+          'work_phone',
+          'mobile_phone',
+          'gender',
+          'birthday',
+          'country_id',
+          'place_of_birth',
+          'country_of_birth',
+          'marital',
+          'identification_id',
+          'passport_id',
+          'bank_account_id',
+          'certificate',
+          'study_field',
+          'study_school',
+          'private_street',
+          'emergency_contact',
+          'emergency_phone',
           'lang',
-          'resource_calendar_id'
+          'resource_calendar_id',
         ],
-        limit: 1
+        limit: 1,
       }
     );
     if (!emp) throw new Error('No employee record linked to this user');
 
     return {
       id: emp.id,
-      ...user,
-      ...emp
+      name: user.name,
+      email: user.login,
+      image_1920: user.image_1920,
+      job_title: emp.job_title,
+      department: Array.isArray(emp.department_id) ? emp.department_id[1] : '',
+      phone: emp.work_phone || emp.mobile_phone,
+      resource_calendar_id: emp.resource_calendar_id,
+      ...emp,
     };
   }
 
@@ -181,27 +209,24 @@ export class OdooClient {
   //
 
   /** Get today's last clock-in/out */
-  async getTodayAttendance(uid: number): Promise<{
-    lastClockIn: string|null;
-    lastClockOut: string|null;
-  }> {
+  async getTodayAttendance(uid: number): Promise<{ lastClockIn: string | null; lastClockOut: string | null }> {
     const profile = await this.getFullUserProfile(uid);
     const empId = profile.id;
-    const today = new Date().toISOString().slice(0,10);
+    const today = new Date().toISOString().slice(0, 10);
     const domain = [
-      ['employee_id','=',empId],
-      ['check_in','>=',`${today} 00:00:00`]
+      ['employee_id', '=', empId],
+      ['check_in', '>=', `${today} 00:00:00`],
     ];
     const recs: any[] = await this.execute(
       'hr.attendance',
       'search_read',
       [domain],
-      { fields:['check_in','check_out'], order:'check_in desc', limit:1 }
+      { fields: ['check_in', 'check_out'], order: 'check_in desc', limit: 1 }
     );
-    const last = recs[0]||{};
+    const last = recs[0] || {};
     return {
-      lastClockIn: last.check_in||null,
-      lastClockOut: last.check_out||null,
+      lastClockIn: last.check_in || null,
+      lastClockOut: last.check_out || null,
     };
   }
 
@@ -217,81 +242,85 @@ export class OdooClient {
   ): Promise<{
     totalHours: number;
     rate: number;
-    records: { id:number; checkIn:string; checkOut:string; workedHours:number }[];
-    dateRange:{ start:string; end:string };
+    records: { id: number; checkIn: string; checkOut: string; workedHours: number }[];
+    dateRange: { start: string; end: string };
   }> {
     const profile = await this.getFullUserProfile(uid);
     const empId = profile.id;
 
     // 1) date window
-    let startDate:Date, endDate:Date;
-    if (range==='custom' && customRange) {
+    let startDate: Date, endDate: Date;
+    if (range === 'custom' && customRange) {
       startDate = parseISO(customRange.from);
-      endDate   = parseISO(customRange.to);
+      endDate = parseISO(customRange.to);
     } else {
       const base = parseISO(customDate!);
-      switch(range) {
+      switch (range) {
         case 'daily':
-          startDate=new Date(base.setHours(0,0,0,0));
-          endDate=new Date(base.setHours(23,59,59,999));
+          startDate = new Date(base.setHours(0, 0, 0, 0));
+          endDate = new Date(base.setHours(23, 59, 59, 999));
           break;
         case 'weekly': {
-          const m=new Date(base); m.setDate(m.getDate()-((m.getDay()+6)%7));
-          startDate=new Date(m.setHours(0,0,0,0));
-          const s=new Date(startDate); s.setDate(s.getDate()+6);
-          endDate=new Date(s.setHours(23,59,59,999));
+          const m = new Date(base);
+          m.setDate(m.getDate() - ((m.getDay() + 6) % 7));
+          startDate = new Date(m.setHours(0, 0, 0, 0));
+          const s = new Date(startDate);
+          s.setDate(s.getDate() + 6);
+          endDate = new Date(s.setHours(23, 59, 59, 999));
           break;
         }
         case 'biweekly': {
-          const m=new Date(base); m.setDate(m.getDate()-((m.getDay()+6)%7));
-          startDate=new Date(m.setHours(0,0,0,0));
-          const two=new Date(startDate); two.setDate(two.getDate()+13);
-          endDate=new Date(two.setHours(23,59,59,999));
+          const m = new Date(base);
+          m.setDate(m.getDate() - ((m.getDay() + 6) % 7));
+          startDate = new Date(m.setHours(0, 0, 0, 0));
+          const two = new Date(startDate);
+          two.setDate(two.getDate() + 13);
+          endDate = new Date(two.setHours(23, 59, 59, 999));
           break;
         }
         case 'monthly':
         default:
-          startDate=new Date(base.getFullYear(),base.getMonth(),1,0,0,0,0);
-          endDate=new Date(base.getFullYear(),base.getMonth()+1,0,23,59,59,999);
+          startDate = new Date(base.getFullYear(), base.getMonth(), 1, 0, 0, 0, 0);
+          endDate = new Date(base.getFullYear(), base.getMonth() + 1, 0, 23, 59, 59, 999);
       }
     }
 
     // 2) query
-    const fmt = (d:Date)=>`${d.toISOString().slice(0,10)} ${d.toTimeString().slice(0,8)}`;
+    const fmt = (d: Date) => `${d.toISOString().slice(0, 10)} ${d.toTimeString().slice(0, 8)}`;
     const domain = [
-      ['employee_id','=',empId],
-      ['check_in','>=',fmt(startDate)],
-      ['check_in','<=',fmt(endDate)],
+      ['employee_id', '=', empId],
+      ['check_in', '>=', fmt(startDate)],
+      ['check_in', '<=', fmt(endDate)],
     ];
     const raw: any[] = await this.execute(
       'hr.attendance',
       'search_read',
       [domain],
       {
-        fields:['id','check_in','check_out','worked_hours'],
-        order:'check_in asc'
+        fields: ['id', 'check_in', 'check_out', 'worked_hours'],
+        order: 'check_in asc',
       }
     );
 
     // 3) map & aggregate
-    const records = raw.map(r=>({
-      id:r.id,
-      checkIn:r.check_in,
-      checkOut:r.check_out,
-      workedHours:r.worked_hours||0,
+    const records = raw.map(r => ({
+      id: r.id,
+      checkIn: r.check_in,
+      checkOut: r.check_out,
+      workedHours: r.worked_hours || 0,
     }));
-    const totalHours = records.reduce((sum,r)=>sum+r.workedHours,0);
-    const days = differenceInCalendarDays(endDate, startDate)+1;
-    const rate = days>0?(totalHours/(days*STANDARD_HOURS))*100:0;
+    const totalHours = records.reduce((sum, r) => sum + r.workedHours, 0);
+    const days = differenceInCalendarDays(endDate, startDate) + 1;
+    const rate = days > 0 ? (totalHours / (days * STANDARD_HOURS)) * 100 : 0;
 
     return {
       totalHours,
       rate,
       records,
-      dateRange:{
-        start:startDate.toISOString().slice(0,10),
-        end:  endDate.toISOString().slice(0,10),
-      }
+      dateRange: {
+        start: startDate.toISOString().slice(0, 10),
+        end: endDate.toISOString().slice(0, 10),
+      },
     };
   }
 
@@ -300,13 +329,9 @@ export class OdooClient {
     const profile = await this.getFullUserProfile(uid);
     const empId = profile.id;
     const nowZ = toZonedTime(new Date(), 'Asia/Kuala_Lumpur');
-    const stamp = dfFormat(nowZ,'yyyy-MM-dd HH:mm:ss');
+    const stamp = dfFormat(nowZ, 'yyyy-MM-dd HH:mm:ss');
     // @ts-ignore
-    return await this.execute(
-      'hr.attendance',
-      'create',
-      [{ employee_id: empId, check_in: stamp }]
-    );
+    return await this.execute('hr.attendance', 'create', [{ employee_id: empId, check_in: stamp }]);
   }
 
   /** Clock out for a user */
@@ -317,20 +342,16 @@ export class OdooClient {
       'hr.attendance',
       'search_read',
       [[
-        ['employee_id','=',empId],
-        ['check_out','=',false]
+        ['employee_id', '=', empId],
+        ['check_out', '=', false],
       ]],
-      { fields:['id'], limit:1, order:'check_in desc' }
+      { fields: ['id'], limit: 1, order: 'check_in desc' }
     );
-    if(!recs[0]) throw new Error('No open attendance record found');
+    if (!recs[0]) throw new Error('No open attendance record found');
     const attendanceId = recs[0].id;
     const nowZ = toZonedTime(new Date(), 'Asia/Kuala_Lumpur');
-    const stamp = dfFormat(nowZ,'yyyy-MM-dd HH:mm:ss');
-    await this.execute(
-      'hr.attendance',
-      'write',
-      [[attendanceId],{ check_out: stamp }]
-    );
+    const stamp = dfFormat(nowZ, 'yyyy-MM-dd HH:mm:ss');
+    await this.execute('hr.attendance', 'write', [[attendanceId], { check_out: stamp }]);
   }
 
   //
@@ -344,19 +365,27 @@ export class OdooClient {
       'search_read',
       [[]],
       {
-        fields:[
-          'id','display_name','requires_allocation','virtual_remaining_leaves',
-          'color','request_unit','support_document','unpaid'
-        ]
+        fields: [
+          'id',
+          'display_name',
+          'requires_allocation',
+          'virtual_remaining_leaves',
+          'color',
+          'request_unit',
+          'support_document',
+          'unpaid',
+        ],
+        order: 'display_name asc',
       }
     );
-    return raw.map(r=>({
+
+    return raw.map(r => ({
       id: r.id,
       name: r.display_name,
       requires_allocation: r.requires_allocation,
       virtual_remaining_leaves: r.virtual_remaining_leaves,
       color: r.color,
-      request_unit: r.request_unit,
+      request_unit: r.request_unit as 'day' | 'hour',
       support_document: r.support_document,
       unpaid: r.unpaid,
     }));
@@ -364,64 +393,94 @@ export class OdooClient {
 
   /** Get leave allocations for a user */
   async getLeaveAllocations(uid: number): Promise<LeaveAllocation[]> {
-    const profile = await this.getFullUserProfile(uid);
-    const empId = profile.id;
-    const allocations = await this.execute(
+    const profile: any = await this.getFullUserProfile(uid);
+    const empId: number = profile.id;
+    const raw: any[] = await this.execute(
       'hr.leave.allocation',
       'search_read',
       [[['employee_id', '=', empId]]],
       {
         fields: [
-          'id', 'name', 'holiday_status_id', 'number_of_days_display', 'state', 'date_from', 'date_to',
-          'notes', 'manager_id', 'department_id', 'allocation_type', 'max_leaves', 'leaves_taken',
-          'duration_display', 'employee_id', 'employee_company_id', 'validation_type', 'type_request_unit',
-          'holiday_type', 'accrual_plan_id', 'already_accrued', 'has_accrual_plan', 'active', 'display_name'
-          // Add more fields as needed from your JSON
+          'id',
+          'holiday_status_id',
+          'number_of_days',
+          'leaves_taken',
+          'date_from',
+          'date_to',
+          'state',
+          'manager_id',
+          'department_id',
+          'allocation_type',
         ],
-        order: 'date_from desc'
+        order: 'date_from desc',
       }
     );
-    return allocations;
+    return raw.map(a => ({
+      id: a.id,
+      holiday_status_id: a.holiday_status_id,
+      number_of_days: a.number_of_days,
+      leaves_taken: a.leaves_taken,
+      date_from: a.date_from,
+      date_to: a.date_to,
+      state: a.state,
+      manager_id: a.manager_id,
+      department_id: a.department_id,
+      allocation_type: a.allocation_type,
+    }));
   }
 
   /** Get leave requests with optional filters */
   async getLeaveRequests(
     uid: number,
-    filters?:{ year?:number; leaveType?:number; status?:string }
+    filters?: { year?: number; leaveType?: number; status?: string }
   ): Promise<LeaveRequest[]> {
-    const prof = await this.getFullUserProfile(uid);
-    const empId = prof.id;
-    const domain: any[] = [['employee_id','=',empId]];
-    if(filters?.leaveType) domain.push(['holiday_status_id','=',filters.leaveType]);
-    if(filters?.status)    domain.push(['state','=',filters.status]);
-    if(filters?.year){
-      const y=filters.year;
-      const start=`${y}-01-01 00:00:00`;
-      const end  =`${y}-12-31 23:59:59`;
-      domain.push(['request_date_from','>=',start]);
-      domain.push(['request_date_to','<=',end]);
+    const prof: any = await this.getFullUserProfile(uid);
+    const empId: number = prof.id;
+    const domain: any[] = [['employee_id', '=', empId]];
+    if (filters?.leaveType) domain.push(['holiday_status_id', '=', filters.leaveType]);
+    if (filters?.status) domain.push(['state', '=', filters.status]);
+    if (filters?.year) {
+      const y = filters.year;
+      const start = `${y}-01-01 00:00:00`;
+      const end = `${y}-12-31 23:59:59`;
+      domain.push(['request_date_from', '>=', start]);
+      domain.push(['request_date_to', '<=', end]);
     }
     const raw: any[] = await this.execute(
       'hr.leave',
       'search_read',
       [domain],
       {
-        fields:[
-          'id','holiday_status_id','request_date_from','request_date_to',
-          'number_of_days','state','name','user_id'
+        fields: [
+          'id',
+          'holiday_status_id',
+          'request_date_from',
+          'request_date_to',
+          'number_of_days',
+          'number_of_days_display',
+          'state',
+          'name',
+          'user_id',
+          'request_unit_hours',
+          'request_hour_from',
+          'request_hour_to',
         ],
-        order:'request_date_from desc'
+        order: 'request_date_from desc',
       }
     );
-    return raw.map(r=>({
+    return raw.map(r => ({
       id: r.id,
       holiday_status_id: r.holiday_status_id,
       request_date_from: r.request_date_from,
-      request_date_to:   r.request_date_to,
-      number_of_days:    r.number_of_days,
-      state:             r.state,
-      name:              r.name,
-      user_id:           r.user_id,
+      request_date_to: r.request_date_to,
+      number_of_days: r.number_of_days,
+      number_of_days_display: r.number_of_days_display,
+      state: r.state,
+      name: r.name,
+      user_id: r.user_id,
+      request_unit_hours: r.request_unit_hours,
+      request_hour_from: r.request_hour_from,
+      request_hour_to: r.request_hour_to,
     }));
   }
 
@@ -433,75 +492,111 @@ export class OdooClient {
       request_date_from: string;
       request_date_to: string;
       reason: string;
-      request_unit?: string;
-      request_unit_half_day?: string;
+      request_unit?: 'day';
+      request_unit_half_day?: 'am' | 'pm';
       request_unit_hours?: boolean;
       request_hour_from?: string;
       request_hour_to?: string;
+      number_of_days?: number;
       number_of_days_display?: number;
+      attachment_id?: number;
     }
   ): Promise<number> {
-    const prof = await this.getFullUserProfile(uid);
-    const empId = prof.id;
-    const newId: number = await this.execute(
-      'hr.leave',
-      'create',
-      [{
-        employee_id: empId,
-        holiday_status_id: data.leaveTypeId,
-        request_date_from: data.request_date_from,
-        request_date_to: data.request_date_to,
-        name: data.reason,
-        ...(data.request_unit && { request_unit: data.request_unit }),
-        ...(data.request_unit_half_day && { request_unit_half_day: data.request_unit_half_day }),
-        ...(typeof data.request_unit_hours !== 'undefined' && { request_unit_hours: data.request_unit_hours }),
-        ...(data.request_hour_from && { request_hour_from: data.request_hour_from }),
-        ...(data.request_hour_to && { request_hour_to: data.request_hour_to }),
-        ...(typeof data.number_of_days_display !== 'undefined' && { number_of_days_display: data.number_of_days_display }),
-      }]
-    );
+    const profile: any = await this.getFullUserProfile(uid);
+    const empId: number = profile.id;
+    const vals: any = {
+      employee_id: empId,
+      holiday_status_id: data.leaveTypeId,
+      date_from: data.request_date_from,
+      date_to: data.request_date_to,
+      name: data.reason,
+    };
+
+    // Day-based or half-day
+    if (data.request_unit === 'day') {
+      if (data.request_unit_half_day) {
+        vals.request_unit = 'half';
+        vals.request_unit_half_day = data.request_unit_half_day;
+        vals.number_of_days = 0.5;
+      } else {
+        vals.number_of_days = data.number_of_days != null ? data.number_of_days : 1.0;
+      }
+    }
+
+    // Hour-based
+    if (data.request_unit_hours) {
+      vals.request_unit_hours = true;
+      const fromFloat = data.request_hour_from
+        ? (() => {
+            const [h, m] = data.request_hour_from.split(':').map(Number);
+            return h + m / 60;
+          })()
+        : 0.0;
+      const toFloat = data.request_hour_to
+        ? (() => {
+            const [h, m] = data.request_hour_to.split(':').map(Number);
+            return h + m / 60;
+          })()
+        : 0.0;
+      vals.request_hour_from = parseFloat(fromFloat.toFixed(2));
+      vals.request_hour_to = parseFloat(toFloat.toFixed(2));
+      if (data.number_of_days_display != null) {
+        vals.number_of_days_display = data.number_of_days_display;
+      }
+    }
+
+    // Attachment
+    if (data.attachment_id) {
+      vals.attachment_ids = [[6, 0, [data.attachment_id]]];
+    }
+
+    const newId: number = await this.execute('hr.leave', 'create', [vals]);
     return newId;
   }
 
   /**
    * Fetch the employee's shift code and today's start/end time
    */
-  async getEmployeeShiftInfo(uid: number): Promise<{ code: string|null, start: string|null, end: string|null }> {
-    const profile = await this.getFullUserProfile(uid);
+  async getEmployeeShiftInfo(
+    uid: number
+  ): Promise<{ code: string | null; start: string | null; end: string | null }> {
+    const profile: any = await this.getFullUserProfile(uid);
     const calendar = profile.resource_calendar_id;
     if (!calendar || !Array.isArray(calendar) || !calendar[0]) {
       return { code: null, start: null, end: null };
     }
     const calendarId = calendar[0];
-    // Fetch calendar info including code and attendance_ids
     const [calendarData] = await this.execute(
       'resource.calendar',
       'read',
       [[calendarId], ['name', 'attendance_ids']]
     );
     let code = calendarData?.name || null;
-    let start: string|null = null;
-    let end: string|null = null;
-    // Fetch today's attendance line (shift times)
-    if (calendarData && Array.isArray(calendarData.attendance_ids) && calendarData.attendance_ids.length > 0) {
-      // Fetch all attendance lines
+    let start: string | null = null;
+    let end: string | null = null;
+    if (
+      calendarData &&
+      Array.isArray(calendarData.attendance_ids) &&
+      calendarData.attendance_ids.length > 0
+    ) {
       const attendanceLines = await this.execute(
         'resource.calendar.attendance',
         'read',
         [calendarData.attendance_ids, ['dayofweek', 'hour_from', 'hour_to']]
       );
-      // Find today's dayofweek (0=Monday, 6=Sunday in Odoo)
       const today = new Date();
       const jsDay = today.getDay(); // 0=Sunday, 6=Saturday
-      const odooDay = jsDay === 0 ? 6 : jsDay - 1; // Odoo: 0=Monday, JS: 0=Sunday
+      const odooDay = jsDay === 0 ? 6 : jsDay - 1; // Odoo: 0=Monday
       const todayLines = attendanceLines.filter((l: any) => Number(l.dayofweek) === odooDay);
       if (todayLines.length > 0) {
-        // Use the earliest start and latest end for today
         const minFrom = Math.min(...todayLines.map((l: any) => l.hour_from));
         const maxTo = Math.max(...todayLines.map((l: any) => l.hour_to));
-        // Format as HH:mm
-        start = `${String(Math.floor(minFrom)).padStart(2, '0')}:${String(Math.round((minFrom%1)*60)).padStart(2, '0')}`;
-        end = `${String(Math.floor(maxTo)).padStart(2, '0')}:${String(Math.round((maxTo%1)*60)).padStart(2, '0')}`;
+        start = `${String(Math.floor(minFrom)).padStart(2, '0')}:${String(
+          Math.round((minFrom % 1) * 60)
+        ).padStart(2, '0')}`;
+        end = `${String(Math.floor(maxTo)).padStart(2, '0')}:${String(
+          Math.round((maxTo % 1) * 60)
+        ).padStart(2, '0')}`;
       }
     }
     return { code, start, end };
@@ -520,13 +615,13 @@ export class OdooClient {
   }
 
   //
-  // ── EXPENSE (CLAIM) MODULE ─────────────────────────────────────────────
+  // ── EXPENSE (CLAIM) MODULE ────────────────────────────────────────────────────
   //
 
   /** Get expense (claim) requests for a user */
   async getExpenseRequests(uid: number): Promise<ExpenseRequest[]> {
-    const profile = await this.getFullUserProfile(uid);
-    const empId = profile.id;
+    const profile: any = await this.getFullUserProfile(uid);
+    const empId: number = profile.id;
     const domain = [['employee_id', '=', empId]];
     const raw: any[] = await this.execute(
       'hr.expense',
@@ -534,7 +629,7 @@ export class OdooClient {
       [domain],
       {
         fields: ['id', 'name', 'date', 'payment_mode', 'total_amount', 'state'],
-        order: 'date desc'
+        order: 'date desc',
       }
     );
     return raw.map(r => ({
@@ -548,20 +643,21 @@ export class OdooClient {
   }
 
   /** Create a new expense (claim) request */
-  async createExpenseRequest(uid: number, data: { name: string; date: string; payment_mode: string; total_amount: number; }): Promise<number> {
-    const profile = await this.getFullUserProfile(uid);
-    const empId = profile.id;
-    const newId: number = await this.execute(
-      'hr.expense',
-      'create',
-      [{
+  async createExpenseRequest(
+    uid: number,
+    data: { name: string; date: string; payment_mode: string; total_amount: number }
+  ): Promise<number> {
+    const profile: any = await this.getFullUserProfile(uid);
+    const empId: number = profile.id;
+    const newId: number = await this.execute('hr.expense', 'create', [
+      {
         employee_id: empId,
         name: data.name,
         date: data.date,
         payment_mode: data.payment_mode,
         total_amount: data.total_amount,
-      }]
-    );
+      },
+    ]);
     return newId;
   }
 
@@ -569,85 +665,88 @@ export class OdooClient {
    * Fetch all discuss.channel records (channels and direct messages) the user belongs to
    */
   async getDiscussChannels(uid: number): Promise<any[]> {
-    // Get the user's partner_id (needed for discuss.channel)
-    const [user] = await this.execute(
-      'res.users',
-      'read',
-      [[uid], ['partner_id']]
-    );
+    const [user] = await this.execute('res.users', 'read', [[uid], ['partner_id']]);
     if (!user || !user.partner_id) throw new Error('User not found or missing partner_id');
     const partnerId = Array.isArray(user.partner_id) ? user.partner_id[0] : user.partner_id;
-    const partnerIdList = [partnerId]; // always wrap in array
-
-    // Find channels the user belongs to
+    const partnerIdList = [partnerId];
     const channels = await this.execute(
       'discuss.channel',
       'search_read',
       [[['channel_partner_ids', 'in', partnerIdList]]],
       {
         fields: ['id', 'name', 'channel_type', 'channel_partner_ids'],
-        order: 'name asc'
+        order: 'name asc',
       }
     );
     return channels;
+  }
+
+  public async postMessage(model: string, recordIds: number[], body: string) {
+    return this.execute(model, 'message_post', [recordIds, { body }]);
   }
 }
 
 // ── single instance & top‐level helpers ────────────────────────────────────────
 let _client: OdooClient;
 export function getOdooClient(): OdooClient {
-  return _client ||= new OdooClient();
+  return (_client ||= new OdooClient());
 }
 
-export async function loginToOdoo(email:string,password:string) {
-  return getOdooClient().login(email,password);
+export async function loginToOdoo(email: string, password: string) {
+  return getOdooClient().login(email, password);
 }
-export async function getFullUserProfile(uid:number) {
+export async function getFullUserProfile(uid: number) {
   return getOdooClient().getFullUserProfile(uid);
 }
-export async function getTodayAttendance(uid:number) {
+export async function getTodayAttendance(uid: number) {
   return getOdooClient().getTodayAttendance(uid);
 }
 export async function getEmployeeAttendance(
-  uid:number,range:DateRange='monthly',customDate?:string,customRange?:{from:string;to:string}
+  uid: number,
+  range: DateRange = 'monthly',
+  customDate?: string,
+  customRange?: { from: string; to: string }
 ) {
-  return getOdooClient().getEmployeeAttendance(uid,range,customDate,customRange);
+  return getOdooClient().getEmployeeAttendance(uid, range, customDate, customRange);
 }
-export async function clockIn(uid:number) {
+export async function clockIn(uid: number) {
   return getOdooClient().clockIn(uid);
 }
-export async function clockOut(uid:number) {
+export async function clockOut(uid: number) {
   return getOdooClient().clockOut(uid);
 }
 export async function getLeaveTypes() {
   return getOdooClient().getLeaveTypes();
 }
-export async function getLeaveAllocations(uid:number) {
+export async function getLeaveAllocations(uid: number) {
   return getOdooClient().getLeaveAllocations(uid);
 }
 export async function getLeaveRequests(
-  uid:number,filters?:{year?:number;leaveType?:number;status?:string}
+  uid: number,
+  filters?: { year?: number; leaveType?: number; status?: string }
 ) {
-  return getOdooClient().getLeaveRequests(uid,filters);
+  return getOdooClient().getLeaveRequests(uid, filters);
 }
 export async function createLeaveRequest(
-  uid:number,
-  data:{
-    leaveTypeId:number;
-    request_date_from:string;
-    request_date_to:string;
-    reason:string;
-    request_unit?:string;
-    request_unit_half_day?:string;
-    request_unit_hours?:boolean;
-    request_hour_from?:string;
-    request_hour_to?:string;
-    number_of_days_display?:number;
+  uid: number,
+  data: {
+    leaveTypeId: number;
+    request_date_from: string;
+    request_date_to: string;
+    reason: string;
+    request_unit?: 'day';
+    request_unit_half_day?: 'am' | 'pm';
+    request_unit_hours?: boolean;
+    request_hour_from?: string;
+    request_hour_to?: string;
+    number_of_days?: number;
+    number_of_days_display?: number;
+    attachment_id?: number;
   }
 ) {
-  return getOdooClient().createLeaveRequest(uid,data);
+  return getOdooClient().createLeaveRequest(uid, data);
 }
-export async function getEmployeeShiftInfo(uid:number) {
+export async function getEmployeeShiftInfo(uid: number) {
   return getOdooClient().getEmployeeShiftInfo(uid);
 }
 export async function getAllShiftAttendances() {
@@ -656,9 +755,13 @@ export async function getAllShiftAttendances() {
 export async function getExpenseRequests(uid: number) {
   return getOdooClient().getExpenseRequests(uid);
 }
-export async function createExpenseRequest(uid: number, data: { name: string; date: string; payment_mode: string; total_amount: number; }) {
+export async function createExpenseRequest(
+  uid: number,
+  data: { name: string; date: string; payment_mode: string; total_amount: number }
+) {
   return getOdooClient().createExpenseRequest(uid, data);
 }
 export async function getDiscussChannels(uid: number) {
   return getOdooClient().getDiscussChannels(uid);
 }
+
