@@ -144,9 +144,9 @@ function Calendar({
         </button>
       </div>
       {viewMode === 'months' ? (
-        <div className="grid grid-cols-3 gap-6">
+        <div className="grid grid-cols-3 gap-12">
           {monthsGrid.map((date, idx) => (
-            <div key={idx} className="border rounded-lg p-2 bg-background">
+            <div key={idx} className="border rounded-lg p-2 bg-background w-full">
               <div className="text-center font-semibold mb-2 text-primary">{MONTHS[date.getMonth()]}</div>
               <DayPicker
                 showOutsideDays={showOutsideDays}

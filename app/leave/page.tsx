@@ -292,11 +292,46 @@ export default function LeavePage() {
         <Tabs defaultValue="calendar" className="w-full">
           <TabsList>
             <TabsTrigger value="calendar">Calendar</TabsTrigger>
-            <TabsTrigger value="history" onClick={() => router.push('/leave/history')}>My Allocations</TabsTrigger>
+            <TabsTrigger value="balance" onClick={() => router.push('/leave/balance')}>Time-Off Balance</TabsTrigger>
+            <TabsTrigger value="history" onClick={() => router.push('/leave/history')}>Time-Off History</TabsTrigger>
           </TabsList>
           <TabsContent value="calendar">
             {/* Calendar view here (example below) */}
-            <Calendar mode="multiple" onDayClick={handleCalendarDayClick} initialMonth={new Date()} />
+            <div className="flex justify-center">
+              <Calendar mode="multiple" onDayClick={handleCalendarDayClick} initialMonth={new Date()} />
+            </div>
+          </TabsContent>
+          <TabsContent value="balance">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Leave Type</TableHead>
+                    <TableHead>Validity Period</TableHead>
+                    <TableHead>Allocation</TableHead>
+                    <TableHead>Used Days</TableHead>
+                    <TableHead>Remaining Days</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {leaveAllocations.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center">No leave allocations found.</TableCell>
+                    </TableRow>
+                  ) : (
+                    leaveAllocations.map((alloc) => (
+                      <TableRow key={alloc.id}>
+                        <TableCell>{alloc.holiday_status_id?.[1] || '-'}</TableCell>
+                        <TableCell>{alloc.date_from ? `${alloc.date_from} - ${alloc.date_to || '-'}` : '-'}</TableCell>
+                        <TableCell>{alloc.number_of_days_display ?? alloc.number_of_days ?? '-'}</TableCell>
+                        <TableCell>{alloc.leaves_taken ?? '-'}</TableCell>
+                        <TableCell>{alloc.number_of_days !== undefined && alloc.leaves_taken !== undefined ? (alloc.number_of_days - alloc.leaves_taken) : '-'}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </TabsContent>
         </Tabs>
         {/* Leave Apply Dialog (already present, just ensure it's controlled by isRequestOpen) */}
