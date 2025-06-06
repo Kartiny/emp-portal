@@ -684,6 +684,19 @@ export class OdooClient {
   public async postMessage(model: string, recordIds: number[], body: string) {
     return this.execute(model, 'message_post', [recordIds, { body }]);
   }
+
+  /**
+   * Get all shift codes from hr.work.schedule.code
+   */
+  async getAllShiftCodes(): Promise<{ id: number; name: string; desc: string }[]> {
+    const raw: any[] = await this.execute(
+      'hr.work.schedule.code',
+      'search_read',
+      [[]],
+      { fields: ['id', 'name', 'desc'], order: 'name asc' }
+    );
+    return raw.map(r => ({ id: r.id, name: r.name, desc: r.desc }));
+  }
 }
 
 // ── single instance & top‐level helpers ────────────────────────────────────────
@@ -763,5 +776,8 @@ export async function createExpenseRequest(
 }
 export async function getDiscussChannels(uid: number) {
   return getOdooClient().getDiscussChannels(uid);
+}
+export async function getAllShiftCodes() {
+  return getOdooClient().getAllShiftCodes();
 }
 
