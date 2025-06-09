@@ -6,6 +6,7 @@ import {
   format as dfFormat,
 } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
+import { Buffer } from 'buffer';
 
 const COMMON_ENDPOINT = `${ODOO_CONFIG.BASE_URL}/xmlrpc/2/common`;
 const OBJECT_ENDPOINT = `${ODOO_CONFIG.BASE_URL}/xmlrpc/2/object`;
@@ -697,6 +698,44 @@ export class OdooClient {
     );
     return raw.map(r => ({ id: r.id, name: r.name, desc: r.desc }));
   }
+
+  /**
+   * Upload a file as ir.attachment and return the attachment ID (static helper)
+   */
+  static async uploadAttachment({
+    fileBuffer,
+    filename,
+    mimetype,
+    relatedModel = null,
+    relatedId = null,
+  }: {
+    fileBuffer: Buffer;
+    filename: string;
+    mimetype: string;
+    relatedModel?: string | null;
+    relatedId?: number | null;
+  }): Promise<number> {
+    const client = new OdooClient();
+    const base64Data = fileBuffer.toString('base64');
+    const values: any = {
+      name: filename,
+      datas: base64Data,
+      mimetype,
+      res_model: relatedModel,
+      res_id: relatedId,
+    };
+    Object.keys(values).forEach((k) => values[k] == null && delete values[k]);
+    const uid = await client.authenticateAdmin();
+    const attachmentId = await xmlRpcCall(client.object, 'execute_kw', [
+      ODOO_CONFIG.DB_NAME,
+      uid,
+      ODOO_CONFIG.ADMIN_PWD,
+      'ir.attachment',
+      'create',
+      [values],
+    ]);
+    return attachmentId;
+  }
 }
 
 // ── single instance & top‐level helpers ────────────────────────────────────────
@@ -779,5 +818,15 @@ export async function getDiscussChannels(uid: number) {
 }
 export async function getAllShiftCodes() {
   return getOdooClient().getAllShiftCodes();
+}
+
+export async function uploadAttachmentToOdoo(opts: {
+  fileBuffer: Buffer;
+  filename: string;
+  mimetype: string;
+  relatedModel?: string | null;
+  relatedId?: number | null;
+}): Promise<number> {
+  return OdooClient.uploadAttachment(opts);
 }
 

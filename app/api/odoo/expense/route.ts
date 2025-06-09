@@ -7,7 +7,13 @@ export async function POST(req: Request) {
     if (typeof uid !== 'number' || !data) {
       return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
     }
-    const newId = await createExpenseRequest(uid, data);
+    const newId = await createExpenseRequest(uid, {
+      name: data.description,
+      date: data.date,
+      payment_mode: data.payment_mode,
+      total_amount: data.total_amount,
+      ...(data.attachment_id ? { attachment_id: data.attachment_id } : {}),
+    });
     return NextResponse.json({ id: newId });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
