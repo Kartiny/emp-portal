@@ -121,15 +121,15 @@ export default function LeaveHistoryPage() {
           className="px-4 py-2 bg-blue-900 text-white rounded hover:bg-blue-800 transition-colors"
           onClick={() => router.push('/leave?request=1')}
         >
-          Request Time-Off
+          Request Leave
         </button>
       </div>
       <div className="space-y-6">
         <Tabs defaultValue="history" className="w-full">
           <TabsList>
             <TabsTrigger value="calendar" onClick={() => router.push('/leave')}>Calendar</TabsTrigger>
-            <TabsTrigger value="balance" onClick={() => router.push('/leave/balance')}>Time-Off Balance</TabsTrigger>
-            <TabsTrigger value="history" onClick={() => router.push('/leave/history')}>Time-Off History</TabsTrigger>
+            <TabsTrigger value="balance" onClick={() => router.push('/leave/balance')}>Leave Balance</TabsTrigger>
+            <TabsTrigger value="history" onClick={() => router.push('/leave/history')}>Leave History</TabsTrigger>
           </TabsList>
         </Tabs>
         <Card>
@@ -179,7 +179,7 @@ export default function LeaveHistoryPage() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Time-Off History</CardTitle>
+            <CardTitle>Leave History</CardTitle>
             <CardDescription>Your leave requests and their status</CardDescription>
           </CardHeader>
           <CardContent>

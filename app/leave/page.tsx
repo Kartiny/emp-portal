@@ -159,7 +159,7 @@ export default function LeavePage() {
     setDocument(null);
   }, [selectedLeaveTypeId, leaveTypes]);
 
-  // Default the leave type to “Annual” if available
+  // Default the leave type to "Annual" if available
   useEffect(() => {
     if (leaveTypes.length > 0 && !selectedLeaveTypeId) {
       const annual = leaveTypes.find((t) =>
@@ -171,7 +171,7 @@ export default function LeavePage() {
   }, [leaveTypes]);
 
   // ───── Helpers ─────────────────────────────────────────────────────────────
-  /** Calculate difference in hours between two “HH:mm” strings */
+  /** Calculate difference in hours between two "HH:mm" strings */
   function calculateHours(start: string, end: string): number {
     const [sh, sm] = start.split(':').map(Number);
     const [eh, em] = end.split(':').map(Number);
@@ -180,7 +180,7 @@ export default function LeavePage() {
     return Math.max(0, parseFloat((endFloat - startFloat).toFixed(2)));
   }
 
-  /** Convert “HH:mm” to a float hour (e.g. “07:30” → 7.5) */
+  /** Convert "HH:mm" to a float hour (e.g. "07:30" → 7.5) */
   function timeStringToFloat(time: string): number | null {
     if (!time) return null;
     const [h, m] = time.split(':').map(Number);
@@ -188,7 +188,7 @@ export default function LeavePage() {
     return h + m / 60;
   }
 
-  /** Convert a float hour back to “HH:mm” string, if ever needed */
+  /** Convert a float hour back to "HH:mm" string, if ever needed */
   function floatToTimeString(val?: number): string {
     if (typeof val !== 'number' || isNaN(val)) return '';
     const h = Math.floor(val);
@@ -196,15 +196,15 @@ export default function LeavePage() {
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
   }
 
-  /** Check if request form is valid before enabling “Submit” */
+  /** Check if request form is valid before enabling "Submit" */
   const isValid = (): boolean => {
     if (!selectedLeaveTypeId || !startDate || !endDate) return false;
 
-    // If the leave type’s “request_unit” is "hour", we must have duration="hour"
-    // If the leave type’s “request_unit” is "day", we must have duration = 'full'|'half'|'second_half'
+    // If the leave type's "request_unit" is "hour", we must have duration="hour"
+    // If the leave type's "request_unit" is "day", we must have duration = 'full'|'half'|'second_half'
     if (selectedType) {
       if (selectedType.request_unit === 'hour') {
-        // Must choose the “Hours” radio
+        // Must choose the "Hours" radio
         if (duration !== 'hour') return false;
         // Must have valid startTime & endTime
         if (!startTime || !endTime) return false;
@@ -215,14 +215,14 @@ export default function LeavePage() {
       }
     }
 
-    // If this leave type requires a supporting document, ensure it’s uploaded
+    // If this leave type requires a supporting document, ensure it's uploaded
     if (selectedType?.support_document && !document) return false;
 
-    // It’s valid
+    // It's valid
     return true;
   };
 
-  // ───── Handle the “Submit Leave Request” ───────────────────────────────────
+  // ───── Handle the "Submit Leave Request" ───────────────────────────────────
   const handleLeaveRequest = async () => {
     if (!isValid()) {
       toast.error('Please fill in all required fields');
@@ -245,7 +245,7 @@ export default function LeavePage() {
         },
       };
 
-      // If the request is “Hourly”
+      // If the request is "Hourly"
       if (duration === 'hour') {
         const fromFloat = timeStringToFloat(startTime);
         const toFloat = timeStringToFloat(endTime);
@@ -264,18 +264,18 @@ export default function LeavePage() {
         // number_of_days_display is sometimes used to show hours on Odoo side
         payload.request.number_of_days_display = parseFloat(hours.toFixed(2));
       }
-      // If the request is “Half-Day (AM or PM)” or “Second Half-Day”
+      // If the request is "Half-Day (AM or PM)" or "Second Half-Day"
       else if (duration === 'half' || duration === 'second_half') {
-        // For a “half-day,” we send number_of_days = 0.5
+        // For a "half-day," we send number_of_days = 0.5
         payload.request.request_unit_hours = false;
         payload.request.number_of_days = 0.5;
       }
-      // If the request is “Full Day”
+      // If the request is "Full Day"
       else if (duration === 'full') {
         payload.request.request_unit_hours = false;
         // We do NOT explicitly set number_of_days here,
-        // because Odoo will compute “(date_to−date_from)+1” as days.
-        // If you want to guarantee “1 day,” you could do payload.request.number_of_days = 1.0;
+        // because Odoo will compute "(date_to−date_from)+1" as days.
+        // If you want to guarantee "1 day," you could do payload.request.number_of_days = 1.0;
         // But Odoo can infer it from the date range.
       }
 
@@ -294,7 +294,7 @@ export default function LeavePage() {
         payload.request.attachment_id = uploadJson.attachmentId;
       }
 
-      // Debug: see exactly what we’re sending
+      // Debug: see exactly what we're sending
       console.log('Leave Request Payload:', payload);
 
       const response = await fetch('/api/odoo/leave/request', {
@@ -360,17 +360,17 @@ export default function LeavePage() {
             <TabsList>
               <TabsTrigger value="calendar">Calendar</TabsTrigger>
               <TabsTrigger value="balance" onClick={() => router.push('/leave/balance')}>
-                Time-Off Balance
+                Leave Balance
               </TabsTrigger>
               <TabsTrigger value="history" onClick={() => router.push('/leave/history')}>
-                Time-Off History
+                Leave History
               </TabsTrigger>
             </TabsList>
             <button
               className="px-4 py-2 bg-blue-900 text-white rounded hover:bg-blue-800 transition-colors ml-4"
               onClick={() => setIsRequestOpen(true)}
             >
-              Request Time-Off
+              Request Leave
             </button>
           </div>
 
@@ -530,7 +530,7 @@ export default function LeavePage() {
                 </div>
               )}
 
-              {/* ── Start/End Time for “Hours” ───────────────────────────────────── */}
+              {/* ── Start/End Time for "Hours" ───────────────────────────────────── */}
               {duration === 'hour' && (
                 <div className="flex gap-2">
                   <div className="flex-1">
