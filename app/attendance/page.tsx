@@ -259,9 +259,17 @@ export default function AttendancePage() {
     <MainLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold">Attendance</h1>
-          <p className="text-muted-foreground">View and manage your attendance</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Attendance</h1>
+            <p className="text-muted-foreground">View and manage your attendance</p>
+          </div>
+          <Button
+            className="bg-blue-900 text-white hover:bg-blue-800 transition-colors"
+            onClick={() => alert('Overtime Request logic coming soon!')}
+          >
+            Overtime Request
+          </Button>
         </div>
 
         {/* Widgets */}
