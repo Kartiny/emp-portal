@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AlertTriangle, ListTodo, Bell } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface UserProfile {
   name: string;
@@ -10,9 +11,14 @@ interface UserProfile {
   image?: string;
 }
 
-export function CustomHeader() {
+interface CustomHeaderProps {
+  missedClockOut?: boolean;
+}
+
+export function CustomHeader({ missedClockOut }: CustomHeaderProps) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showMissedPopover, setShowMissedPopover] = useState(false);
 
   useEffect(() => {
     const uid = localStorage.getItem('uid');
@@ -66,9 +72,26 @@ export function CustomHeader() {
       </div>
       {/* Right: Warning, Tasks, Notifications, Logo */}
       <div className="flex items-center space-x-6">
-        <button title="Missed Clock Out" className="hover:text-yellow-600 transition-colors" onClick={() => alert('You have not clocked out today!')}>
-          <AlertTriangle className="h-6 w-6" />
-        </button>
+        {missedClockOut ? (
+          <Popover open={showMissedPopover} onOpenChange={setShowMissedPopover}>
+            <PopoverTrigger asChild>
+              <button title="Missed Clock Out" className="relative transition-colors" onClick={() => setShowMissedPopover(true)}>
+                <AlertTriangle className="h-6 w-6 text-red-600" />
+                <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-yellow-500 border-2 border-white animate-pulse" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 text-sm text-yellow-900 bg-yellow-50 border-yellow-400">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">⚠️</span>
+                <span>You forgot to check out. Please update your time.</span>
+              </div>
+            </PopoverContent>
+          </Popover>
+        ) : (
+          <span title="No missed clock out" className="relative">
+            <AlertTriangle className="h-6 w-6 text-yellow-500" />
+          </span>
+        )}
         <button title="Pending Tasks" className="hover:text-blue-600 transition-colors" onClick={() => alert('View your pending tasks!')}>
           <ListTodo className="h-6 w-6" />
         </button>

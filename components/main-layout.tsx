@@ -12,9 +12,10 @@ import { CustomHeader } from "@/components/custom-header"
 
 interface MainLayoutProps {
   children: React.ReactNode
+  missedClockOut?: boolean
 }
 
-export function MainLayout({ children }: MainLayoutProps) {
+export function MainLayout({ children, missedClockOut }: MainLayoutProps) {
   const pathname = usePathname()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
@@ -66,7 +67,7 @@ export function MainLayout({ children }: MainLayoutProps) {
               </SheetContent>
             </Sheet>
           </Button>
-          <CustomHeader />
+          <CustomHeader missedClockOut={missedClockOut} />
         </div>
       </header>
       <div className="flex flex-1">
