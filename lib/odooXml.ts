@@ -572,7 +572,7 @@ export class OdooClient {
       'read',
       [[calendarId], ['name', 'attendance_ids']]
     );
-    let code = calendarData?.name || null;
+    let code: string | null = null;
     let start: string | null = null;
     let end: string | null = null;
     if (
@@ -583,13 +583,20 @@ export class OdooClient {
       const attendanceLines = await this.execute(
         'resource.calendar.attendance',
         'read',
-        [calendarData.attendance_ids, ['dayofweek', 'hour_from', 'hour_to']]
+        [calendarData.attendance_ids, ['dayofweek', 'hour_from', 'hour_to', 'schedule_code_id']]
       );
       const today = new Date();
       const jsDay = today.getDay(); // 0=Sunday, 6=Saturday
       const odooDay = jsDay === 0 ? 6 : jsDay - 1; // Odoo: 0=Monday
       const todayLines = attendanceLines.filter((l: any) => Number(l.dayofweek) === odooDay);
       if (todayLines.length > 0) {
+        // Use the first attendance line for the day (or you can enhance to handle multiple)
+        const line = todayLines[0];
+        if (line.schedule_code_id && Array.isArray(line.schedule_code_id)) {
+          code = line.schedule_code_id[1]; // [id, name]
+        } else {
+          code = null;
+        }
         const minFrom = Math.min(...todayLines.map((l: any) => l.hour_from));
         const maxTo = Math.max(...todayLines.map((l: any) => l.hour_to));
         start = `${String(Math.floor(minFrom)).padStart(2, '0')}:${String(

@@ -236,9 +236,18 @@ export default function AttendancePage() {
   };
   const formatHours = (h: number) => `${Math.floor(h)}h ${Math.round((h%1)*60)}m`;
 
+  // Compute missedClockOut
+  const now = toZonedTime(new Date(), 'Asia/Kuala_Lumpur');
+  const missedClockOut = !!(
+    todayData &&
+    todayData.lastClockIn &&
+    !todayData.lastClockOut &&
+    (now.getHours() > WORK_END_HOUR || (now.getHours() === WORK_END_HOUR && now.getMinutes() > 0))
+  );
+
   if (loading) {
     return (
-      <MainLayout>
+      <MainLayout missedClockOut={missedClockOut}>
         <div className="flex items-center justify-center h-64">
           <p>Loading attendance data...</p>
         </div>
@@ -247,7 +256,7 @@ export default function AttendancePage() {
   }
   if (error) {
     return (
-      <MainLayout>
+      <MainLayout missedClockOut={missedClockOut}>
         <Card>
           <CardContent className="text-red-600 p-6">{error}</CardContent>
         </Card>
@@ -256,7 +265,7 @@ export default function AttendancePage() {
   }
 
   return (
-    <MainLayout>
+    <MainLayout missedClockOut={missedClockOut}>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
