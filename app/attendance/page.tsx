@@ -55,6 +55,8 @@ interface AttendanceRecord {
   checkIn: string;
   checkOut: string | null;
   workedHours: number;
+  start_clock_actual?: string;
+  end_clock_actual?: string;
 }
 
 interface AttendanceData {
@@ -71,7 +73,12 @@ interface DateRangeState {
 
 export default function AttendancePage() {
   const [attendanceData, setAttendanceData] = useState<AttendanceData | null>(null);
-  const [todayData, setTodayData] = useState<{ lastClockIn: string | null; lastClockOut: string | null } | null>(null);
+  const [todayData, setTodayData] = useState<{
+    lastClockIn: string | null;
+    lastClockOut: string | null;
+    start_clock_actual?: string | null;
+    end_clock_actual?: string | null;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<DateRangeState>({ type: 'monthly' });
@@ -190,10 +197,16 @@ export default function AttendancePage() {
   }, [dateRange.type, currentDate, customDateRange]);
 
   // Status computations
-  const calculateLateStatus = (checkIn: string) => {
+  const calculateLateStatus = (checkIn: string, shiftStart?: string) => {
     try {
       const d = toZonedTime(new Date(checkIn), 'Asia/Kuala_Lumpur');
-      const ref = new Date(d); ref.setHours(WORK_START_HOUR, 0, 0, 0);
+      let ref = new Date(d);
+      if (shiftStart) {
+        const [h, m] = shiftStart.split(':').map(Number);
+        ref.setHours(h, m, 0, 0);
+      } else {
+        ref.setHours(WORK_START_HOUR, 0, 0, 0);
+      }
       const mins = differenceInMinutes(d, ref);
       const absMins = Math.abs(mins);
       const h = Math.floor(absMins / 60);
@@ -207,10 +220,16 @@ export default function AttendancePage() {
       return { isLate: false, isEarly: false, status: 'N/A' };
     }
   };
-  const calculateEarlyLeaveStatus = (checkOut: string, late: boolean) => {
+  const calculateEarlyLeaveStatus = (checkOut: string, late: boolean, shiftEnd?: string) => {
     try {
       const d = toZonedTime(new Date(checkOut), 'Asia/Kuala_Lumpur');
-      const ref = new Date(d); ref.setHours(WORK_END_HOUR, 0, 0, 0);
+      let ref = new Date(d);
+      if (shiftEnd) {
+        const [h, m] = shiftEnd.split(':').map(Number);
+        ref.setHours(h, m, 0, 0);
+      } else {
+        ref.setHours(WORK_END_HOUR, 0, 0, 0);
+      }
       const mins = differenceInMinutes(ref, d);
       const absMins = Math.abs(mins);
       const h = Math.floor(absMins / 60);
@@ -298,23 +317,31 @@ export default function AttendancePage() {
                     <p className={
                       !todayData.lastClockIn
                         ? 'text-red-600'
-                        : calculateLateStatus(todayData.lastClockIn || '').isLate
+                        : calculateLateStatus(todayData.lastClockIn || '', todayData.start_clock_actual || undefined).isLate
                           ? 'text-yellow-600'
-                          : calculateLateStatus(todayData.lastClockIn || '').isEarly
+                          : calculateLateStatus(todayData.lastClockIn || '', todayData.start_clock_actual || undefined).isEarly
                             ? 'text-blue-600'
                             : 'text-green-600'
                     }>
                       {!todayData.lastClockIn
                         ? 'Not clocked in today'
-                        : calculateLateStatus(todayData.lastClockIn || '').status}
+                        : calculateLateStatus(todayData.lastClockIn || '', todayData.start_clock_actual || undefined).status}
                     </p>
                   </div>
                   {todayData.lastClockOut && (
                     <>
                       <div>
                         <p className="text-sm">Check-out Status</p>
-                        <p className={calculateEarlyLeaveStatus(todayData.lastClockOut || '', calculateLateStatus(todayData.lastClockIn || '').isLate).isEarly ? 'text-red-600' : 'text-green-600'}>
-                          {calculateEarlyLeaveStatus(todayData.lastClockOut || '', calculateLateStatus(todayData.lastClockIn || '').isLate).status}
+                        <p className={calculateEarlyLeaveStatus(
+                          todayData.lastClockOut || '',
+                          calculateLateStatus(todayData.lastClockIn || '', todayData.start_clock_actual || undefined).isLate,
+                          todayData.end_clock_actual || undefined
+                        ).isEarly ? 'text-red-600' : 'text-green-600'}>
+                          {calculateEarlyLeaveStatus(
+                            todayData.lastClockOut || '',
+                            calculateLateStatus(todayData.lastClockIn || '', todayData.start_clock_actual || undefined).isLate,
+                            todayData.end_clock_actual || undefined
+                          ).status}
                         </p>
                       </div>
                       {calculateOvertimeHours(todayData.lastClockOut) > 0 && (
@@ -425,9 +452,9 @@ export default function AttendancePage() {
               </TableHeader>
               <TableBody>
                 {attendanceData?.records.map((rec) => {
-                  const late = calculateLateStatus(rec.checkIn);
+                  const late = calculateLateStatus(rec.checkIn, rec.start_clock_actual);
                   const early = rec.checkOut
-                    ? calculateEarlyLeaveStatus(rec.checkOut, late.isLate)
+                    ? calculateEarlyLeaveStatus(rec.checkOut, late.isLate, rec.end_clock_actual)
                     : null;
                   const overtime = rec.checkOut
                     ? calculateOvertimeHours(rec.checkOut)

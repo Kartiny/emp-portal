@@ -19,7 +19,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // 2️⃣ Query today’s records
+    // 2️⃣ Query today's records
     const today = new Date().toISOString().split('T')[0];
     const domain = [
       ['employee_id','=', empId],
@@ -34,10 +34,15 @@ export async function POST(req: Request) {
       { fields: ['check_in','check_out'], order: 'check_in desc', limit: 1 }
     );
 
+    // Fetch shift info for today
+    const shiftInfo = await client.getEmployeeShiftInfo(uid);
+
     const last = recs[0] || {};
     return NextResponse.json({
       lastClockIn: last.check_in || null,
       lastClockOut: last.check_out || null,
+      start_clock_actual: shiftInfo.start || null,
+      end_clock_actual: shiftInfo.end || null,
     });
   } catch (err: any) {
     console.error("Today's attendance error:", err);
