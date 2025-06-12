@@ -12,6 +12,14 @@ const COMMON_ENDPOINT = `${ODOO_CONFIG.BASE_URL}/xmlrpc/2/common`;
 const OBJECT_ENDPOINT = `${ODOO_CONFIG.BASE_URL}/xmlrpc/2/object`;
 const STANDARD_HOURS = 12; // for attendance rate (7 AM–7 PM)
 
+// Helper to convert float hour to HH:mm string
+function floatToTimeString(floatVal: number | null): string | null {
+  if (floatVal == null || isNaN(floatVal)) return null;
+  const hours = Math.floor(floatVal);
+  const minutes = Math.round((floatVal - hours) * 60);
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+}
+
 /** Wrapper for xmlrpc.methodCall → Promise */
 function xmlRpcCall(client: any, method: string, params: any[]): Promise<any> {
   return new Promise((resolve, reject) => {
@@ -582,23 +590,61 @@ export class OdooClient {
       return { code: null, start: null, end: null };
     }
     const scheduleCode = attendanceLines[0].schedule_code_id;
+    let start: string | null = null;
+    let end: string | null = null;
+    if (scheduleCode && Array.isArray(scheduleCode) && scheduleCode[0]) {
+      // Fetch timing from hr.work.schedule.code.line
+      const codeLines = await this.execute(
+        'hr.work.schedule.code.line',
+        'search_read',
+        [[['code_id', '=', scheduleCode[0]]]],
+        { fields: ['start_clock_actual', 'end_clock_actual'], limit: 1 }
+      );
+      if (codeLines && codeLines.length > 0) {
+        start = floatToTimeString(codeLines[0].start_clock_actual);
+        end = floatToTimeString(codeLines[0].end_clock_actual);
+      }
+    }
     if (!scheduleCode || !Array.isArray(scheduleCode) || !scheduleCode[0]) {
-      return { code: null, start: null, end: null };
+      return { code: null, start, end };
     }
     const code = scheduleCode[1] || null;
-    return { code, start: null, end: null };
+    return { code, start, end };
   }
 
   /**
-   * Get all resource.calendar.attendance records with schedule_code_id, hour_from, hour_to
+   * Get all resource.calendar.attendance records with schedule_code_id, hour_from, hour_to, and code line's start/end clock actual
    */
   async getAllShiftAttendances(): Promise<any[]> {
-    return await this.execute(
+    const attendances = await this.execute(
       'resource.calendar.attendance',
       'search_read',
       [[]],
       { fields: ['id', 'schedule_code_id', 'hour_from', 'hour_to'] }
     );
+    // For each attendance, fetch code line's start/end if schedule_code_id exists
+    const results = await Promise.all(attendances.map(async (att: any) => {
+      let start: string | null = null;
+      let end: string | null = null;
+      if (att.schedule_code_id && Array.isArray(att.schedule_code_id) && att.schedule_code_id[0]) {
+        const codeLines = await this.execute(
+          'hr.work.schedule.code.line',
+          'search_read',
+          [[['code_id', '=', att.schedule_code_id[0]]]],
+          { fields: ['start_clock_actual', 'end_clock_actual'], limit: 1 }
+        );
+        if (codeLines && codeLines.length > 0) {
+          start = floatToTimeString(codeLines[0].start_clock_actual);
+          end = floatToTimeString(codeLines[0].end_clock_actual);
+        }
+      }
+      return {
+        ...att,
+        start_clock_actual: start,
+        end_clock_actual: end,
+      };
+    }));
+    return results;
   }
 
   //
