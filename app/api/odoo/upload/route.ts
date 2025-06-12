@@ -5,6 +5,7 @@ export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
     const file = formData.get('file');
+    const expenseId = formData.get('expenseId');
     if (!file || typeof file === 'string') {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
     }
@@ -16,7 +17,8 @@ export async function POST(req: NextRequest) {
       fileBuffer: buffer,
       filename: file.name,
       mimetype: file.type,
-      // Optionally: relatedModel: 'hr.expense', relatedId: null
+      relatedModel: expenseId ? 'hr.expense' : null,
+      relatedId: expenseId ? Number(expenseId) : null,
     });
     return NextResponse.json({ attachmentId });
   } catch (err) {

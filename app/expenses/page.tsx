@@ -57,13 +57,36 @@ export default function ExpensesPage() {
       setFormLoading(false);
       return;
     }
-    let attachmentId = null;
     try {
-      if (receipt) {
+      // 1. Create the expense (without attachment)
+      const payload = {
+        uid: Number(uid),
+        data: {
+          description: form.description,
+          date: form.date,
+          payment_mode: form.payment_mode,
+          total_amount: parseFloat(form.total_amount),
+        },
+      };
+      const res = await fetch('/api/odoo/expense', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error('Claim submission failed:', errText);
+        alert('Failed to submit claim: ' + errText);
+        setFormLoading(false);
+        return;
+      }
+      const { id: expenseId } = await res.json();
+      // 2. If receipt, upload and link to expense
+      if (receipt && expenseId) {
         setUploading(true);
         const formData = new FormData();
         formData.append('file', receipt);
-        console.log('Uploading receipt...');
+        formData.append('expenseId', String(expenseId));
         const uploadRes = await fetch('/api/odoo/upload', {
           method: 'POST',
           body: formData,
@@ -76,31 +99,6 @@ export default function ExpensesPage() {
           setFormLoading(false);
           return;
         }
-        attachmentId = uploadJson.attachmentId;
-        console.log('Receipt uploaded, attachmentId:', attachmentId);
-      }
-      const payload = {
-        uid: Number(uid),
-        data: {
-          description: form.description,
-          date: form.date,
-          payment_mode: form.payment_mode,
-          total_amount: parseFloat(form.total_amount),
-          ...(attachmentId ? { attachment_id: attachmentId } : {}),
-        },
-      };
-      console.log('Submitting claim payload:', payload);
-      const res = await fetch('/api/odoo/expense', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const errText = await res.text();
-        console.error('Claim submission failed:', errText);
-        alert('Failed to submit claim: ' + errText);
-        setFormLoading(false);
-        return;
       }
       setForm({ description: '', date: '', payment_mode: '', total_amount: '' });
       setReceipt(null);
@@ -240,11 +238,11 @@ export default function ExpensesPage() {
                 {selectedClaim.attachment_url && (
                   <div>
                     <b>Receipt:</b>{' '}
-                    {selectedClaim.attachment_url.match(/\.pdf$/i) ? (
+                    {selectedClaim.attachment_mimetype === 'application/pdf' ? (
                       <a href={selectedClaim.attachment_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">View PDF</a>
                     ) : (
                       <a href={selectedClaim.attachment_url} target="_blank" rel="noopener noreferrer">
-                        <img src={selectedClaim.attachment_url} alt="Receipt" className="max-h-48 mt-2 border rounded" />
+                        <img src={selectedClaim.attachment_url} alt="Receipt" className="max-h-48 mt-2 border rounded cursor-pointer" />
                       </a>
                     )}
                   </div>
