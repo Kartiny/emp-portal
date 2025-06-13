@@ -76,11 +76,46 @@ export async function POST(req: Request) {
     );
 
     // 4️⃣ Map + totals
-    const records = raw.map((r: any) => ({
-      id: r.id,
-      checkIn: r.check_in,
-      checkOut: r.check_out,
-      workedHours: r.worked_hours || 0,
+    // For each record, fetch shift code for that date
+    const records = await Promise.all(raw.map(async (r: any) => {
+      // Get the date part of check_in
+      const checkInDate = r.check_in ? r.check_in.split(' ')[0] : null;
+      let shiftCode = null;
+      if (checkInDate) {
+        // Get shift code for that date
+        try {
+          const jsDate = new Date(checkInDate);
+          const profile = await getFullUserProfile(uid);
+          const calendar = profile.resource_calendar_id;
+          if (calendar && Array.isArray(calendar) && calendar[0]) {
+            const calendarId = calendar[0];
+            // Odoo: 0=Monday, 6=Sunday
+            const jsDay = jsDate.getDay();
+            const odooDay = jsDay === 0 ? 6 : jsDay - 1;
+            const attendanceLines = await client['execute'](
+              'resource.calendar.attendance',
+              'search_read',
+              [[['calendar_id', '=', calendarId], ['dayofweek', '=', odooDay]]],
+              { fields: ['schedule_code_id'], limit: 1 }
+            );
+            if (attendanceLines && attendanceLines.length > 0) {
+              const scheduleCode = attendanceLines[0].schedule_code_id;
+              if (scheduleCode && Array.isArray(scheduleCode) && scheduleCode[1]) {
+                shiftCode = scheduleCode[1];
+              }
+            }
+          }
+        } catch (e) {
+          shiftCode = null;
+        }
+      }
+      return {
+        id: r.id,
+        checkIn: r.check_in,
+        checkOut: r.check_out,
+        workedHours: r.worked_hours || 0,
+        shiftCode,
+      };
     }));
     const totalHours = records.reduce((sum: number, n: { workedHours: number }) => sum + n.workedHours, 0);
     const days = differenceInCalendarDays(endDt, startDt) + 1;

@@ -38,11 +38,13 @@ import {
   endOfWeek,
   differenceInMinutes,
   parseISO,
+  getDaysInMonth,
 } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { toZonedTime } from 'date-fns-tz';
 import { ShiftCodes } from '@/components/ui/shift-codes';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 const WORK_START_HOUR = 9; // 9 AM
 const WORK_END_HOUR = 18;  // 6 PM
@@ -57,6 +59,7 @@ interface AttendanceRecord {
   workedHours: number;
   start_clock_actual?: string;
   end_clock_actual?: string;
+  shiftCode?: string;
 }
 
 interface AttendanceData {
@@ -87,6 +90,10 @@ export default function AttendancePage() {
     from: new Date(),
     to: new Date(),
   });
+  const [roster, setRoster] = useState<any>(null);
+  const [rosterMonth, setRosterMonth] = useState<number>(new Date().getMonth());
+  const [rosterYear, setRosterYear] = useState<number>(new Date().getFullYear());
+  const [rosterLoading, setRosterLoading] = useState(false);
 
   // Navigate period controls
   const goToPrevious = () => {
@@ -186,6 +193,26 @@ export default function AttendancePage() {
     }
   };
 
+  // Fetch shift roster for selected month/year
+  const fetchRoster = async () => {
+    setRosterLoading(true);
+    try {
+      const uidStr = localStorage.getItem('uid');
+      if (!uidStr) throw new Error('Not logged in');
+      const res = await fetch('/api/odoo/auth/attendance/shift-roster', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: Number(uidStr), year: rosterYear, month: rosterMonth }),
+      });
+      if (!res.ok) throw new Error(`(${res.status}) ${await res.text()}`);
+      setRoster(await res.json());
+    } catch (err) {
+      setRoster(null);
+    } finally {
+      setRosterLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchTodayAttendance();
     const iv = setInterval(fetchTodayAttendance, 60_000);
@@ -195,6 +222,11 @@ export default function AttendancePage() {
   useEffect(() => {
     fetchAttendanceRange();
   }, [dateRange.type, currentDate, customDateRange]);
+
+  useEffect(() => {
+    fetchRoster();
+    // eslint-disable-next-line
+  }, [rosterMonth, rosterYear]);
 
   // Status computations
   const calculateLateStatus = (checkIn: string, shiftStart?: string) => {
@@ -261,7 +293,14 @@ export default function AttendancePage() {
     todayData &&
     todayData.lastClockIn &&
     !todayData.lastClockOut &&
-    (now.getHours() > WORK_END_HOUR || (now.getHours() === WORK_END_HOUR && now.getMinutes() > 0))
+    todayData.end_clock_actual &&
+    (() => {
+      const [endHour, endMinute] = todayData.end_clock_actual.split(':').map(Number);
+      return (
+        now.getHours() > endHour || 
+        (now.getHours() === endHour && now.getMinutes() > endMinute)
+      );
+    })()
   );
 
   if (loading) {
@@ -286,234 +325,266 @@ export default function AttendancePage() {
   return (
     <MainLayout missedClockOut={missedClockOut}>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Attendance</h1>
-            <p className="text-muted-foreground">View and manage your attendance</p>
-          </div>
-          <Button
-            className="bg-blue-900 text-white hover:bg-blue-800 transition-colors"
-            onClick={() => alert('Overtime Request logic coming soon!')}
-          >
-            Overtime Request
-          </Button>
-        </div>
-
-        {/* Widgets */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <AttendanceWidget />
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Today's Attendance</CardTitle>
-              <CardDescription>Current attendance status</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {todayData ? (
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-sm">Check-in Status</p>
-                    <p className={
-                      !todayData.lastClockIn
-                        ? 'text-red-600'
-                        : calculateLateStatus(todayData.lastClockIn || '', todayData.start_clock_actual || undefined).isLate
-                          ? 'text-yellow-600'
-                          : calculateLateStatus(todayData.lastClockIn || '', todayData.start_clock_actual || undefined).isEarly
-                            ? 'text-blue-600'
-                            : 'text-green-600'
-                    }>
-                      {!todayData.lastClockIn
-                        ? 'Not clocked in today'
-                        : calculateLateStatus(todayData.lastClockIn || '', todayData.start_clock_actual || undefined).status}
-                    </p>
-                  </div>
-                  {todayData.lastClockOut && (
-                    <>
+        <Tabs defaultValue="today" className="w-full">
+          <TabsList>
+            <TabsTrigger value="today">Today's Attendance</TabsTrigger>
+            <TabsTrigger value="summary">Attendance Summary</TabsTrigger>
+            <TabsTrigger value="rosters">Shift Rosters</TabsTrigger>
+          </TabsList>
+          <TabsContent value="today">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <AttendanceWidget />
+              <Card>
+                <CardHeader>
+                  <CardTitle>Today's Attendance</CardTitle>
+                  <CardDescription>Current attendance status</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {todayData ? (
+                    <div className="space-y-4">
                       <div>
-                        <p className="text-sm">Check-out Status</p>
-                        <p className={calculateEarlyLeaveStatus(
-                          todayData.lastClockOut || '',
-                          calculateLateStatus(todayData.lastClockIn || '', todayData.start_clock_actual || undefined).isLate,
-                          todayData.end_clock_actual || undefined
-                        ).isEarly ? 'text-red-600' : 'text-green-600'}>
-                          {calculateEarlyLeaveStatus(
-                            todayData.lastClockOut || '',
-                            calculateLateStatus(todayData.lastClockIn || '', todayData.start_clock_actual || undefined).isLate,
-                            todayData.end_clock_actual || undefined
-                          ).status}
+                        <p className="text-sm">Check-in Status</p>
+                        <p className={
+                          !todayData.lastClockIn
+                            ? 'text-red-600'
+                            : calculateLateStatus(todayData.lastClockIn || '', todayData.start_clock_actual || undefined).isLate
+                              ? 'text-yellow-600'
+                              : calculateLateStatus(todayData.lastClockIn || '', todayData.start_clock_actual || undefined).isEarly
+                                ? 'text-blue-600'
+                                : 'text-green-600'
+                        }>
+                          {!todayData.lastClockIn
+                            ? 'Not clocked in today'
+                            : calculateLateStatus(todayData.lastClockIn || '', todayData.start_clock_actual || undefined).status}
                         </p>
                       </div>
-                      {calculateOvertimeHours(todayData.lastClockOut) > 0 && (
-                        <div>
-                          <p className="text-sm">Overtime</p>
-                          <p className="text-lg text-blue-600">
-                            {formatHours(calculateOvertimeHours(todayData.lastClockOut))}
-                          </p>
-                        </div>
+                      {todayData.lastClockOut && (
+                        <>
+                          <div>
+                            <p className="text-sm">Check-out Status</p>
+                            <p className={calculateEarlyLeaveStatus(
+                              todayData.lastClockOut || '',
+                              calculateLateStatus(todayData.lastClockIn || '', todayData.start_clock_actual || undefined).isLate,
+                              todayData.end_clock_actual || undefined
+                            ).isEarly ? 'text-red-600' : 'text-green-600'}>
+                              {calculateEarlyLeaveStatus(
+                                todayData.lastClockOut || '',
+                                calculateLateStatus(todayData.lastClockIn || '', todayData.start_clock_actual || undefined).isLate,
+                                todayData.end_clock_actual || undefined
+                              ).status}
+                            </p>
+                          </div>
+                          {calculateOvertimeHours(todayData.lastClockOut) > 0 && (
+                            <div>
+                              <p className="text-sm">Overtime</p>
+                              <p className="text-lg text-blue-600">
+                                {formatHours(calculateOvertimeHours(todayData.lastClockOut))}
+                              </p>
+                            </div>
+                          )}
+                        </>
                       )}
-                    </>
+                    </div>
+                  ) : (
+                    <div className="text-muted-foreground">No attendance recorded for today</div>
                   )}
-                </div>
-              ) : (
-                <div className="text-muted-foreground">No attendance recorded for today</div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-        
-        {/* Summary */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Attendance Summary</CardTitle>
-            <CardDescription>
-              {attendanceData?.dateRange
-                ? `From ${formatDate(attendanceData.dateRange.start)} to ${formatDate(attendanceData.dateRange.end)}`
-                : 'Your attendance statistics'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm">Total Hours</p>
-                <p className="text-2xl font-bold">{attendanceData?.totalHours.toFixed(1)}h</p>
-              </div>
-              <div>
-                <p className="text-sm">Attendance Rate</p>
-                <p className="text-2xl font-bold">{attendanceData?.rate.toFixed(1)}%</p>
-              </div>
+                </CardContent>
+              </Card>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Controls */}
-        <div className="flex items-center gap-4 py-2 px-4 bg-[#1d1a4e] rounded-lg">
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={goToPrevious} disabled={dateRange.type === 'daily' || dateRange.type === 'custom'}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" onClick={goToCurrent}>
-              {getRangeLabel()}
-            </Button>
-            <Button variant="outline" size="icon" onClick={goToNext} disabled={dateRange.type === 'daily' || dateRange.type === 'custom' || format(currentDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-          <Select value={dateRange.type} onValueChange={(v: ViewType) => setDateRange({ type: v })}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Select range" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="daily">Daily View</SelectItem>
-              <SelectItem value="weekly">Weekly View</SelectItem>
-              <SelectItem value="biweekly">Bi-Weekly View</SelectItem>
-              <SelectItem value="monthly">Monthly View</SelectItem>
-              <SelectItem value="custom">Custom Range</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {dateRange.type === 'custom' && (
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline">
-                  <Calendar className="mr-2 h-4 w-4" /> Select Dates
+          </TabsContent>
+          <TabsContent value="summary">
+            <Card>
+              <CardHeader>
+                <CardTitle>Attendance Summary</CardTitle>
+                <CardDescription>
+                  {attendanceData?.dateRange
+                    ? `From ${formatDate(attendanceData.dateRange.start)} to ${formatDate(attendanceData.dateRange.end)}`
+                    : 'Your attendance statistics'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm">Total Hours</p>
+                    <p className="text-2xl font-bold">{attendanceData?.totalHours.toFixed(1)}h</p>
+                  </div>
+                  <div>
+                    <p className="text-sm">Attendance Rate</p>
+                    <p className="text-2xl font-bold">{attendanceData?.rate.toFixed(1)}%</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            {/* Controls */}
+            <div className="flex items-center gap-4 py-2 px-4 bg-[#1d1a4e] rounded-lg">
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="icon" onClick={goToPrevious} disabled={dateRange.type === 'daily' || dateRange.type === 'custom'}>
+                  <ChevronLeft className="h-4 w-4" />
                 </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <CalendarComponent
-                  mode="range"
-                  selected={customDateRange}
-                  onSelect={(range) => range?.from && range?.to && setCustomDateRange({ from: range.from, to: range.to })}
-                  numberOfMonths={2}
-                />
-              </PopoverContent>
-            </Popover>
-          )}
-        </div>
-
-        {/* Records Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Attendance Records</CardTitle>
-            <CardDescription>Your attendance history</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Check In</TableHead>
-                  <TableHead>Check Out</TableHead>
-                  <TableHead>Worked Hours</TableHead>
-                  <TableHead>Overtime</TableHead>
-                  <TableHead>Overtime Approved Hour(s)</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {attendanceData?.records.map((rec) => {
-                  const late = calculateLateStatus(rec.checkIn, rec.start_clock_actual);
-                  const early = rec.checkOut
-                    ? calculateEarlyLeaveStatus(rec.checkOut, late.isLate, rec.end_clock_actual)
-                    : null;
-                  const overtime = rec.checkOut
-                    ? calculateOvertimeHours(rec.checkOut)
-                    : 0;
-
-                  return (
-                    <TableRow key={rec.id}>
-                      <TableCell>{formatDate(rec.checkIn)}</TableCell>
-                      <TableCell>{formatTime(rec.checkIn)}</TableCell>
-                      <TableCell>
-                        {rec.checkOut ? formatTime(rec.checkOut) : '-'}
-                      </TableCell>
-                      <TableCell>
-                        {rec.workedHours ? formatHours(rec.workedHours) : '-'}
-                      </TableCell>
-                      <TableCell>
-                        {overtime ? formatHours(overtime) : '-'}
-                      </TableCell>
-                      <TableCell>
-                        {'-'}
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          {!rec.checkIn ? (
-                            <span className="text-red-600">Not clocked in</span>
-                          ) : late.isLate ? (
-                            <span className="text-yellow-600">{late.status}</span>
-                          ) : late.isEarly ? (
-                            <span className="text-blue-600">{late.status}</span>
-                          ) : (
-                            <span className="text-green-600">{late.status}</span>
-                          )}
-                          {rec.checkOut && (
-                            <>
-                              <br />
-                              {early?.isEarly ? (
-                                <span className="text-red-600">{early.status}</span>
-                              ) : early && early.status && early.status !== 'Full day' && early.status !== 'Left on time' ? (
-                                <span className="text-green-600">{early.status}</span>
-                              ) : null}
-                            </>
-                          )}
-                        </div>
-                      </TableCell>
+                <Button variant="outline" onClick={goToCurrent}>
+                  {getRangeLabel()}
+                </Button>
+                <Button variant="outline" size="icon" onClick={goToNext} disabled={dateRange.type === 'daily' || dateRange.type === 'custom' || format(currentDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+              <Select value={dateRange.type} onValueChange={(v: ViewType) => setDateRange({ type: v })}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Select range" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="daily">Daily View</SelectItem>
+                  <SelectItem value="weekly">Weekly View</SelectItem>
+                  <SelectItem value="biweekly">Bi-Weekly View</SelectItem>
+                  <SelectItem value="monthly">Monthly View</SelectItem>
+                  <SelectItem value="custom">Custom Range</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {/* Records Table */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Attendance Records</CardTitle>
+                <CardDescription>Your attendance history</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Shift Code</TableHead>
+                      <TableHead>Check In</TableHead>
+                      <TableHead>Check Out</TableHead>
+                      <TableHead>Worked Hours</TableHead>
+                      <TableHead>Overtime</TableHead>
+                      <TableHead>Overtime Approved Hour(s)</TableHead>
+                      <TableHead>Status</TableHead>
                     </TableRow>
-                  );
-                })}
-                {(!attendanceData?.records ||
-                  attendanceData.records.length === 0) && (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center">
-                      No attendance records found
-                    </TableCell>
-                  </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {attendanceData?.records.map((rec) => {
+                      const late = calculateLateStatus(rec.checkIn, rec.start_clock_actual);
+                      const early = rec.checkOut
+                        ? calculateEarlyLeaveStatus(rec.checkOut, late.isLate, rec.end_clock_actual)
+                        : null;
+                      const overtime = rec.checkOut
+                        ? calculateOvertimeHours(rec.checkOut)
+                        : 0;
+
+                      return (
+                        <TableRow key={rec.id}>
+                          <TableCell>{formatDate(rec.checkIn)}</TableCell>
+                          <TableCell>{rec.shiftCode || '-'}</TableCell>
+                          <TableCell>{formatTime(rec.checkIn)}</TableCell>
+                          <TableCell>
+                            {rec.checkOut ? formatTime(rec.checkOut) : '-'}
+                          </TableCell>
+                          <TableCell>
+                            {rec.workedHours ? formatHours(rec.workedHours) : '-'}
+                          </TableCell>
+                          <TableCell>
+                            {overtime ? formatHours(overtime) : '-'}
+                          </TableCell>
+                          <TableCell>
+                            {'-'}
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm">
+                              {!rec.checkIn ? (
+                                <span className="text-red-600">Not clocked in</span>
+                              ) : late.isLate ? (
+                                <span className="text-yellow-600">{late.status}</span>
+                              ) : late.isEarly ? (
+                                <span className="text-blue-600">{late.status}</span>
+                              ) : (
+                                <span className="text-green-600">{late.status}</span>
+                              )}
+                              {rec.checkOut && (
+                                <>
+                                  <br />
+                                  {early?.isEarly ? (
+                                    <span className="text-red-600">{early.status}</span>
+                                  ) : early && early.status && early.status !== 'Full day' && early.status !== 'Left on time' ? (
+                                    <span className="text-green-600">{early.status}</span>
+                                  ) : null}
+                                </>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    {(!attendanceData?.records ||
+                      attendanceData.records.length === 0) && (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center">
+                          No attendance records found
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          <TabsContent value="rosters">
+            <Card>
+              <CardHeader>
+                <CardTitle>Shift Rosters</CardTitle>
+                <CardDescription>View your assigned shifts and rosters here.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2 mb-4">
+                  <Select value={String(rosterMonth)} onValueChange={v => setRosterMonth(Number(v))}>
+                    <SelectTrigger className="w-[120px]">
+                      <SelectValue placeholder="Month" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 12 }, (_, i) => (
+                        <SelectItem key={i} value={String(i)}>{format(new Date(2000, i, 1), 'MMMM')}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={String(rosterYear)} onValueChange={v => setRosterYear(Number(v))}>
+                    <SelectTrigger className="w-[100px]">
+                      <SelectValue placeholder="Year" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 5 }, (_, i) => {
+                        const y = new Date().getFullYear() - 2 + i;
+                        return <SelectItem key={y} value={String(y)}>{y}</SelectItem>;
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {rosterLoading ? (
+                  <div>Loading shift roster...</div>
+                ) : roster ? (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          {Array.from({ length: getDaysInMonth(new Date(rosterYear, rosterMonth)) }, (_, i) => (
+                            <TableHead key={i}>Day {i + 1}</TableHead>
+                          ))}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        <TableRow>
+                          {Array.from({ length: getDaysInMonth(new Date(rosterYear, rosterMonth)) }, (_, i) => (
+                            <TableCell key={i}>{roster[`day_${i + 1}`] || '-'}</TableCell>
+                          ))}
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <div className="text-muted-foreground">No shift roster found for this month.</div>
                 )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </MainLayout>
   );
