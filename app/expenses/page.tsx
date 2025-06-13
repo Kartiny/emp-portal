@@ -184,7 +184,7 @@ export default function ExpensesPage() {
         </Dialog>
         <Card>
           <CardHeader>
-            <CardTitle>Your Expense Claims</CardTitle>
+            <CardTitle>Expense Claims</CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
