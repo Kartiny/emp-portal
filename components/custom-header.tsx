@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { AlertTriangle, ListTodo, Bell } from "lucide-react";
+import { AlertTriangle, ListTodo, MessageCircle } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface UserProfile {
@@ -19,6 +19,9 @@ export function CustomHeader({ missedClockOut }: CustomHeaderProps) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showMissedPopover, setShowMissedPopover] = useState(false);
+  const [showActivities, setShowActivities] = useState(false);
+  const [activities, setActivities] = useState<any[]>([]);
+  const [activitiesLoading, setActivitiesLoading] = useState(false);
 
   useEffect(() => {
     const uid = localStorage.getItem('uid');
@@ -49,6 +52,25 @@ export function CustomHeader({ missedClockOut }: CustomHeaderProps) {
       });
   }, []);
 
+  const fetchActivities = async () => {
+    setActivitiesLoading(true);
+    try {
+      const uid = localStorage.getItem('uid');
+      if (!uid) return;
+      const res = await fetch('/api/odoo/auth/activities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: Number(uid) }),
+      });
+      const data = await res.json();
+      setActivities(data.activities || []);
+    } catch (err) {
+      setActivities([]);
+    } finally {
+      setActivitiesLoading(false);
+    }
+  };
+
   const getInitials = (name: string) => {
     if (!name) return 'U';
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
@@ -70,33 +92,61 @@ export function CustomHeader({ missedClockOut }: CustomHeaderProps) {
         </Link>
         <span className="text-lg font-semibold">Hi, {profile?.name || 'User'}</span>
       </div>
-      {/* Right: Warning, Tasks, Notifications, Logo */}
+      {/* Right: Warning, Tasks, Notifications, Logo, Activities */}
       <div className="flex items-center space-x-6">
         {missedClockOut ? (
           <Popover open={showMissedPopover} onOpenChange={setShowMissedPopover}>
             <PopoverTrigger asChild>
               <button title="Missed Clock Out" className="relative transition-colors" onClick={() => setShowMissedPopover(true)}>
-                <AlertTriangle className="h-6 w-6 text-red-600" />
-                <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-yellow-500 border-2 border-white animate-pulse" />
+                <AlertTriangle className="h-6 w-6 text-red-600 animate-pulse" />
+                <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-red-500 border-2 border-white animate-ping" />
               </button>
             </PopoverTrigger>
-            <PopoverContent className="w-64 text-sm text-yellow-900 bg-yellow-50 border-yellow-400">
+            <PopoverContent className="w-64 text-sm text-red-900 bg-red-50 border-red-400">
               <div className="flex items-center gap-2">
                 <span className="text-xl">⚠️</span>
-                <span>You forgot to check out. Please update your time.</span>
+                <span>You missed your clock out for today! Please update your attendance.</span>
               </div>
             </PopoverContent>
           </Popover>
         ) : (
           <span title="No missed clock out" className="relative">
-            <AlertTriangle className="h-6 w-6 text-yellow-500" />
+            <AlertTriangle className="h-6 w-6 text-gray-400" />
           </span>
         )}
-        <button title="Pending Tasks" className="hover:text-blue-600 transition-colors" onClick={() => alert('View your pending tasks!')}>
-          <ListTodo className="h-6 w-6" />
-        </button>
-        <button title="Notifications" className="hover:text-red-600 transition-colors" onClick={() => alert('View notifications!')}>
-          <Bell className="h-6 w-6" />
+        <Popover open={showActivities} onOpenChange={(open) => {
+          setShowActivities(open);
+          if (open) fetchActivities();
+        }}>
+          <PopoverTrigger asChild>
+            <button title="Activities" className="hover:text-blue-600 transition-colors relative">
+              <ListTodo className="h-6 w-6" />
+              {activities.length > 0 && (
+                <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-blue-500 border-2 border-white" />
+              )}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-72">
+            <div className="font-semibold mb-2">Your Activities</div>
+            {activitiesLoading ? (
+              <div>Loading...</div>
+            ) : activities.length === 0 ? (
+              <div className="text-muted-foreground">No activities found.</div>
+            ) : (
+              <ul className="space-y-1">
+                {activities.map((a) => (
+                  <li key={a.id} className="border-b last:border-b-0 py-1">
+                    <span className="font-medium">{a.activity_type_name}</span>
+                    {a.summary && <span className="ml-2 text-xs text-muted-foreground">{a.summary}</span>}
+                    {a.date_deadline && <span className="ml-2 text-xs text-blue-600">{a.date_deadline}</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </PopoverContent>
+        </Popover>
+        <button title="Chat" className="hover:text-blue-600 transition-colors" onClick={() => alert('Open chat!')}>
+          <MessageCircle className="h-6 w-6" />
         </button>
         <Image
           src="/logo.png"

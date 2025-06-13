@@ -101,6 +101,8 @@ export interface ExpenseRequest {
   payment_mode: string;
   total_amount: number;
   state: string;
+  attachment_url?: string | null;
+  attachment_mimetype?: string | null;
 }
 
 //
@@ -665,14 +667,32 @@ export class OdooClient {
         order: 'date desc',
       }
     );
-    return raw.map(r => ({
-      id: r.id,
-      name: r.name,
-      date: r.date,
-      payment_mode: r.payment_mode,
-      total_amount: r.total_amount,
-      state: r.state,
+    // For each expense, fetch the first attachment (if any)
+    const withAttachments = await Promise.all(raw.map(async (r) => {
+      let attachment_url = null;
+      let attachment_mimetype = null;
+      const attachments = await this.execute(
+        'ir.attachment',
+        'search_read',
+        [[['res_model', '=', 'hr.expense'], ['res_id', '=', r.id]]],
+        { fields: ['id', 'mimetype'], limit: 1 }
+      );
+      if (attachments && attachments.length > 0) {
+        attachment_url = `/api/odoo/attachment/${attachments[0].id}`;
+        attachment_mimetype = attachments[0].mimetype;
+      }
+      return {
+        id: r.id,
+        name: r.name,
+        date: r.date,
+        payment_mode: r.payment_mode,
+        total_amount: r.total_amount,
+        state: r.state,
+        attachment_url,
+        attachment_mimetype,
+      };
     }));
+    return withAttachments;
   }
 
   /** Create a new expense (claim) request */
@@ -767,6 +787,75 @@ export class OdooClient {
       [values],
     ]);
     return attachmentId;
+  }
+
+  /**
+   * Fetch the employee's duty roster shift for a given month
+   */
+  async getMonthlyDutyRosterShift(uid: number, year: number, month: number): Promise<any> {
+    const profile = await this.getFullUserProfile(uid);
+    const empId = profile.id;
+    // Odoo months are 1-based (January = 1)
+    const domain = [
+      ['employee_id', '=', empId],
+      ['year', '=', year],
+      ['month', '=', month + 1],
+    ];
+    // Build day_1 ... day_31 fields
+    const dayFields = Array.from({ length: 31 }, (_, i) => `day_${i + 1}`);
+    const recs = await this.execute(
+      'hr.duty_roster_shift',
+      'search_read',
+      [domain],
+      { fields: ['id', 'employee_id', 'year', 'month', ...dayFields] }
+    );
+    return recs && recs.length > 0 ? recs[0] : null;
+  }
+
+  /**
+   * Fetch an ir.attachment by id (public helper for API route)
+   */
+  async getAttachmentById(id: number): Promise<any> {
+    const atts = await this.execute(
+      'ir.attachment',
+      'read',
+      [[id], ['datas', 'mimetype', 'name']]
+    );
+    return atts && atts.length > 0 ? atts[0] : null;
+  }
+
+  /**
+   * Fetch mail_activity for the employee (by user id)
+   */
+  async getEmployeeActivities(uid: number): Promise<any[]> {
+    // Fetch activities where user_id = uid (not employee_id)
+    const activities = await this.execute(
+      'mail.activity',
+      'search_read',
+      [[['user_id', '=', uid]]],
+      { fields: ['id', 'activity_type_id', 'summary', 'date_deadline'], order: 'date_deadline asc' }
+    );
+    // Fetch all unique activity_type_id
+    const typeIds = Array.from(new Set(
+      activities
+        .map((a: any) => Array.isArray(a.activity_type_id) ? a.activity_type_id[0] : null)
+        .filter(Boolean)
+    ));
+    let typeNames: Record<number, string> = {};
+    if (typeIds.length > 0) {
+      const types = await this.execute(
+        'mail.activity.type',
+        'search_read',
+        [[['id', 'in', typeIds]]],
+        { fields: ['id', 'name'] }
+      );
+      typeNames = Object.fromEntries(types.map((t: any) => [t.id, t.name]));
+    }
+    // Map name into each activity
+    return activities.map((a: any) => ({
+      ...a,
+      activity_type_name: Array.isArray(a.activity_type_id) && a.activity_type_id[0] ? typeNames[a.activity_type_id[0]] || a.activity_type_id[1] : a.activity_type_id,
+    }));
   }
 }
 
