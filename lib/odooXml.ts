@@ -10,7 +10,7 @@ import { Buffer } from 'buffer';
 
 const COMMON_ENDPOINT = `${ODOO_CONFIG.BASE_URL}/xmlrpc/2/common`;
 const OBJECT_ENDPOINT = `${ODOO_CONFIG.BASE_URL}/xmlrpc/2/object`;
-const STANDARD_HOURS = 12; // for attendance rate (7 AM–7 PM)
+const STANDARD_HOURS = 12; 
 
 // Helper to convert float hour to HH:mm string
 function floatToTimeString(floatVal: number | null): string | null {
@@ -20,7 +20,7 @@ function floatToTimeString(floatVal: number | null): string | null {
   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 }
 
-/** Wrapper for xmlrpc.methodCall → Promise */
+// Wrapper for xmlrpc.methodCall → Promise- easier with async/await
 function xmlRpcCall(client: any, method: string, params: any[]): Promise<any> {
   return new Promise((resolve, reject) => {
     client.methodCall(method, params, (err: any, val: any) =>
@@ -29,14 +29,8 @@ function xmlRpcCall(client: any, method: string, params: any[]): Promise<any> {
   });
 }
 
-//
-// ── TYPES ─────────────────────────────────────────────────────────────────────
-//
-
-/** Date range options for attendance queries */
 export type DateRange = 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'custom';
 
-/** Leave type record */
 export interface LeaveType {
   id: number;
   name: string;
@@ -48,7 +42,6 @@ export interface LeaveType {
   unpaid: boolean;
 }
 
-/** Leave allocation record */
 export interface LeaveAllocation {
   id: number;
   holiday_status_id: [number, string];
@@ -62,7 +55,6 @@ export interface LeaveAllocation {
   allocation_type?: string;
 }
 
-/** Leave request record */
 export interface LeaveRequest {
   id: number;
   holiday_status_id: [number, string];
@@ -78,7 +70,6 @@ export interface LeaveRequest {
   request_hour_to?: number;
 }
 
-/** User profile combining res.users and hr.employee */
 interface UserProfile {
   name: string;
   email: string;
@@ -89,10 +80,6 @@ interface UserProfile {
   resource_calendar_id: [number, string];
   // ...other fields
 }
-
-//
-// ── EXPENSE (CLAIM) MODULE ────────────────────────────────────────────────────
-//
 
 export interface ExpenseRequest {
   id: number;
@@ -105,16 +92,11 @@ export interface ExpenseRequest {
   attachment_mimetype?: string | null;
 }
 
-//
-// ── OdooClient ────────────────────────────────────────────────────────────────
-//
-
 export class OdooClient {
   private common = xmlrpc.createSecureClient({ url: COMMON_ENDPOINT, allow_none: true });
   private object = xmlrpc.createSecureClient({ url: OBJECT_ENDPOINT, allow_none: true });
   private adminUid: number | null = null;
 
-  /** Login as given user/admin */
   async login(email: string, password: string): Promise<number> {
     const uid = await xmlRpcCall(this.common, 'authenticate', [
       ODOO_CONFIG.DB_NAME,
@@ -126,7 +108,6 @@ export class OdooClient {
     return uid;
   }
 
-  /** Ensure admin session is available */
   private async authenticateAdmin(): Promise<number> {
     if (this.adminUid) return this.adminUid;
     this.adminUid = await this.login(
@@ -135,8 +116,7 @@ export class OdooClient {
     );
     return this.adminUid;
   }
-
-  /** Generic execute_kw call */
+  
   private async execute(
     model: string,
     method: string,
@@ -155,7 +135,6 @@ export class OdooClient {
     ]);
   }
 
-  /** Public method to search for users by login */
   async searchUserByLogin(login: string): Promise<any[]> {
     return this.execute(
       'res.users',
@@ -165,31 +144,24 @@ export class OdooClient {
     );
   }
 
-  /** Public method to get user profile */
   async getUserProfile(uid: number): Promise<any> {
     return this.getFullUserProfile(uid);
   }
 
-  //
-  // ── USER PROFILE ────────────────────────────────────────────────────────────
-  //
 
-  /** Read res.users + linked hr.employee (Odoo 17 uses hr.employee.user_id) */
   async getFullUserProfile(uid: number): Promise<any> {
     try {
       console.log('🔍 Getting user profile for UID:', uid);
       
-      // 1) Basic user
       const userResult = await this.execute('res.users', 'read', [[uid], ['name', 'login', 'image_1920']]);
       console.log('👤 User result:', userResult);
       
       if (!userResult || !userResult[0]) {
         throw new Error(`User with UID ${uid} not found in res.users`);
       }
-      
       const [user] = userResult;
 
-      // 2) Employee by user_id back-relation
+     
       const empResult = await this.execute(
         'hr.employee',
         'search_read',

@@ -8,13 +8,12 @@ const LOCALE = 'en-MY';
 const parseDateString = (dateStr: string): Date => {
   console.log('🕒 Parsing date string:', dateStr);
   
-  // Try parsing as ISO format first
+  // Try parsing as ISO format 
   try {
     if (dateStr.includes('T') || dateStr.includes('Z')) {
       const utcDate = new Date(dateStr);
       if (!isNaN(utcDate.getTime())) {
         console.log('✅ Parsed as ISO format with time');
-        // Convert UTC to Malaysia time properly
         const malaysiaDate = toZonedTime(utcDate, TIMEZONE);
         console.log('🕒 Converted to Malaysia time:', malaysiaDate);
         return malaysiaDate;
@@ -38,7 +37,7 @@ const parseDateString = (dateStr: string): Date => {
     console.warn('Failed to parse as YYYY-MM-DD format:', error);
   }
 
-  // Try parsing as "YYYY-MM-DD HH:mm:ss" format
+  // Try parsing as format (YYYY-MM-DD HH:mm:ss)
   try {
     if (dateStr.includes('-') && dateStr.includes(':')) {
       const [datePart, timePart] = dateStr.split(' ');
@@ -63,7 +62,7 @@ const parseDateString = (dateStr: string): Date => {
     console.warn('Failed to parse as YYYY-MM-DD HH:mm:ss format:', error);
   }
 
-  // Try parsing as "DD/MM/YYYY HH:mm:ss" format
+  // Try parsing as format (DD/MM/YYYY HH:mm:ss)
   try {
     if (dateStr.includes('/') && dateStr.includes(':')) {
       const [datePart, timePart] = dateStr.split(' ');
@@ -88,7 +87,7 @@ const parseDateString = (dateStr: string): Date => {
     console.warn('Failed to parse as DD/MM/YYYY HH:mm:ss format:', error);
   }
 
-  // Try parsing as "DD/MM/YYYY" format
+  // Try parsing as format (DD/MM/YYYY)
   try {
     if (dateStr.includes('/') && !dateStr.includes(':')) {
       const [day, month, year] = dateStr.split('/');

@@ -1,5 +1,39 @@
+# ✅ Node.js dependencies
 node_modules/
+
+# ✅ Next.js build output
 .next/
+out/
+
+# ✅ Environment variables (keep secrets out)
 .env
-npm-debug.log
-yarn-error.log
+.env.local
+.env.*.local
+
+# ✅ Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor directories
+.vscode/
+.idea/
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# TypeScript build output
+dist/
+*.tsbuildinfo
+
+# Test coverage
+coverage/
+
+# shadcn/ui temporary files 
+.shadcn/
+
+# Local development cache
+.cache/
+.vercel/
