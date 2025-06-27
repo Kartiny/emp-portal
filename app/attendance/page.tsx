@@ -225,14 +225,14 @@ export default function AttendancePage() {
 
   useEffect(() => {
     fetchRoster();
-    // eslint-disable-next-line
+     
   }, [rosterMonth, rosterYear]);
 
   // Status computations
   const calculateLateStatus = (checkIn: string, shiftStart?: string) => {
     try {
       const d = toZonedTime(new Date(checkIn), 'Asia/Kuala_Lumpur');
-      let ref = new Date(d);
+      const ref = new Date(d);
       if (shiftStart) {
         const [h, m] = shiftStart.split(':').map(Number);
         ref.setHours(h, m, 0, 0);
@@ -255,7 +255,7 @@ export default function AttendancePage() {
   const calculateEarlyLeaveStatus = (checkOut: string, late: boolean, shiftEnd?: string) => {
     try {
       const d = toZonedTime(new Date(checkOut), 'Asia/Kuala_Lumpur');
-      let ref = new Date(d);
+      const ref = new Date(d);
       if (shiftEnd) {
         const [h, m] = shiftEnd.split(':').map(Number);
         ref.setHours(h, m, 0, 0);

@@ -16,8 +16,12 @@ export default function VerifyPage() {
   useEffect(() => {
     // Check if user is logged in
     const uid = localStorage.getItem('uid')
+    console.log('🔍 Verify page - checking UID:', uid);
     if (!uid) {
+      console.log('❌ No UID found, redirecting to login');
       router.push('/login')
+    } else {
+      console.log('✅ UID found, staying on verify page');
     }
   }, [router])
 

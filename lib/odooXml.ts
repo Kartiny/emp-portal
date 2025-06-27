@@ -110,8 +110,8 @@ export interface ExpenseRequest {
 //
 
 export class OdooClient {
-  private common = xmlrpc.createSecureClient({ url: COMMON_ENDPOINT });
-  private object = xmlrpc.createSecureClient({ url: OBJECT_ENDPOINT });
+  private common = xmlrpc.createSecureClient({ url: COMMON_ENDPOINT, allow_none: true });
+  private object = xmlrpc.createSecureClient({ url: OBJECT_ENDPOINT, allow_none: true });
   private adminUid: number | null = null;
 
   /** Login as given user/admin */
@@ -155,64 +155,102 @@ export class OdooClient {
     ]);
   }
 
+  /** Public method to search for users by login */
+  async searchUserByLogin(login: string): Promise<any[]> {
+    return this.execute(
+      'res.users',
+      'search_read',
+      [[['login', '=', login]]],
+      { fields: ['login', 'email'], limit: 1 }
+    );
+  }
+
+  /** Public method to get user profile */
+  async getUserProfile(uid: number): Promise<any> {
+    return this.getFullUserProfile(uid);
+  }
+
   //
   // ── USER PROFILE ────────────────────────────────────────────────────────────
   //
 
   /** Read res.users + linked hr.employee (Odoo 17 uses hr.employee.user_id) */
   async getFullUserProfile(uid: number): Promise<any> {
-    // 1) Basic user
-    const [user] = await this.execute('res.users', 'read', [[uid], ['name', 'login', 'image_1920']]);
-    if (!user) throw new Error('User not found');
-
-    // 2) Employee by user_id back-relation
-    const [emp] = await this.execute(
-      'hr.employee',
-      'search_read',
-      [[['user_id', '=', uid]]],
-      {
-        fields: [
-          'id',
-          'name',
-          'job_title',
-          'department_id',
-          'work_email',
-          'work_phone',
-          'mobile_phone',
-          'gender',
-          'birthday',
-          'country_id',
-          'place_of_birth',
-          'country_of_birth',
-          'marital',
-          'identification_id',
-          'passport_id',
-          'bank_account_id',
-          'certificate',
-          'study_field',
-          'study_school',
-          'private_street',
-          'emergency_contact',
-          'emergency_phone',
-          'lang',
-          'resource_calendar_id',
-        ],
-        limit: 1,
+    try {
+      console.log('🔍 Getting user profile for UID:', uid);
+      
+      // 1) Basic user
+      const userResult = await this.execute('res.users', 'read', [[uid], ['name', 'login', 'image_1920']]);
+      console.log('👤 User result:', userResult);
+      
+      if (!userResult || !userResult[0]) {
+        throw new Error(`User with UID ${uid} not found in res.users`);
       }
-    );
-    if (!emp) throw new Error('No employee record linked to this user');
+      
+      const [user] = userResult;
 
-    return {
-      id: emp.id,
-      name: user.name,
-      email: user.login,
-      image_1920: user.image_1920,
-      job_title: emp.job_title,
-      department: Array.isArray(emp.department_id) ? emp.department_id[1] : '',
-      phone: emp.work_phone || emp.mobile_phone,
-      resource_calendar_id: emp.resource_calendar_id,
-      ...emp,
-    };
+      // 2) Employee by user_id back-relation
+      const empResult = await this.execute(
+        'hr.employee',
+        'search_read',
+        [[['user_id', '=', uid]]],
+        {
+          fields: [
+            'id',
+            'name',
+            'job_title',
+            'department_id',
+            'work_email',
+            'work_phone',
+            'mobile_phone',
+            'gender',
+            'birthday',
+            'country_id',
+            'place_of_birth',
+            'country_of_birth',
+            'marital',
+            'identification_id',
+            'passport_id',
+            'bank_account_id',
+            'certificate',
+            'study_field',
+            'study_school',
+            'private_street',
+            'emergency_contact',
+            'emergency_phone',
+            'lang',
+            'resource_calendar_id',
+          ],
+          limit: 1,
+        }
+      );
+      
+      console.log('👷 Employee result:', empResult);
+      
+      if (!empResult || !empResult[0]) {
+        throw new Error(`No employee record found for user with UID ${uid}. Please check if the user is linked to an employee record.`);
+      }
+
+      const [emp] = empResult;
+
+      const profile = {
+        id: emp.id,
+        name: user.name,
+        email: user.login,
+        image_1920: user.image_1920,
+        job_title: emp.job_title,
+        department: Array.isArray(emp.department_id) ? emp.department_id[1] : '',
+        phone: emp.work_phone || emp.mobile_phone,
+        resource_calendar_id: emp.resource_calendar_id,
+        ...emp,
+      };
+      
+      console.log('✅ Profile constructed successfully');
+      return profile;
+    } catch (error) {
+      console.error('❌ Error in getFullUserProfile:', error);
+      throw error;
+    }
   }
 
   //

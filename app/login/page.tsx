@@ -8,8 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 
-const ADMIN_USER = 'admin';
-const ADMIN_PWD = 'admin@202502';
+const ADMIN_USER = 'e-global';
+const ADMIN_PWD = '12345';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -23,15 +23,24 @@ export default function LoginPage() {
     setError('');
     setIsLoading(true);
 
+    console.log('🔐 Login attempt:', { email, password });
+
     // Check if it's admin login
     if (email === ADMIN_USER && password === ADMIN_PWD) {
+      console.log('✅ Admin login successful');
       localStorage.setItem('userEmail', email);
       localStorage.setItem('userPassword', password);
-      router.push('/admin');
+      localStorage.setItem('uid', 'admin'); // Add UID for admin
+      console.log('📦 Stored in localStorage:', { 
+        userEmail: localStorage.getItem('userEmail'),
+        uid: localStorage.getItem('uid')
+      });
+      router.push('/verify');
       return;
     }
 
     try {
+      console.log('🌐 Making API call to /api/odoo/auth/login');
       const response = await fetch('/api/odoo/auth/login', {
         method: 'POST',
         headers: {
@@ -40,21 +49,21 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password }),
       });
 
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`Login failed: ${text}`);
-      }
-
+      console.log('📡 Response status:', response.status);
       const data = await response.json();
+      console.log('📄 Response data:', data);
 
-      if (response.ok) {
+      if (response.ok && data.uid) {
+        console.log('✅ Regular user login successful, UID:', data.uid);
         localStorage.setItem('uid', data.uid.toString());
+        console.log('📦 Stored UID in localStorage:', localStorage.getItem('uid'));
         router.push('/verify');
       } else {
+        console.log('❌ Login failed:', data.error);
         setError(data.error || 'Invalid credentials');
       }
     } catch (err) {
-      console.error('Login error:', err);
+      console.error('💥 Login error:', err);
       setError('An error occurred. Please try again.');
     } finally {
       setIsLoading(false);
