@@ -49,17 +49,24 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 const WORK_START_HOUR = 9; // 9 AM
 const WORK_END_HOUR = 18;  // 6 PM
 const STANDARD_HOURS = 12; // 7am to 7pm = 12 hours
+const MALAYSIA_TZ = 'Asia/Kuala_Lumpur';
 
 type ViewType = 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'custom';
 
 interface AttendanceRecord {
   id: number;
+  day: string;
+  date: string;
   checkIn: string;
   checkOut: string | null;
   workedHours: number;
+  overtime: number;
+  approvedOvertime: number;
   start_clock_actual?: string;
   end_clock_actual?: string;
   shiftCode?: string;
+  lunchIn?: string;
+  lunchOut?: string;
 }
 
 interface AttendanceData {
@@ -72,6 +79,16 @@ interface AttendanceData {
 interface DateRangeState {
   type: ViewType;
   customRange?: { from: Date; to: Date };
+}
+
+function formatTimeKL(dt: string | null | undefined) {
+  if (!dt) return '-';
+  try {
+    const zoned = toZonedTime(new Date(dt), MALAYSIA_TZ);
+    return zoned.toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit', hour12: false });
+  } catch {
+    return '-';
+  }
 }
 
 export default function AttendancePage() {
@@ -94,6 +111,7 @@ export default function AttendancePage() {
   const [rosterMonth, setRosterMonth] = useState<number>(new Date().getMonth());
   const [rosterYear, setRosterYear] = useState<number>(new Date().getFullYear());
   const [rosterLoading, setRosterLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('today');
 
   // Navigate period controls
   const goToPrevious = () => {
@@ -325,7 +343,7 @@ export default function AttendancePage() {
   return (
     <MainLayout missedClockOut={missedClockOut}>
       <div className="space-y-6">
-        <Tabs defaultValue="today" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList>
             <TabsTrigger value="today">Today's Attendance</TabsTrigger>
             <TabsTrigger value="summary">Attendance Summary</TabsTrigger>
@@ -451,13 +469,16 @@ export default function AttendancePage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Day</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Shift Code</TableHead>
+                      <TableHead>Approved Overtime</TableHead>
                       <TableHead>Check In</TableHead>
+                      <TableHead>Lunch Out</TableHead>
+                      <TableHead>Lunch In</TableHead>        
                       <TableHead>Check Out</TableHead>
                       <TableHead>Worked Hours</TableHead>
                       <TableHead>Overtime</TableHead>
-                      <TableHead>Overtime Approved Hour(s)</TableHead>
                       <TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -467,27 +488,19 @@ export default function AttendancePage() {
                       const early = rec.checkOut
                         ? calculateEarlyLeaveStatus(rec.checkOut, late.isLate, rec.end_clock_actual)
                         : null;
-                      const overtime = rec.checkOut
-                        ? calculateOvertimeHours(rec.checkOut)
-                        : 0;
-
                       return (
                         <TableRow key={rec.id}>
-                          <TableCell>{formatDate(rec.checkIn)}</TableCell>
+                          <TableCell>{rec.day}</TableCell>
+                          <TableCell>{formatDate(rec.date)}</TableCell>
                           <TableCell>{rec.shiftCode || '-'}</TableCell>
-                          <TableCell>{formatTime(rec.checkIn)}</TableCell>
-                          <TableCell>
-                            {rec.checkOut ? formatTime(rec.checkOut) : '-'}
-                          </TableCell>
-                          <TableCell>
-                            {rec.workedHours ? formatHours(rec.workedHours) : '-'}
-                          </TableCell>
-                          <TableCell>
-                            {overtime ? formatHours(overtime) : '-'}
-                          </TableCell>
-                          <TableCell>
-                            {'-'}
-                          </TableCell>
+                          <TableCell>{rec.approvedOvertime ? formatHours(rec.approvedOvertime) : '-'}</TableCell>
+                          <TableCell>{rec.checkIn ? formatTimeKL(rec.checkIn) : '-'}</TableCell>
+                          <TableCell>{rec.lunchOut ? formatTimeKL(rec.lunchOut) : '-'}</TableCell>
+                          <TableCell>{rec.lunchIn ? formatTimeKL(rec.lunchIn) : '-'}</TableCell>
+                          <TableCell>{rec.checkOut ? formatTimeKL(rec.checkOut) : '-'}</TableCell>
+                          <TableCell>{rec.workedHours ? formatHours(rec.workedHours) : '-'}</TableCell>
+                          <TableCell>{rec.overtime ? formatHours(rec.overtime) : '-'}</TableCell>
+                         
                           <TableCell>
                             <div className="text-sm">
                               {!rec.checkIn ? (
@@ -517,7 +530,7 @@ export default function AttendancePage() {
                     {(!attendanceData?.records ||
                       attendanceData.records.length === 0) && (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center">
+                        <TableCell colSpan={11} className="text-center">
                           No attendance records found
                         </TableCell>
                       </TableRow>

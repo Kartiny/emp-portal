@@ -1,7 +1,7 @@
 // app/api/odoo/auth/attendance/route.ts
 import { NextResponse } from 'next/server';
-import { getFullUserProfile, getOdooClient } from '@/lib/odooXml';
-import { parseISO, differenceInCalendarDays } from 'date-fns';
+import { getOdooClient } from '@/lib/odooXml';
+import { parseISO, differenceInCalendarDays, differenceInMinutes } from 'date-fns';
 
 const STANDARD_HOURS = 12; // 7am–7pm
 
@@ -12,13 +12,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing or invalid uid' }, { status: 400 });
     }
 
-    // 1️⃣ Find employee
-    const profile = await getFullUserProfile(uid);
-    const empId = profile.id;
-    if (!empId) {
+    // 1️⃣ Find employee and their barcode
+    const client = getOdooClient();
+    const employee = await client.getEmployeeBarcode(uid);
+
+    if (!employee) {
       return NextResponse.json(
         { error: 'Employee record not found for this user' },
         { status: 404 }
+      );
+    }
+
+    if (!employee.barcode) {
+      return NextResponse.json(
+        { error: 'Employee does not have a barcode assigned' },
+        { status: 400 }
       );
     }
 
@@ -59,65 +67,27 @@ export async function POST(req: Request) {
       }
     }
 
-    // 3️⃣ Query Odoo hr.attendance
-    const fmt = (d: Date) => `${d.toISOString().slice(0,10)} ${d.toTimeString().slice(0,8)}`;
-    const domain = [
-      ['employee_id','=', empId],
-      ['check_in','>=', fmt(startDt)],
-      ['check_in','<=', fmt(endDt)],
-    ];
-    const client = getOdooClient();
-    // @ts-ignore
-    const raw = await client.execute(
-      'hr.attendance',
-      'search_read',
-      [domain],
-      { fields: ['id','check_in','check_out','worked_hours'], order: 'check_in asc' }
-    );
+    // 3️⃣ Fetch all attendance lines for the employee in the date range
+    const fmt = (d: Date) => `${d.toISOString().slice(0,10)}`;
+    const allLines = await client.getAttendanceSheetLinesByEmployee(employee.id, fmt(startDt), fmt(endDt));
 
-    // 4️⃣ Map + totals
-    // For each record, fetch shift code for that date
-    const records = await Promise.all(raw.map(async (r: any) => {
-      // Get the date part of check_in
-      const checkInDate = r.check_in ? r.check_in.split(' ')[0] : null;
-      let shiftCode = null;
-      if (checkInDate) {
-        // Get shift code for that date
-        try {
-          const jsDate = new Date(checkInDate);
-          const profile = await getFullUserProfile(uid);
-          const calendar = profile.resource_calendar_id;
-          if (calendar && Array.isArray(calendar) && calendar[0]) {
-            const calendarId = calendar[0];
-            // Odoo: 0=Monday, 6=Sunday
-            const jsDay = jsDate.getDay();
-            const odooDay = jsDay === 0 ? 6 : jsDay - 1;
-            const attendanceLines = await client['execute'](
-              'resource.calendar.attendance',
-              'search_read',
-              [[['calendar_id', '=', calendarId], ['dayofweek', '=', odooDay]]],
-              { fields: ['schedule_code_id'], limit: 1 }
-            );
-            if (attendanceLines && attendanceLines.length > 0) {
-              const scheduleCode = attendanceLines[0].schedule_code_id;
-              if (scheduleCode && Array.isArray(scheduleCode) && scheduleCode[1]) {
-                shiftCode = scheduleCode[1];
-              }
-            }
-          }
-        } catch (e) {
-          shiftCode = null;
-        }
-      }
-      return {
-        id: r.id,
-        checkIn: r.check_in,
-        checkOut: r.check_out,
-        workedHours: r.worked_hours || 0,
-        shiftCode,
-      };
+    // 4️⃣ Process records
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    if (allLines.length > 0) {
+    }
+    const records = allLines.map(r => ({
+      id: r.id,
+      day: dayNames[Number(r.day)] ?? r.day,
+      date: r.date,
+      checkIn: r.ac_sign_in,
+      checkOut: r.ac_sign_out,
+      overtime: r.real_overtime,
+      approvedOvertime: r.overtime,
+      workedHours: (r.ac_sign_out && r.ac_sign_in) ? differenceInMinutes(new Date(r.ac_sign_out), new Date(r.ac_sign_in)) / 60 : 0
     }));
-    const totalHours = records.reduce((sum: number, n: { workedHours: number }) => sum + n.workedHours, 0);
+
+    // Calculate totals
+    const totalHours = records.reduce((sum, n) => sum + (n.workedHours || 0), 0);
     const days = differenceInCalendarDays(endDt, startDt) + 1;
     const rate = days > 0 ? (totalHours / (days * STANDARD_HOURS)) * 100 : 0;
 
