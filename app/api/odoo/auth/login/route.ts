@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { loginToOdoo, getOdooClient } from '@/lib/odooXml';
+import { loginToOdoo, getOdooClient, getEmployeeByUserId } from '@/lib/odooXml';
 
 export async function POST(req: Request) {
   try {
@@ -25,7 +25,40 @@ export async function POST(req: Request) {
     const uid = await loginToOdoo(loginValue, password);
     console.log('✅ Login successful, UID:', uid);
     
-    return NextResponse.json({ uid });
+    // Now get the employee information linked to this user
+    console.log('🔍 Finding employee record for user UID:', uid);
+    
+    try {
+      const employee = await getEmployeeByUserId(uid);
+      
+      if (employee) {
+        console.log('✅ Found employee record:', employee);
+        
+        return NextResponse.json({ 
+          uid: uid,
+          employeeId: employee.id,
+          employeeName: employee.name,
+          employeeEmail: employee.work_email,
+          jobTitle: employee.job_title
+        });
+      } else {
+        console.log('⚠️ No employee record found for user UID:', uid);
+        return NextResponse.json({ 
+          uid: uid,
+          employeeId: null,
+          error: 'No employee record found for this user'
+        });
+      }
+      
+    } catch (employeeError: any) {
+      console.error('❌ Error finding employee record:', employeeError);
+      return NextResponse.json({ 
+        uid: uid,
+        employeeId: null,
+        error: 'Could not retrieve employee information'
+      });
+    }
+    
   } catch (err: any) {
     console.error('❌ Login error:', err);
     

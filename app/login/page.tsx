@@ -25,20 +25,6 @@ export default function LoginPage() {
 
     console.log('🔐 Login attempt:', { email, password });
 
-    // Check if it's admin login
-    if (email === ADMIN_USER && password === ADMIN_PWD) {
-      console.log('✅ Admin login successful');
-      localStorage.setItem('userEmail', email);
-      localStorage.setItem('userPassword', password);
-      localStorage.setItem('uid', 'admin'); // Add UID for admin
-      console.log('📦 Stored in localStorage:', { 
-        userEmail: localStorage.getItem('userEmail'),
-        uid: localStorage.getItem('uid')
-      });
-      router.push('/verify');
-      return;
-    }
-
     try {
       console.log('🌐 Making API call to /api/odoo/auth/login');
       const response = await fetch('/api/odoo/auth/login', {
@@ -54,9 +40,35 @@ export default function LoginPage() {
       console.log('📄 Response data:', data);
 
       if (response.ok && data.uid) {
-        console.log('✅ Regular user login successful, UID:', data.uid);
+        console.log('✅ Login successful, UID:', data.uid);
         localStorage.setItem('uid', data.uid.toString());
-        console.log('📦 Stored UID in localStorage:', localStorage.getItem('uid'));
+        
+        // Store employee information if available
+        if (data.employeeId) {
+          localStorage.setItem('employeeId', data.employeeId.toString());
+          localStorage.setItem('employeeName', data.employeeName || '');
+          localStorage.setItem('employeeEmail', data.employeeEmail || '');
+          localStorage.setItem('jobTitle', data.jobTitle || '');
+          console.log('👷 Employee info stored:', {
+            employeeId: data.employeeId,
+            employeeName: data.employeeName,
+            jobTitle: data.jobTitle
+          });
+        } else {
+          console.log('⚠️ No employee record found for user');
+          // Clear any existing employee data
+          localStorage.removeItem('employeeId');
+          localStorage.removeItem('employeeName');
+          localStorage.removeItem('employeeEmail');
+          localStorage.removeItem('jobTitle');
+        }
+        
+        console.log('📦 Stored in localStorage:', { 
+          uid: localStorage.getItem('uid'),
+          employeeId: localStorage.getItem('employeeId'),
+          employeeName: localStorage.getItem('employeeName')
+        });
+        
         router.push('/verify');
       } else {
         console.log('❌ Login failed:', data.error);

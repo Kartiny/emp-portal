@@ -144,10 +144,10 @@ export class OdooClient {
     );
   }
 
+  /** Public method to get user profile */
   async getUserProfile(uid: number): Promise<any> {
     return this.getFullUserProfile(uid);
   }
-
 
   async getFullUserProfile(uid: number): Promise<any> {
     try {
@@ -251,114 +251,29 @@ export class OdooClient {
     };
   }
 
-  /**
-   * Fetch attendance over a range
-   * range: daily | weekly | biweekly | monthly | custom
-   */
-  async getEmployeeAttendance(
-    uid: number,
-    range: DateRange = 'monthly',
-    customDate?: string,
-    customRange?: { from: string; to: string }
-  ): Promise<{
-    totalHours: number;
-    rate: number;
-    records: { id: number; checkIn: string; checkOut: string; workedHours: number }[];
-    dateRange: { start: string; end: string };
-  }> {
-    const profile = await this.getFullUserProfile(uid);
-    const empId = profile.id;
-
-    // 1) date window
-    let startDate: Date, endDate: Date;
-    if (range === 'custom' && customRange) {
-      startDate = parseISO(customRange.from);
-      endDate = parseISO(customRange.to);
-    } else {
-      const base = parseISO(customDate!);
-      switch (range) {
-        case 'daily':
-          startDate = new Date(base.setHours(0, 0, 0, 0));
-          endDate = new Date(base.setHours(23, 59, 59, 999));
-          break;
-        case 'weekly': {
-          const m = new Date(base);
-          m.setDate(m.getDate() - ((m.getDay() + 6) % 7));
-          startDate = new Date(m.setHours(0, 0, 0, 0));
-          const s = new Date(startDate);
-          s.setDate(s.getDate() + 6);
-          endDate = new Date(s.setHours(23, 59, 59, 999));
-          break;
-        }
-        case 'biweekly': {
-          const m = new Date(base);
-          m.setDate(m.getDate() - ((m.getDay() + 6) % 7));
-          startDate = new Date(m.setHours(0, 0, 0, 0));
-          const two = new Date(startDate);
-          two.setDate(two.getDate() + 13);
-          endDate = new Date(two.setHours(23, 59, 59, 999));
-          break;
-        }
-        case 'monthly':
-        default:
-          startDate = new Date(base.getFullYear(), base.getMonth(), 1, 0, 0, 0, 0);
-          endDate = new Date(base.getFullYear(), base.getMonth() + 1, 0, 23, 59, 59, 999);
-      }
-    }
-
-    // 2) query
-    const fmt = (d: Date) => `${d.toISOString().slice(0, 10)} ${d.toTimeString().slice(0, 8)}`;
-    const domain = [
-      ['employee_id', '=', empId],
-      ['check_in', '>=', fmt(startDate)],
-      ['check_in', '<=', fmt(endDate)],
-    ];
-    const raw: any[] = await this.execute(
-      'hr.attendance',
-      'search_read',
-      [domain],
-      {
-        fields: ['id', 'check_in', 'check_out', 'worked_hours'],
-        order: 'check_in asc',
-      }
-    );
-
-    // 3) map & aggregate
-    const records = raw.map(r => ({
-      id: r.id,
-      checkIn: r.check_in,
-      checkOut: r.check_out,
-      workedHours: r.worked_hours || 0,
-    }));
-    const totalHours = records.reduce((sum, r) => sum + r.workedHours, 0);
-    const days = differenceInCalendarDays(endDate, startDate) + 1;
-    const rate = days > 0 ? (totalHours / (days * STANDARD_HOURS)) * 100 : 0;
-
-    return {
-      totalHours,
-      rate,
-      records,
-      dateRange: {
-        start: startDate.toISOString().slice(0, 10),
-        end: endDate.toISOString().slice(0, 10),
-      },
-    };
-  }
+  
 
   /** Clock in for a user */
   async clockIn(uid: number): Promise<number> {
     const profile = await this.getFullUserProfile(uid);
     const empId = profile.id;
+    const empCode = profile.barcode;
     const nowZ = toZonedTime(new Date(), 'Asia/Kuala_Lumpur');
     const stamp = dfFormat(nowZ, 'yyyy-MM-dd HH:mm:ss');
-    // @ts-ignore
-    return await this.execute('hr.attendance', 'create', [{ employee_id: empId, check_in: stamp }]);
+    // Create in hr.attendance
+    const attendanceId = await this.execute('hr.attendance', 'create', [{ employee_id: empId, check_in: stamp }]);
+    // Also create in hr.attendance.raw
+    if (empCode) {
+      await this.execute('hr.attendance.raw', 'create', [{ emp_code: empCode, datetime: stamp, attn_type: 'i' }]);
+    }
+    return attendanceId;
   }
 
   /** Clock out for a user */
   async clockOut(uid: number): Promise<void> {
     const profile = await this.getFullUserProfile(uid);
     const empId = profile.id;
+    const empCode = profile.barcode;
     const recs: any[] = await this.execute(
       'hr.attendance',
       'search_read',
@@ -373,6 +288,10 @@ export class OdooClient {
     const nowZ = toZonedTime(new Date(), 'Asia/Kuala_Lumpur');
     const stamp = dfFormat(nowZ, 'yyyy-MM-dd HH:mm:ss');
     await this.execute('hr.attendance', 'write', [[attendanceId], { check_out: stamp }]);
+    // Also create in hr.attendance.raw
+    if (empCode) {
+      await this.execute('hr.attendance.raw', 'create', [{ emp_code: empCode, datetime: stamp, attn_type: 'o' }]);
+    }
   }
 
   //
@@ -838,34 +757,236 @@ export class OdooClient {
    * Fetch mail_activity for the employee (by user id)
    */
   async getEmployeeActivities(uid: number): Promise<any[]> {
-    // Fetch activities where user_id = uid (not employee_id)
-    const activities = await this.execute(
-      'mail.activity',
-      'search_read',
-      [[['user_id', '=', uid]]],
-      { fields: ['id', 'activity_type_id', 'summary', 'date_deadline'], order: 'date_deadline asc' }
-    );
-    // Fetch all unique activity_type_id
-    const typeIds = Array.from(new Set(
-      activities
-        .map((a: any) => Array.isArray(a.activity_type_id) ? a.activity_type_id[0] : null)
-        .filter(Boolean)
-    ));
-    let typeNames: Record<number, string> = {};
-    if (typeIds.length > 0) {
-      const types = await this.execute(
-        'mail.activity.type',
-        'search_read',
-        [[['id', 'in', typeIds]]],
-        { fields: ['id', 'name'] }
+    try {
+      console.log('🔍 Getting employee activities for UID:', uid);
+      
+      const activities = await this.execute('mail.activity', 'search_read', 
+        [[['user_id', '=', uid]]], 
+        {
+          fields: [
+            'id',
+            'activity_type_id',
+            'summary',
+            'note',
+            'date_deadline',
+            'state',
+            'res_model',
+            'res_id',
+            'res_name'
+          ],
+          order: 'date_deadline asc',
+          limit: 20
+        }
       );
-      typeNames = Object.fromEntries(types.map((t: any) => [t.id, t.name]));
+      
+      console.log('📋 Employee activities:', activities);
+      return activities;
+    } catch (error: any) {
+      console.error('❌ Error getting employee activities:', error);
+      throw error;
     }
-    // Map name into each activity
-    return activities.map((a: any) => ({
-      ...a,
-      activity_type_name: Array.isArray(a.activity_type_id) && a.activity_type_id[0] ? typeNames[a.activity_type_id[0]] || a.activity_type_id[1] : a.activity_type_id,
-    }));
+  }
+
+  /** Public method to search for employee by user_id */
+  async getEmployeeByUserId(uid: number): Promise<any> {
+    try {
+      console.log('🔍 Searching for employee with user_id:', uid);
+      const employees = await this.execute('hr.employee', 'search_read', 
+        [[['user_id', '=', uid]]], 
+        { fields: ['id', 'name', 'user_id', 'work_email', 'job_title'], limit: 1 }
+      );
+      
+      console.log('👷 Employee search result:', employees);
+      
+      if (employees && employees.length > 0) {
+        return employees[0];
+      }
+      return null;
+    } catch (error: any) {
+      console.error('❌ Error searching for employee by user_id:', error);
+      throw error;
+    }
+  }
+
+  /** Public method to get employee barcode by user_id */
+  async getEmployeeBarcode(uid: number): Promise<{ id: number; name: string; barcode: string | false } | null> {
+    try {
+      const employees = await this.execute(
+        'hr.employee',
+        'search_read',
+        [[['user_id', '=', uid]]],
+        { fields: ['id', 'name', 'barcode'] }
+      );
+      
+      if (employees && employees.length > 0) {
+        return employees[0];
+      }
+      return null;
+    } catch (error: any) {
+      console.error('❌ Error getting employee barcode:', error);
+      throw error;
+    }
+  }
+
+  /** Public method to get raw attendance records from hr.attendance.raw */
+  async getRawAttendanceRecords(empCode: string, startDate: string, endDate: string): Promise<any[]> {
+    try {
+      const domain = [
+        ['emp_code', '=', empCode],
+        ['datetime', '>=', startDate],
+        ['datetime', '<=', endDate],
+      ];
+      
+      const records = await this.execute(
+        'hr.attendance.raw',
+        'search_read',
+        [domain],
+        { fields: ['id', 'datetime', 'attn_type', 'emp_code'], order: 'datetime asc' }
+      );
+      
+      return records;
+    } catch (error: any) {
+      console.error('❌ Error getting raw attendance records:', error);
+      throw error;
+    }
+  }
+
+  /** Public method to get shift timings from hr.attendance.raw */
+  async getShiftTimingsFromRaw(empCode: string, date: string): Promise<{ start: string | null; end: string | null }> {
+    try {
+      const domain = [
+        ['emp_code', '=', empCode],
+        ['datetime', '>=', `${date} 00:00:00`],
+        ['datetime', '<=', `${date} 23:59:59`],
+      ];
+      
+      const records = await this.execute(
+        'hr.attendance.raw',
+        'search_read',
+        [domain],
+        { 
+          fields: ['datetime', 'attn_type', 'emp_code'], 
+          order: 'datetime asc'
+        }
+      );
+
+      // Get first check-in and last check-out of the day
+      let firstIn = null;
+      let lastOut = null;
+
+      for (const rec of records) {
+        if (rec.attn_type === 'i' && !firstIn) {
+          firstIn = rec.datetime;
+        }
+        if (rec.attn_type === 'o') {
+          lastOut = rec.datetime;
+        }
+      }
+
+      return {
+        start: firstIn,
+        end: lastOut
+      };
+    } catch (error: any) {
+      console.error('❌ Error getting shift timings from raw:', error);
+      throw error;
+    }
+  }
+
+  /** Public method to get attendance sheets for an employee in a date range */
+  async getAttendanceSheets(employeeId: number, startDate: string, endDate: string): Promise<any[]> {
+    try {
+      const domain = [
+        ['employee_id', '=', employeeId],
+        ['date_from', '<=', endDate],
+        ['date_to', '>=', startDate],
+      ];
+      const records = await this.execute(
+        'attendance.sheet',
+        'search_read',
+        [domain],
+        {
+          fields: [
+            'id',
+            'employee_id',
+            'date_from',
+            'date_to',
+            'state',
+          ],
+          order: 'date_from asc',
+        }
+      );
+      return records;
+    } catch (error: any) {
+      console.error('❌ Error getting attendance sheets:', error);
+      throw error;
+    }
+  }
+
+  /** Public method to get attendance sheet line records for a sheet in a date range */
+  async getAttendanceSheetLineBySheet(sheetId: number, startDate: string, endDate: string): Promise<any[]> {
+    try {
+      const domain = [
+        ['att_sheet_id', '=', sheetId],
+        ['date', '>=', startDate],
+        ['date', '<=', endDate],
+      ];
+      const records = await this.execute(
+        'attendance.sheet.line',
+        'search_read',
+        [domain],
+        {
+          fields: [
+            'day',
+            'date',
+            'ac_sign_in',
+            'ac_sign_out',
+            'real_overtime',
+            'overtime',
+            'line_employee_id',
+            'att_sheet_id',
+          ],
+          order: 'date asc',
+        }
+      );
+      return records;
+    } catch (error: any) {
+      console.error('❌ Error getting attendance sheet line records by sheet:', error);
+      throw error;
+    }
+  }
+
+  /** Public method to get attendance sheet line records for an employee in a date range */
+  async getAttendanceSheetLinesByEmployee(empId: number, startDate: string, endDate: string): Promise<any[]> {
+    try {
+      const domain = [
+        ['line_employee_id', '=', empId],
+        ['date', '>=', startDate],
+        ['date', '<=', endDate],
+      ];
+      const records = await this.execute(
+        'attendance.sheet.line',
+        'search_read',
+        [domain],
+        {
+          fields: [
+            'day',
+            'date',
+            'ac_sign_in',
+            'ac_sign_out',
+            'real_overtime',
+            'overtime',
+            'line_employee_id',
+            'att_sheet_id',
+          ],
+          order: 'date asc',
+        }
+      );
+      return records;
+    } catch (error: any) {
+      console.error('❌ Error getting attendance sheet line records by employee:', error);
+      throw error;
+    }
   }
 }
 
@@ -884,14 +1005,7 @@ export async function getFullUserProfile(uid: number) {
 export async function getTodayAttendance(uid: number) {
   return getOdooClient().getTodayAttendance(uid);
 }
-export async function getEmployeeAttendance(
-  uid: number,
-  range: DateRange = 'monthly',
-  customDate?: string,
-  customRange?: { from: string; to: string }
-) {
-  return getOdooClient().getEmployeeAttendance(uid, range, customDate, customRange);
-}
+
 export async function clockIn(uid: number) {
   return getOdooClient().clockIn(uid);
 }
@@ -948,7 +1062,8 @@ export async function getDiscussChannels(uid: number) {
   return getOdooClient().getDiscussChannels(uid);
 }
 export async function getAllShiftCodes() {
-  return getOdooClient().getAllShiftCodes();
+  const client = getOdooClient();
+  return client.getAllShiftCodes();
 }
 
 export async function uploadAttachmentToOdoo(opts: {
@@ -959,5 +1074,10 @@ export async function uploadAttachmentToOdoo(opts: {
   relatedId?: number | null;
 }): Promise<number> {
   return OdooClient.uploadAttachment(opts);
+}
+
+export async function getEmployeeByUserId(uid: number) {
+  const client = getOdooClient();
+  return client.getEmployeeByUserId(uid);
 }
 

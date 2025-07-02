@@ -6,110 +6,26 @@ const LOCALE = 'en-MY';
 
 // Helper function to parse various date formats and convert to Malaysia timezone
 const parseDateString = (dateStr: string): Date => {
-  console.log('🕒 Parsing date string:', dateStr);
-  
-  // Try parsing as ISO format 
-  try {
-    if (dateStr.includes('T') || dateStr.includes('Z')) {
-      const utcDate = new Date(dateStr);
-      if (!isNaN(utcDate.getTime())) {
-        console.log('✅ Parsed as ISO format with time');
-        const malaysiaDate = toZonedTime(utcDate, TIMEZONE);
-        console.log('🕒 Converted to Malaysia time:', malaysiaDate);
-        return malaysiaDate;
-      }
-    }
-  } catch (error) {
-    console.warn('Failed to parse as ISO format with time:', error);
+  if (!dateStr) {
+    throw new Error('Invalid date string provided: ' + dateStr);
   }
 
-  // Try parsing as date-only format (YYYY-MM-DD)
-  try {
-    if (dateStr.includes('-') && !dateStr.includes(':')) {
-      const [year, month, day] = dateStr.split('-');
-      const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-      if (!isNaN(date.getTime())) {
-        console.log('✅ Parsed as YYYY-MM-DD format');
-        return date;
-      }
-    }
-  } catch (error) {
-    console.warn('Failed to parse as YYYY-MM-DD format:', error);
-  }
-
-  // Try parsing as format (YYYY-MM-DD HH:mm:ss)
-  try {
-    if (dateStr.includes('-') && dateStr.includes(':')) {
-      const [datePart, timePart] = dateStr.split(' ');
-      const [year, month, day] = datePart.split('-');
-      const [hours, minutes, seconds] = timePart.split(':');
-      
-      const date = new Date(
-        parseInt(year),
-        parseInt(month) - 1,
-        parseInt(day),
-        parseInt(hours),
-        parseInt(minutes),
-        parseInt(seconds)
-      );
-      
-      if (!isNaN(date.getTime())) {
-        console.log('✅ Parsed as YYYY-MM-DD HH:mm:ss format');
-        return date;
-      }
-    }
-  } catch (error) {
-    console.warn('Failed to parse as YYYY-MM-DD HH:mm:ss format:', error);
-  }
-
-  // Try parsing as format (DD/MM/YYYY HH:mm:ss)
-  try {
-    if (dateStr.includes('/') && dateStr.includes(':')) {
-      const [datePart, timePart] = dateStr.split(' ');
-      const [day, month, year] = datePart.split('/');
-      const [hours, minutes, seconds] = timePart.split(':');
-      
-      const date = new Date(
-        parseInt(year),
-        parseInt(month) - 1,
-        parseInt(day),
-        parseInt(hours),
-        parseInt(minutes),
-        parseInt(seconds)
-      );
-      
-      if (!isNaN(date.getTime())) {
-        console.log('✅ Parsed as DD/MM/YYYY HH:mm:ss format');
-        return date;
-      }
-    }
-  } catch (error) {
-    console.warn('Failed to parse as DD/MM/YYYY HH:mm:ss format:', error);
-  }
-
-  // Try parsing as format (DD/MM/YYYY)
-  try {
-    if (dateStr.includes('/') && !dateStr.includes(':')) {
-      const [day, month, year] = dateStr.split('/');
-      const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-      if (!isNaN(date.getTime())) {
-        console.log('✅ Parsed as DD/MM/YYYY format');
-        return date;
-      }
-    }
-  } catch (error) {
-    console.warn('Failed to parse as DD/MM/YYYY format:', error);
-  }
-
-  // Try parsing as a general date string
-  try {
-    const date = new Date(dateStr);
+  // Odoo provides datetime in UTC, typically as 'YYYY-MM-DD HH:mm:ss'.
+  // To parse this correctly as UTC, we convert it to ISO 8601 format
+  // by replacing the space with 'T' and appending 'Z'.
+  if (dateStr.includes(' ') && dateStr.includes(':')) {
+    const isoStr = dateStr.replace(' ', 'T') + 'Z';
+    const date = parseISO(isoStr);
     if (!isNaN(date.getTime())) {
-      console.log('✅ Parsed as general date format');
-      return toZonedTime(date, TIMEZONE);
+      return date; // Returns a Date object representing the correct UTC time
     }
-  } catch (error) {
-    console.warn('Failed to parse as general date format:', error);
+  }
+
+  // Fallback for ISO strings or date-only strings (e.g., 'YYYY-MM-DD')
+  // which parseISO handles correctly. For date-only, it assumes UTC midnight.
+  const date = parseISO(dateStr);
+  if (!isNaN(date.getTime())) {
+    return date;
   }
 
   throw new Error(`Unable to parse date: ${dateStr}`);
