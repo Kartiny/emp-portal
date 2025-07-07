@@ -116,7 +116,7 @@ export class OdooClient {
     );
     return this.adminUid;
   }
-  
+
   private async execute(
     model: string,
     method: string,
@@ -163,39 +163,64 @@ export class OdooClient {
 
      
       const empResult = await this.execute(
-        'hr.employee',
-        'search_read',
-        [[['user_id', '=', uid]]],
-        {
-          fields: [
-            'id',
-            'name',
-            'job_title',
-            'department_id',
-            'work_email',
-            'work_phone',
-            'mobile_phone',
-            'gender',
-            'birthday',
-            'country_id',
-            'place_of_birth',
-            'country_of_birth',
-            'marital',
-            'identification_id',
-            'passport_id',
-            'bank_account_id',
-            'certificate',
-            'study_field',
-            'study_school',
-            'private_street',
-            'emergency_contact',
-            'emergency_phone',
-            'lang',
-            'resource_calendar_id',
-          ],
-          limit: 1,
-        }
-      );
+      'hr.employee',
+      'search_read',
+      [[['user_id', '=', uid]]],
+      {
+        fields: [
+          // 1. Basic Information
+          'name',
+          'mobile_phone',
+          'work_phone',
+          'work_email',
+          'barcode',
+          'gender',
+          'birthday',
+          'age',
+          'place_of_birth',
+          'country_of_birth',
+          // 2. Work information
+          'job_title',
+          'department_id',
+          'parent_id',
+          'expense_manager_id',
+          'leave_manager_id',
+          'attendance_manager_id',
+          'contract_id',
+          // 3. Private Information
+          'private_street',
+          'private_street2',
+          'private_zip',
+          'private_state_id',
+          'country_id',
+          'permanent_resident',
+          // 3.1 Family Status
+          'marital',
+          'children',
+          // 3.2 Emergency
+          'emergency_contact',
+          'emergency_phone',
+          // 3.3 Education
+          'certificate',
+          'study_field',
+          'study_school',
+          // 3.4 Work permit
+          'visa_no',
+          'permit_no',
+          'visa_expire',
+          'work_permit_expiration_date',
+          'has_work_permit',
+          // 3.5 Citizenship
+          'emp_country',
+          'emp_old_ic',
+          'identification_id',
+          'ssnid',
+          'passport_id',
+          'passport_exp_date',
+        ],
+        limit: 1,
+      }
+    );
       
       console.log('👷 Employee result:', empResult);
       
@@ -206,16 +231,16 @@ export class OdooClient {
       const [emp] = empResult;
 
       const profile = {
-        id: emp.id,
-        name: user.name,
-        email: user.login,
-        image_1920: user.image_1920,
-        job_title: emp.job_title,
-        department: Array.isArray(emp.department_id) ? emp.department_id[1] : '',
-        phone: emp.work_phone || emp.mobile_phone,
-        resource_calendar_id: emp.resource_calendar_id,
-        ...emp,
-      };
+      id: emp.id,
+      name: user.name,
+      email: user.login,
+      image_1920: user.image_1920,
+      job_title: emp.job_title,
+      department: Array.isArray(emp.department_id) ? emp.department_id[1] : '',
+      phone: emp.work_phone || emp.mobile_phone,
+      resource_calendar_id: emp.resource_calendar_id,
+      ...emp,
+    };
       
       console.log('✅ Profile constructed successfully');
       return profile;
@@ -256,42 +281,59 @@ export class OdooClient {
   /** Clock in for a user */
   async clockIn(uid: number): Promise<number> {
     const profile = await this.getFullUserProfile(uid);
-    const empId = profile.id;
     const empCode = profile.barcode;
     const nowZ = toZonedTime(new Date(), 'Asia/Kuala_Lumpur');
-    const stamp = dfFormat(nowZ, 'yyyy-MM-dd HH:mm:ss');
-    // Create in hr.attendance
-    const attendanceId = await this.execute('hr.attendance', 'create', [{ employee_id: empId, check_in: stamp }]);
-    // Also create in hr.attendance.raw
+    const stamp = dfFormat(nowZ, 'yyyy-MM-dd HH:mm:ss'); // Odoo standard format
     if (empCode) {
-      await this.execute('hr.attendance.raw', 'create', [{ emp_code: empCode, datetime: stamp, attn_type: 'i' }]);
+      try {
+        const rawRecord = {
+          emp_code: empCode,
+          datetime: stamp,
+          attn_type: 'i',
+          job_id: 1,
+          machine_id: '127.0.0.1-manual',
+          latitude: 12.9716,
+          longitude: 77.5946
+        };
+        console.log('[DEBUG] Attempting to write to hr.attendance.raw:', rawRecord);
+        const rawId = await this.execute('hr.attendance.raw', 'create', [rawRecord]);
+        console.log('[DEBUG] Write to hr.attendance.raw successful.');
+        return rawId;
+      } catch (err) {
+        console.error('[ERROR] Failed to write to hr.attendance.raw:', err);
+        throw err;
+      }
     }
-    return attendanceId;
+    throw new Error('No employee barcode found');
   }
 
   /** Clock out for a user */
-  async clockOut(uid: number): Promise<void> {
+  async clockOut(uid: number): Promise<number> {
     const profile = await this.getFullUserProfile(uid);
-    const empId = profile.id;
     const empCode = profile.barcode;
-    const recs: any[] = await this.execute(
-      'hr.attendance',
-      'search_read',
-      [[
-        ['employee_id', '=', empId],
-        ['check_out', '=', false],
-      ]],
-      { fields: ['id'], limit: 1, order: 'check_in desc' }
-    );
-    if (!recs[0]) throw new Error('No open attendance record found');
-    const attendanceId = recs[0].id;
     const nowZ = toZonedTime(new Date(), 'Asia/Kuala_Lumpur');
     const stamp = dfFormat(nowZ, 'yyyy-MM-dd HH:mm:ss');
-    await this.execute('hr.attendance', 'write', [[attendanceId], { check_out: stamp }]);
-    // Also create in hr.attendance.raw
     if (empCode) {
-      await this.execute('hr.attendance.raw', 'create', [{ emp_code: empCode, datetime: stamp, attn_type: 'o' }]);
+      try {
+        const rawRecord = {
+          emp_code: empCode,
+          datetime: stamp,
+          attn_type: 'o',
+          job_id: 1,
+          machine_id: '127.0.0.1-manual',
+          latitude: 12.9716,
+          longitude: 77.5946
+        };
+        console.log('[DEBUG] Attempting to write to hr.attendance.raw (clock out):', rawRecord);
+        const rawId = await this.execute('hr.attendance.raw', 'create', [rawRecord]);
+        console.log('[DEBUG] Write to hr.attendance.raw (clock out) successful.');
+        return rawId;
+      } catch (err) {
+        console.error('[ERROR] Failed to write to hr.attendance.raw (clock out):', err);
+        throw err;
+      }
     }
+    throw new Error('No employee barcode found');
   }
 
   //
@@ -495,15 +537,15 @@ export class OdooClient {
   }
 
   /**
-   * Fetch the employee's shift code and today's start/end time
+   * Fetch the start/end time for code 'S01' from hr.work.schedule.code.line
    */
   async getEmployeeShiftInfo(
     uid: number
-  ): Promise<{ code: string | null; start: string | null; end: string | null }> {
+  ): Promise<{ schedule_name: string | null; start: string | null; end: string | null }> {
     const profile: any = await this.getFullUserProfile(uid);
     const calendar = profile.resource_calendar_id;
     if (!calendar || !Array.isArray(calendar) || !calendar[0]) {
-      return { code: null, start: null, end: null };
+      return { schedule_name: null, start: null, end: null };
     }
     const calendarId = calendar[0];
     // Get today's dayofweek in Odoo format (0=Monday, 6=Sunday)
@@ -518,29 +560,40 @@ export class OdooClient {
       { fields: ['schedule_code_id'], limit: 1 }
     );
     if (!attendanceLines || attendanceLines.length === 0) {
-      return { code: null, start: null, end: null };
+      return { schedule_name: null, start: null, end: null };
     }
     const scheduleCode = attendanceLines[0].schedule_code_id;
-    let start: string | null = null;
-    let end: string | null = null;
-    if (scheduleCode && Array.isArray(scheduleCode) && scheduleCode[0]) {
-      // Fetch timing from hr.work.schedule.code.line
-      const codeLines = await this.execute(
-        'hr.work.schedule.code.line',
-        'search_read',
-        [[['code_id', '=', scheduleCode[0]]]],
-        { fields: ['start_clock_actual', 'end_clock_actual'], limit: 1 }
-      );
-      if (codeLines && codeLines.length > 0) {
-        start = floatToTimeString(codeLines[0].start_clock_actual);
-        end = floatToTimeString(codeLines[0].end_clock_actual);
-      }
-    }
     if (!scheduleCode || !Array.isArray(scheduleCode) || !scheduleCode[0]) {
-      return { code: null, start, end };
+      return { schedule_name: null, start: null, end: null };
     }
-    const code = scheduleCode[1] || null;
-    return { code, start, end };
+    // Fetch the schedule code record with its line_ids and name
+    const codeRecord = await this.execute(
+      'hr.work.schedule.code',
+      'search_read',
+      [[['id', '=', scheduleCode[0]]]],
+      { fields: ['id', 'name', 'line_ids'], limit: 1 }
+    );
+    if (!codeRecord || codeRecord.length === 0) {
+      return { schedule_name: null, start: null, end: null };
+    }
+    const schedule_name = codeRecord[0].name;
+    const lineIds = codeRecord[0].line_ids;
+    if (!lineIds || !Array.isArray(lineIds) || lineIds.length === 0) {
+      return { schedule_name, start: null, end: null };
+    }
+    // Fetch all lines for this code and filter for code = 'S01'
+    const codeLines = await this.execute(
+      'hr.work.schedule.code.line',
+      'search_read',
+      [[['id', 'in', lineIds], ['code', '=', 'S01']]],
+      { fields: ['start_clock_actual', 'end_clock_actual', 'code'], limit: 1 }
+    );
+    if (!codeLines || codeLines.length === 0) {
+      return { schedule_name, start: null, end: null };
+    }
+    const start = floatToTimeString(codeLines[0].start_clock_actual);
+    const end = floatToTimeString(codeLines[0].end_clock_actual);
+    return { schedule_name, start, end };
   }
 
   /**
@@ -561,7 +614,7 @@ export class OdooClient {
         const codeLines = await this.execute(
           'hr.work.schedule.code.line',
           'search_read',
-          [[['code_id', '=', att.schedule_code_id[0]]]],
+          [[['code', '=', att.schedule_code_id[0]]]],
           { fields: ['start_clock_actual', 'end_clock_actual'], limit: 1 }
         );
         if (codeLines && codeLines.length > 0) {
@@ -813,8 +866,8 @@ export class OdooClient {
     try {
       const employees = await this.execute(
         'hr.employee',
-        'search_read',
-        [[['user_id', '=', uid]]],
+      'search_read',
+      [[['user_id', '=', uid]]],
         { fields: ['id', 'name', 'barcode'] }
       );
       
@@ -943,6 +996,7 @@ export class OdooClient {
             'ac_sign_out',
             'real_overtime',
             'overtime',
+            'total_working_time',
             'line_employee_id',
             'att_sheet_id',
           ],
@@ -976,6 +1030,7 @@ export class OdooClient {
             'ac_sign_out',
             'real_overtime',
             'overtime',
+            'total_working_time',
             'line_employee_id',
             'att_sheet_id',
           ],

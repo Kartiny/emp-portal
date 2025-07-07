@@ -3,7 +3,7 @@ import { getOdooClient } from '@/lib/odooXml';
 
 export async function POST(req: Request) {
   try {
-    const { uid } = await req.json();
+  const { uid } = await req.json();
     
     if (!uid) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
