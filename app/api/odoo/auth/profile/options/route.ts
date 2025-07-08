@@ -17,6 +17,20 @@ export async function GET(req: Request) {
     
     const client = getOdooClient();
     
+    // Support fetching options for residence_status (many2one)
+    if (model === 'hr.employee' && field === 'residence_status') {
+      // Fetch the selection options for the residence_status field from hr.employee
+      const fields = await (client as any).execute(
+        'hr.employee',
+        'fields_get',
+        [[field]],
+        {}
+      );
+      const selection = fields?.[field]?.selection || [];
+      const options = selection.map(([value, label]: [string, string]) => ({ value, label }));
+      return NextResponse.json({ options });
+    }
+
     // Get field information to determine the type
     const fieldInfo = await (client as any).execute(
       model,

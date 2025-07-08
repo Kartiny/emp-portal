@@ -193,7 +193,7 @@ export class OdooClient {
           'private_zip',
           'private_state_id',
           'country_id',
-          'permanent_resident',
+          'residence_status', // many2one
           // 3.1 Family Status
           'marital',
           'children',
@@ -240,7 +240,8 @@ export class OdooClient {
       phone: emp.work_phone || emp.mobile_phone,
       resource_calendar_id: emp.resource_calendar_id,
       ...emp,
-    };
+        residence_status: Array.isArray(emp.residence_status) ? emp.residence_status : null,
+      };
       
       console.log('✅ Profile constructed successfully');
       return profile;
@@ -582,9 +583,9 @@ export class OdooClient {
       return { schedule_name, start: null, end: null };
     }
     // Fetch all lines for this code and filter for code = 'S01'
-    const codeLines = await this.execute(
-      'hr.work.schedule.code.line',
-      'search_read',
+      const codeLines = await this.execute(
+        'hr.work.schedule.code.line',
+        'search_read',
       [[['id', 'in', lineIds], ['code', '=', 'S01']]],
       { fields: ['start_clock_actual', 'end_clock_actual', 'code'], limit: 1 }
     );

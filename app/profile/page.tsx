@@ -90,6 +90,7 @@ interface EmployeeProfile {
   ssnid: string;
   passport_id: string;
   passport_exp_date: string;
+  residence_status: string;
 }
 
 export default function ProfilePage() {
@@ -155,13 +156,10 @@ export default function ProfilePage() {
   // Fetch residency options on mount
   useEffect(() => {
     const fetchResidencyOptions = async () => {
-      const res = await fetch('/api/odoo/auth/profile/options?model=hr.employee&field=permanent_resident');
+      const res = await fetch('/api/odoo/auth/profile/options?model=hr.employee&field=residence_status');
       if (res.ok) {
         const { options } = await res.json();
-        setResidencyOptions(Array.isArray(options) && options.length && Array.isArray(options[0])
-          ? options.map(([value, label]) => ({ value, label }))
-          : options
-        );
+        setResidencyOptions(options);
       }
     };
     fetchResidencyOptions();
@@ -640,11 +638,11 @@ export default function ProfilePage() {
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="permanent_resident">Residency</Label>
+                          <Label htmlFor="residence_status">Residency</Label>
                           {isEditing ? (
                             <Select
-                              value={editedProfile.permanent_resident || ''}
-                              onValueChange={(v) => setEditedProfile((p) => ({ ...p, permanent_resident: v }))}
+                              value={editedProfile.residence_status || ''}
+                              onValueChange={(v) => setEditedProfile((p) => ({ ...p, residence_status: v }))}
                             >
                               <SelectTrigger>
                                 <SelectValue placeholder="Select residency" />
@@ -659,8 +657,8 @@ export default function ProfilePage() {
                             </Select>
                           ) : (
                             <Input
-                              id="permanent_resident"
-                              value={residencyOptions.find((o) => o.value === profile.permanent_resident)?.label || profile.permanent_resident || ''}
+                              id="residence_status"
+                              value={residencyOptions.find(opt => opt.value === profile.residence_status)?.label || ''}
                               readOnly
                               className="bg-muted"
                             />
@@ -673,38 +671,38 @@ export default function ProfilePage() {
                     <div>
                       <h4 className="font-semibold mb-3">Family Status</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="marital">Marital Status</Label>
-                          {isEditing ? (
-                            <Select
-                              value={editedProfile.marital || ''}
-                              onValueChange={(v) =>
-                                setEditedProfile((p) => ({ ...p, marital: v as MaritalStatus }))
-                              }
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select marital status" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {MARITAL_OPTIONS.map((opt) => (
-                                  <SelectItem key={opt.value} value={opt.value}>
-                                    {opt.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          ) : (
-                            <Input
-                              id="marital"
-                              value={MARITAL_OPTIONS.find((o) => o.value === profile.marital)?.label || ''}
-                              readOnly
-                              className="bg-muted"
-                            />
-                          )}
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="children">Number of Dependent Children</Label>
+                      <div className="space-y-2">
+                        <Label htmlFor="marital">Marital Status</Label>
+                        {isEditing ? (
+                          <Select
+                            value={editedProfile.marital || ''}
+                            onValueChange={(v) =>
+                              setEditedProfile((p) => ({ ...p, marital: v as MaritalStatus }))
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select marital status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {MARITAL_OPTIONS.map((opt) => (
+                                <SelectItem key={opt.value} value={opt.value}>
+                                  {opt.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
                           <Input
+                            id="marital"
+                            value={MARITAL_OPTIONS.find((o) => o.value === profile.marital)?.label || ''}
+                            readOnly
+                            className="bg-muted"
+                          />
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                          <Label htmlFor="children">Number of Dependent Children</Label>
+                        <Input
                             id="children"
                             type="number"
                             value={profile.children || ''}
@@ -720,7 +718,7 @@ export default function ProfilePage() {
                     <div>
                       <h4 className="font-semibold mb-3">Emergency</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
+                    <div className="space-y-2">
                           <Label htmlFor="emergency_contact">Contact Name</Label>
                           <Input
                             id="emergency_contact"
@@ -729,8 +727,8 @@ export default function ProfilePage() {
                             readOnly={!isEditing}
                             className={!isEditing ? 'bg-muted' : ''}
                           />
-                        </div>
-                        <div className="space-y-2">
+                    </div>
+                    <div className="space-y-2">
                           <Label htmlFor="emergency_phone">Contact Phone</Label>
                           <Input
                             id="emergency_phone"
@@ -756,8 +754,8 @@ export default function ProfilePage() {
                             readOnly={!isEditing}
                             className={!isEditing ? 'bg-muted' : ''}
                           />
-                        </div>
-                        <div className="space-y-2">
+                    </div>
+                    <div className="space-y-2">
                           <Label htmlFor="study_field">Field of Study</Label>
                           <Input
                             id="study_field"
@@ -766,8 +764,8 @@ export default function ProfilePage() {
                             readOnly={!isEditing}
                             className={!isEditing ? 'bg-muted' : ''}
                           />
-                        </div>
-                        <div className="space-y-2">
+                    </div>
+                    <div className="space-y-2">
                           <Label htmlFor="study_school">School</Label>
                           <Input
                             id="study_school"
@@ -907,8 +905,8 @@ export default function ProfilePage() {
                             readOnly={!isEditing}
                             className={!isEditing ? 'bg-muted' : ''}
                           />
-                        </div>
-                        <div className="space-y-2">
+                    </div>
+                    <div className="space-y-2">
                           <Label htmlFor="passport_exp_date">Passport Expiry Date</Label>
                           <Input
                             id="passport_exp_date"
