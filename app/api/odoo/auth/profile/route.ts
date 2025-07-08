@@ -18,8 +18,47 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
     }
 
-    console.log('✅ Profile fetched successfully');
-    return NextResponse.json({ user });
+    // Fetch employeeId from user.id (from hr.employee)
+    const employeeId = user.id;
+    // Fetch bank details
+    let bankDetails = [];
+    if (employeeId) {
+      bankDetails = await (client as any).execute(
+        'hr.bank.details',
+        'search_read',
+        [[['bank_emp_id', '=', employeeId]]],
+        {
+          fields: [
+            'id',
+            'bank_name',
+            'bank_code',
+            'bank_ac_no',
+            'beneficiary_name',
+          ]
+        }
+      );
+    }
+    // Fetch status history
+    let statusHistory = [];
+    if (employeeId) {
+      statusHistory = await (client as any).execute(
+        'hr.employee.status.history',
+        'search_read',
+        [[['employee_id', '=', employeeId]]],
+        {
+          fields: [
+            'id',
+            'employee_id',
+            'state',
+            'start_date',
+            'end_date',
+            'duration',
+          ],
+          order: 'start_date desc'
+        }
+      );
+    }
+    return NextResponse.json({ user, bankDetails, statusHistory });
   } catch (err: any) {
     console.error('❌ Profile API error:', err);
     

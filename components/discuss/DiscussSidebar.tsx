@@ -31,7 +31,7 @@ export function DiscussSidebar() {
       return;
     }
     // Connect to WebSocket for channels
-    const wsUrl = `ws://localhost:3000/ws/discuss/channels?uid=${uid}`;
+    const wsUrl = process.env.NEXT_PUBLIC_WS_URL ? `${process.env.NEXT_PUBLIC_WS_URL}/ws/discuss/channels?uid=${uid}` : '';
     wsRef.current = new DiscussWebSocket(wsUrl, (data) => {
       if (data.type === "channels") {
         setChannels(data.channels || []);

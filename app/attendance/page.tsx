@@ -84,8 +84,11 @@ interface DateRangeState {
 function formatTimeKL(dt: string | null | undefined) {
   if (!dt) return '-';
   try {
-    const zoned = toZonedTime(new Date(dt), MALAYSIA_TZ);
-    return zoned.toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit', hour12: false });
+    // Parse as local time, do not convert timezone
+    const [datePart, timePart] = dt.split(' ');
+    if (!timePart) return '-';
+    const [h, m] = timePart.split(':');
+    return `${h}:${m}`;
   } catch {
     return '-';
   }
@@ -247,30 +250,29 @@ export default function AttendancePage() {
   }, [rosterMonth, rosterYear]);
 
   // Status computations
-  const calculateLateStatus = (checkIn: string, shiftStart?: string) => {
+  const calculateCheckInStatus = (checkIn: string, shiftStart?: string) => {
     try {
       const d = toZonedTime(new Date(checkIn), 'Asia/Kuala_Lumpur');
       const ref = new Date(d);
       if (shiftStart) {
         const [h, m] = shiftStart.split(':').map(Number);
+        if (isNaN(h) || isNaN(m)) return { isLate: false, status: 'N/A' };
         ref.setHours(h, m, 0, 0);
       } else {
         ref.setHours(WORK_START_HOUR, 0, 0, 0);
       }
       const mins = differenceInMinutes(d, ref);
-      const absMins = Math.abs(mins);
-      const h = Math.floor(absMins / 60);
-      const m = absMins % 60;
+      if (mins <= 0) return { isLate: false, status: 'On time' };
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      if (isNaN(h) || isNaN(m)) return { isLate: true, status: 'Late in (invalid time)' };
       const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
-      if (mins === 0) return { isLate: false, isEarly: false, status: 'On time' };
-      if (mins > 0)  return { isLate: true, isEarly: false, status: `Late by ${timeStr}` };
-      if (mins < 0)  return { isLate: false, isEarly: true, status: `Clocked in ${timeStr} early` };
-      return { isLate: false, isEarly: false, status: 'On time' };
+      return { isLate: true, status: `Late in by ${timeStr}` };
     } catch {
-      return { isLate: false, isEarly: false, status: 'N/A' };
+      return { isLate: false, status: 'N/A' };
     }
   };
-  const calculateEarlyLeaveStatus = (checkOut: string, late: boolean, shiftEnd?: string) => {
+  const calculateCheckOutStatus = (checkOut: string, shiftEnd?: string) => {
     try {
       const d = toZonedTime(new Date(checkOut), 'Asia/Kuala_Lumpur');
       const ref = new Date(d);
@@ -281,14 +283,14 @@ export default function AttendancePage() {
         ref.setHours(WORK_END_HOUR, 0, 0, 0);
       }
       const mins = differenceInMinutes(ref, d);
-      const absMins = Math.abs(mins);
-      const h = Math.floor(absMins / 60);
-      const m = absMins % 60;
+      if (mins === 0) return { isEarly: false, status: 'On time' };
+      if (mins > 0) {
+        const h = Math.floor(mins / 60);
+        const m = mins % 60;
       const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
-      if (mins === 0)  return { isEarly: false, status: late ? 'Left on time' : 'Full day' };
-      if (mins > 0)   return { isEarly: true,  status: `Left early by ${timeStr}` };
-      if (mins < 0)   return { isEarly: false, status: `Left late by ${timeStr}` };
-      return { isEarly: false, status: 'N/A' };
+        return { isEarly: true, status: `Early check out by ${timeStr}` };
+      }
+      return { isEarly: false, status: 'On time' };
     } catch {
       return { isEarly: false, status: 'N/A' };
     }
@@ -306,7 +308,7 @@ export default function AttendancePage() {
   const formatHours = (h: number) => `${Math.floor(h)}h ${Math.round((h%1)*60)}m`;
 
   // Compute missedClockOut
-  const now = toZonedTime(new Date(), 'Asia/Kuala_Lumpur');
+  const now = new Date();
   const missedClockOut = !!(
     todayData &&
     todayData.lastClockIn &&
@@ -365,29 +367,25 @@ export default function AttendancePage() {
                         <p className={
                           !todayData.lastClockIn
                             ? 'text-red-600'
-                            : calculateLateStatus(todayData.lastClockIn || '', todayData.start_clock_actual || undefined).isLate
+                            : calculateCheckInStatus(todayData.lastClockIn || '', todayData.start_clock_actual || undefined).isLate
                               ? 'text-yellow-600'
-                              : calculateLateStatus(todayData.lastClockIn || '', todayData.start_clock_actual || undefined).isEarly
-                                ? 'text-blue-600'
                                 : 'text-green-600'
                         }>
                           {!todayData.lastClockIn
                             ? 'Not clocked in today'
-                            : calculateLateStatus(todayData.lastClockIn || '', todayData.start_clock_actual || undefined).status}
+                            : calculateCheckInStatus(todayData.lastClockIn || '', todayData.start_clock_actual || undefined).status}
                         </p>
                       </div>
                       {todayData.lastClockOut && (
                         <>
                           <div>
                             <p className="text-sm">Check-out Status</p>
-                            <p className={calculateEarlyLeaveStatus(
+                            <p className={calculateCheckOutStatus(
                               todayData.lastClockOut || '',
-                              calculateLateStatus(todayData.lastClockIn || '', todayData.start_clock_actual || undefined).isLate,
                               todayData.end_clock_actual || undefined
                             ).isEarly ? 'text-red-600' : 'text-green-600'}>
-                              {calculateEarlyLeaveStatus(
+                              {calculateCheckOutStatus(
                                 todayData.lastClockOut || '',
-                                calculateLateStatus(todayData.lastClockIn || '', todayData.start_clock_actual || undefined).isLate,
                                 todayData.end_clock_actual || undefined
                               ).status}
                             </p>
@@ -484,9 +482,9 @@ export default function AttendancePage() {
                   </TableHeader>
                   <TableBody>
                     {attendanceData?.records.map((rec) => {
-                      const late = calculateLateStatus(rec.checkIn, rec.start_clock_actual);
-                      const early = rec.checkOut
-                        ? calculateEarlyLeaveStatus(rec.checkOut, late.isLate, rec.end_clock_actual)
+                      const checkInStatus = calculateCheckInStatus(rec.checkIn, rec.start_clock_actual);
+                      const checkOutStatus = rec.checkOut
+                        ? calculateCheckOutStatus(rec.checkOut, rec.end_clock_actual)
                         : null;
                       return (
                         <TableRow key={rec.id}>
@@ -505,21 +503,19 @@ export default function AttendancePage() {
                             <div className="text-sm">
                               {!rec.checkIn ? (
                                 <span className="text-red-600">Not clocked in</span>
-                              ) : late.isLate ? (
-                                <span className="text-yellow-600">{late.status}</span>
-                              ) : late.isEarly ? (
-                                <span className="text-blue-600">{late.status}</span>
+                              ) : checkInStatus.isLate ? (
+                                <span className="text-yellow-600">{checkInStatus.status}</span>
                               ) : (
-                                <span className="text-green-600">{late.status}</span>
+                                <span className="text-green-600">{checkInStatus.status}</span>
                               )}
-                              {rec.checkOut && (
+                              {rec.checkOut && checkOutStatus && (
                                 <>
                                   <br />
-                                  {early?.isEarly ? (
-                                    <span className="text-red-600">{early.status}</span>
-                                  ) : early && early.status && early.status !== 'Full day' && early.status !== 'Left on time' ? (
-                                    <span className="text-green-600">{early.status}</span>
-                                  ) : null}
+                                  {checkOutStatus.isEarly ? (
+                                    <span className="text-red-600">{checkOutStatus.status}</span>
+                                  ) : (
+                                    <span className="text-green-600">{checkOutStatus.status}</span>
+                                  )}
                                 </>
                               )}
                             </div>
@@ -577,14 +573,14 @@ export default function AttendancePage() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          {Array.from({ length: getDaysInMonth(new Date(rosterYear, rosterMonth)) }, (_, i) => (
+                          {Array.from({ length: 31 }, (_, i) => (
                             <TableHead key={i}>Day {i + 1}</TableHead>
                           ))}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         <TableRow>
-                          {Array.from({ length: getDaysInMonth(new Date(rosterYear, rosterMonth)) }, (_, i) => (
+                          {Array.from({ length: 31 }, (_, i) => (
                             <TableCell key={i}>{roster[`day_${i + 1}`] || '-'}</TableCell>
                           ))}
                         </TableRow>

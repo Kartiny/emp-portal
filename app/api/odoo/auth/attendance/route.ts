@@ -83,7 +83,9 @@ export async function POST(req: Request) {
       checkOut: r.ac_sign_out,
       overtime: r.real_overtime,
       approvedOvertime: r.overtime,
-      workedHours: (r.ac_sign_out && r.ac_sign_in) ? differenceInMinutes(new Date(r.ac_sign_out), new Date(r.ac_sign_in)) / 60 : 0
+      workedHours: typeof r.total_working_time === 'number' && !isNaN(r.total_working_time)
+        ? r.total_working_time
+        : 0
     }));
 
     // Calculate totals

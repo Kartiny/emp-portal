@@ -214,7 +214,7 @@ export default function DashboardPage() {
         // Track which days have a record
         const daysWithRecord = new Set<string>();
         records.forEach((rec: any) => {
-          if (!rec.checkIn) return;
+          if (!rec.checkIn || typeof rec.checkIn !== 'string') return;
           const dt = rec.checkIn.slice(0, 10);
           daysWithRecord.add(dt);
           const mIdx = getMonthIdx(rec.checkIn);

@@ -21,8 +21,8 @@ export default function ChannelPage() {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    // Replace with your actual WebSocket server URL
-    const wsUrl = `ws://localhost:3000/ws/discuss/${channelId}`;
+    // TODO: Replace with environment variable or production URL
+    const wsUrl = process.env.NEXT_PUBLIC_WS_URL ? `${process.env.NEXT_PUBLIC_WS_URL}/ws/discuss/${channelId}` : '';
     wsRef.current = new DiscussWebSocket(wsUrl, (data) => {
       if (data.type === "messages") {
         setMessages(data.messages || []);

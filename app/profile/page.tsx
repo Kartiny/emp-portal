@@ -136,9 +136,11 @@ export default function ProfilePage() {
           );
         }
 
-        const { user } = await res.json();
+        const { user, bankDetails, statusHistory } = await res.json();
         if (!user) throw new Error('Malformed profile response');
         setProfile(user);
+        setBankDetails(bankDetails || []);
+        setStatusHistory(statusHistory || []);
       } catch (err: any) {
         console.error('❌ Failed to load profile:', err);
         setError(err.message);
@@ -149,28 +151,6 @@ export default function ProfilePage() {
 
     fetchProfile();
   }, []);
-
-  // Fetch bank details and status history after profile is loaded
-  useEffect(() => {
-    const fetchExtra = async () => {
-      if (!profile) return;
-      const rawUid = localStorage.getItem('uid');
-      if (!rawUid) return;
-      // Bank Details
-      const bankRes = await fetch(`/api/odoo/auth/profile/bank-details?uid=${rawUid}`);
-      if (bankRes.ok) {
-        const { bankDetails } = await bankRes.json();
-        setBankDetails(bankDetails);
-      }
-      // Status History
-      const statusRes = await fetch(`/api/odoo/auth/profile/status-history?uid=${rawUid}`);
-      if (statusRes.ok) {
-        const { statusHistory } = await statusRes.json();
-        setStatusHistory(statusHistory);
-      }
-    };
-    fetchExtra();
-  }, [profile]);
 
   // Fetch residency options on mount
   useEffect(() => {
@@ -960,13 +940,13 @@ export default function ProfilePage() {
                     <CardDescription>Your bank accounts</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <table className="min-w-full text-sm">
+                    <table className="min-w-full text-sm border-collapse">
                       <thead>
                         <tr>
-                          <th>Name of Bank</th>
-                          <th>Bank Code</th>
-                          <th>Bank Account No</th>
-                          <th>Beneficiary Name</th>
+                          <th className="px-4 py-2 text-center w-1/4">Name of Bank</th>
+                          <th className="px-4 py-2 text-center w-1/4">Bank Code</th>
+                          <th className="px-4 py-2 text-center w-1/4">Bank Account No</th>
+                          <th className="px-4 py-2 text-center w-1/4">Beneficiary Name</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -977,10 +957,10 @@ export default function ProfilePage() {
                         ) : (
                           bankDetails.map((b, i) => (
                             <tr key={b.id || i}>
-                              <td>{b.bank_name}</td>
-                              <td>{b.bank_code}</td>
-                              <td>{b.bank_ac_no}</td>
-                              <td>{b.beneficiary_name}</td>
+                              <td className="px-4 py-2 text-center">{b.bank_name}</td>
+                              <td className="px-4 py-2 text-center">{b.bank_code}</td>
+                              <td className="px-4 py-2 text-center">{b.bank_ac_no}</td>
+                              <td className="px-4 py-2 text-center">{b.beneficiary_name}</td>
                             </tr>
                           ))
                         )}
@@ -997,13 +977,13 @@ export default function ProfilePage() {
                     <CardDescription>Employment status changes</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <table className="min-w-full text-sm">
+                    <table className="min-w-full text-sm border-collapse">
                       <thead>
                         <tr>
-                          <th>Stage</th>
-                          <th>Start Date</th>
-                          <th>End Date</th>
-                          <th>Duration (Days)</th>
+                          <th className="px-4 py-2 text-center w-1/4">Stage</th>
+                          <th className="px-4 py-2 text-center w-1/4">Start Date</th>
+                          <th className="px-4 py-2 text-center w-1/4">End Date</th>
+                          <th className="px-4 py-2 text-center w-1/4">Duration (Days)</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1014,10 +994,10 @@ export default function ProfilePage() {
                         ) : (
                           statusHistory.map((s, i) => (
                             <tr key={s.id || i}>
-                              <td>{s.state}</td>
-                              <td>{s.start_date}</td>
-                              <td>{s.end_date}</td>
-                              <td>{s.duration}</td>
+                              <td className="px-4 py-2 text-center">{s.state}</td>
+                              <td className="px-4 py-2 text-center">{s.start_date ? format(new Date(s.start_date), 'dd/MM/yyyy') : ''}</td>
+                              <td className="px-4 py-2 text-center">{s.end_date ? format(new Date(s.end_date), 'dd/MM/yyyy') : ''}</td>
+                              <td className="px-4 py-2 text-center">{s.duration}</td>
                             </tr>
                           ))
                         )}
