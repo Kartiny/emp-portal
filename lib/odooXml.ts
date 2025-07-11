@@ -539,62 +539,112 @@ export class OdooClient {
 
   /**
    * Fetch the start/end time for code 'S01' from hr.work.schedule.code.line
+   * Following the proper relationship chain:
+   * hr.employee → hr.contract → resource_calendar_id → resource.calendar.attendance → schedule_code_id → hr.work.schedule.code.line
    */
   async getEmployeeShiftInfo(
     uid: number
   ): Promise<{ schedule_name: string | null; start: string | null; end: string | null }> {
+    try {
+      // 1. Get employee profile
     const profile: any = await this.getFullUserProfile(uid);
-    const calendar = profile.resource_calendar_id;
-    if (!calendar || !Array.isArray(calendar) || !calendar[0]) {
-      return { schedule_name: null, start: null, end: null };
-    }
-    const calendarId = calendar[0];
-    // Get today's dayofweek in Odoo format (0=Monday, 6=Sunday)
+      const empId = profile.id;
+      
+      // 2. Get employee's contract to find resource_calendar_id
+      const contracts = await this.execute(
+        'hr.contract',
+        'search_read',
+        [[['employee_id', '=', empId], ['state', '=', 'open']]],
+        { fields: ['id', 'resource_calendar_id'], limit: 1 }
+      );
+      
+      if (!contracts || contracts.length === 0) {
+        console.log('[DEBUG] No active contract found for employee:', empId);
+        return { schedule_name: null, start: null, end: null };
+      }
+      
+      const contract = contracts[0];
+      const calendarId = contract.resource_calendar_id;
+      
+      if (!calendarId || !Array.isArray(calendarId) || !calendarId[0]) {
+        console.log('[DEBUG] No resource calendar found in contract:', contract);
+        return { schedule_name: null, start: null, end: null };
+      }
+      
+      // 3. Get today's dayofweek in Odoo format (0=Monday, 6=Sunday)
     const today = new Date();
     const jsDay = today.getDay(); // 0=Sunday, 6=Saturday
     const odooDay = jsDay === 0 ? 6 : jsDay - 1;
-    // Find today's resource.calendar.attendance line
+      
+      // 4. Find today's resource.calendar.attendance line for this calendar
     const attendanceLines = await this.execute(
       'resource.calendar.attendance',
       'search_read',
-      [[['calendar_id', '=', calendarId], ['dayofweek', '=', odooDay]]],
-      { fields: ['schedule_code_id'], limit: 1 }
-    );
+        [[
+          ['calendar_id', '=', calendarId[0]], 
+          ['dayofweek', '=', odooDay]
+        ]],
+        { fields: ['id', 'schedule_code_id'], limit: 1 }
+      );
+      
     if (!attendanceLines || attendanceLines.length === 0) {
-      return { schedule_name: null, start: null, end: null };
+        console.log('[DEBUG] No attendance line found for calendar:', calendarId[0], 'day:', odooDay);
+        return { schedule_name: null, start: null, end: null };
     }
+      
     const scheduleCode = attendanceLines[0].schedule_code_id;
-    if (!scheduleCode || !Array.isArray(scheduleCode) || !scheduleCode[0]) {
-      return { schedule_name: null, start: null, end: null };
-    }
-    // Fetch the schedule code record with its line_ids and name
-    const codeRecord = await this.execute(
-      'hr.work.schedule.code',
-      'search_read',
-      [[['id', '=', scheduleCode[0]]]],
-      { fields: ['id', 'name', 'line_ids'], limit: 1 }
-    );
-    if (!codeRecord || codeRecord.length === 0) {
-      return { schedule_name: null, start: null, end: null };
-    }
-    const schedule_name = codeRecord[0].name;
-    const lineIds = codeRecord[0].line_ids;
-    if (!lineIds || !Array.isArray(lineIds) || lineIds.length === 0) {
-      return { schedule_name, start: null, end: null };
-    }
-    // Fetch all lines for this code and filter for code = 'S01'
+      if (!scheduleCode || !Array.isArray(scheduleCode) || !scheduleCode[0]) {
+        console.log('[DEBUG] No schedule code found in attendance line:', attendanceLines[0]);
+        return { schedule_name: null, start: null, end: null };
+      }
+      
+      // 5. Fetch the schedule code record with its line_ids and name
+      const codeRecord = await this.execute(
+        'hr.work.schedule.code',
+        'search_read',
+        [[['id', '=', scheduleCode[0]]]],
+        { fields: ['id', 'name', 'line_ids'], limit: 1 }
+      );
+      
+      if (!codeRecord || codeRecord.length === 0) {
+        console.log('[DEBUG] No schedule code record found for ID:', scheduleCode[0]);
+        return { schedule_name: null, start: null, end: null };
+      }
+      
+      const schedule_name = codeRecord[0].name;
+      const lineIds = codeRecord[0].line_ids;
+      
+      if (!lineIds || !Array.isArray(lineIds) || lineIds.length === 0) {
+        console.log('[DEBUG] No line_ids found in schedule code:', codeRecord[0]);
+        return { schedule_name, start: null, end: null };
+      }
+      
+      // 6. Fetch all lines for this code and filter for code = 'S01'
       const codeLines = await this.execute(
         'hr.work.schedule.code.line',
         'search_read',
-      [[['id', 'in', lineIds], ['code', '=', 'S01']]],
-      { fields: ['start_clock_actual', 'end_clock_actual', 'code'], limit: 1 }
-    );
-    if (!codeLines || codeLines.length === 0) {
-      return { schedule_name, start: null, end: null };
+        [[
+          ['id', 'in', lineIds], 
+          ['code', '=', 'S01']
+        ]],
+        { fields: ['start_clock_actual', 'end_clock_actual', 'code'], limit: 1 }
+      );
+      
+      if (!codeLines || codeLines.length === 0) {
+        console.log('[DEBUG] No S01 code line found for schedule code:', scheduleCode[0]);
+        return { schedule_name, start: null, end: null };
+      }
+      
+      const start = floatToTimeString(codeLines[0].start_clock_actual);
+      const end = floatToTimeString(codeLines[0].end_clock_actual);
+      
+      console.log('[DEBUG] Found shift info:', { schedule_name, start, end });
+      return { schedule_name, start, end };
+      
+    } catch (error: any) {
+      console.error('[ERROR] Error in getEmployeeShiftInfo:', error);
+      return { schedule_name: null, start: null, end: null };
     }
-    const start = floatToTimeString(codeLines[0].start_clock_actual);
-    const end = floatToTimeString(codeLines[0].end_clock_actual);
-    return { schedule_name, start, end };
   }
 
   /**
@@ -774,25 +824,161 @@ export class OdooClient {
 
   /**
    * Fetch the employee's duty roster shift for a given month
+   * Get employee department, match with hr.duty_roster department_id, fetch shift_day_1 to shift_day_31
    */
-  async getMonthlyDutyRosterShift(uid: number, year: number, month: number): Promise<any> {
+  async getMonthlyDutyRosterShift(uid: number, year?: number, month?: number): Promise<any> {
+    // Default to current year/month if not provided
+    const now = new Date();
+    const selectedYear = year || now.getFullYear();
+    const selectedMonth = month || now.getMonth() + 1; // JS months are 0-based
+
+    console.log('[DEBUG] getMonthlyDutyRosterShift called with:', { uid, selectedYear, selectedMonth });
+
+    // 1. Get employee and department
     const profile = await this.getFullUserProfile(uid);
     const empId = profile.id;
-    // Odoo months are 1-based (January = 1)
-    const domain = [
-      ['employee_id', '=', empId],
-      ['year', '=', year],
-      ['month', '=', month + 1],
-    ];
-    // Build day_1 ... day_31 fields
-    const dayFields = Array.from({ length: 31 }, (_, i) => `day_${i + 1}`);
+    console.log('[DEBUG] Employee profile:', { empId, name: profile.name });
+    
+    const employee = await this.execute(
+      'hr.employee',
+      'read',
+      [[empId], ['department_id']]
+    );
+    console.log('[DEBUG] Employee record:', employee);
+    
+    if (!employee || !employee[0] || !employee[0].department_id || !employee[0].department_id[0]) {
+      console.log('[DEBUG] No department found for employee');
+      return { assigned: false, error: 'No department found for employee' };
+    }
+    const departmentId = employee[0].department_id[0];
+    console.log('[DEBUG] Department ID:', departmentId);
+
+    // 2. Find the duty roster for this department and month
+    console.log('[DEBUG] Searching for duty roster with criteria:', {
+      departmentId,
+      selectedMonth,
+      searchDomain: [['department_id', '=', departmentId], ['month', '=', selectedMonth]]
+    });
+    
+    // First, let's see what duty rosters exist for this department
+    const allRostersForDept = await this.execute(
+      'hr.duty_roster',
+      'search_read',
+      [[['department_id', '=', departmentId]]],
+      { fields: ['id', 'month', 'department_id', 'name'] }
+    );
+    console.log('[DEBUG] All duty rosters for department:', allRostersForDept);
+    
+    const rosters = await this.execute(
+      'hr.duty_roster',
+      'search_read',
+      [[
+        ['department_id', '=', departmentId],
+        ['month', '=', selectedMonth]
+      ]],
+      { fields: ['id', 'month', 'department_id'], limit: 1 }
+    );
+    console.log('[DEBUG] Duty rosters found:', rosters);
+    
+    if (!rosters || rosters.length === 0) {
+      console.log('[DEBUG] No duty roster found for department:', departmentId, 'month:', selectedMonth);
+      return { assigned: false };
+    }
+    const dutyRosterId = rosters[0].id;
+    console.log('[DEBUG] Duty roster ID:', dutyRosterId);
+
+    // 3. Find the shift for this employee and roster
+    const shiftDayFields = Array.from({ length: 31 }, (_, i) => `shift_day_${i + 1}`);
     const recs = await this.execute(
       'hr.duty_roster_shift',
       'search_read',
-      [domain],
-      { fields: ['id', 'employee_id', 'year', 'month', ...dayFields] }
+      [[
+        ['employee_id', '=', empId],
+        ['duty_roster_id', '=', dutyRosterId]
+      ]],
+      { fields: ['id', 'employee_id', 'duty_roster_id', ...shiftDayFields] }
     );
-    return recs && recs.length > 0 ? recs[0] : null;
+    console.log('[DEBUG] Duty roster shifts found:', recs);
+    
+    if (!recs || recs.length === 0) {
+      console.log('[DEBUG] No duty roster shift found for employee:', empId, 'roster:', dutyRosterId);
+      return { assigned: false };
+    }
+    const shiftRec = recs[0];
+
+    // 4. Build days array with shift codes (day 1 = date 01 of month)
+    const days = Array.from({ length: 31 }, (_, i) => {
+      const codeField = `shift_day_${i + 1}`;
+      const codeVal = shiftRec[codeField];
+      let codeName = null;
+      let codeId = null;
+      if (Array.isArray(codeVal)) {
+        codeId = codeVal[0];
+        codeName = codeVal[1];
+      } else if (typeof codeVal === 'number') {
+        codeId = codeVal;
+      } else if (typeof codeVal === 'string') {
+        codeName = codeVal;
+      }
+      let meal_hour_value = null;
+      let grace_period_late_in = null;
+      let grace_period_early_out = null;
+      if (codeId) {
+        // Fetch config values from hr.work.schedule.code
+        // This is a sync loop, but only 1-2 calls per month in practice
+        // (could be optimized with caching if needed)
+        // eslint-disable-next-line no-async-promise-executor
+        const codeResPromise = this.execute(
+          'hr.work.schedule.code',
+          'search_read',
+          [[['id', '=', codeId]]],
+          { fields: ['meal_hour_value', 'grace_period_late_in', 'grace_period_early_out'], limit: 1 }
+        );
+        // We'll resolve all promises after the array is built
+        return {
+          day: i + 1,
+          code: codeName,
+          codeId,
+          codeResPromise
+        };
+      }
+      return {
+        day: i + 1,
+        code: codeName,
+        codeId,
+        codeResPromise: null
+      };
+    });
+    // Now resolve all codeResPromise in parallel
+    return Promise.all(days.map(async (d) => {
+      if (d.codeResPromise) {
+        const codeRes = await d.codeResPromise;
+        if (codeRes && codeRes.length > 0) {
+          return {
+            day: d.day,
+            code: d.code,
+            meal_hour_value: codeRes[0].meal_hour_value,
+            grace_period_late_in: codeRes[0].grace_period_late_in,
+            grace_period_early_out: codeRes[0].grace_period_early_out
+          };
+        }
+      }
+      return {
+        day: d.day,
+        code: d.code,
+        meal_hour_value: null,
+        grace_period_late_in: null,
+        grace_period_early_out: null
+      };
+    })).then(daysWithConfig => {
+      console.log('[DEBUG] Returning assigned roster with days:', daysWithConfig.length);
+      return {
+        assigned: true,
+        year: selectedYear,
+        month: selectedMonth,
+        days: daysWithConfig
+      };
+    });
   }
 
   /**
@@ -1027,13 +1213,15 @@ export class OdooClient {
           fields: [
             'day',
             'date',
+            'schedule_code_id',
             'ac_sign_in',
             'ac_sign_out',
-            'real_overtime',
-            'overtime',
+            'meal_sign_in',
+            'meal_sign_out',
             'total_working_time',
             'line_employee_id',
             'att_sheet_id',
+            'status', // <-- ensure this is included
           ],
           order: 'date asc',
         }

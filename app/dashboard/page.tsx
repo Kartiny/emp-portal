@@ -415,7 +415,41 @@ export default function DashboardPage() {
           <p className="text-gray-500 mt-2">Overview of your attendance and leave management</p>
         </div>
 
-        {/* Top Row: Summary Cards */}
+{/* Top Row: Card with Clock In/Out (left) and Action Buttons (right) */}
+<Card className="mt-6 w-full">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-0 items-stretch min-h-[320px]">
+            {/* Left: Clock In/Out Widget, centered, no border, left-aligned text */}
+            <div className="flex items-center justify-center p-8 md:p-12">
+              <div className="w-full max-w-md text-left">
+                <h2 className="text-2xl font-bold text-[#1d1a4e] mb-2">Attendance</h2>
+                <AttendanceWidget />
+              </div>
+            </div>
+            {/* Right: 2x2 grid of action buttons, centered, larger buttons */}
+            <div className="flex items-center justify-center p-8 md:p-12">
+              <div className="grid grid-cols-2 gap-8 w-full max-w-md">
+                <Button variant="secondary" className="flex flex-col items-center py-8 px-4 min-h-[120px] min-w-[120px] text-base font-semibold shadow-sm" onClick={() => setLeaveDialogOpen(true)}>
+                  <CalendarIcon className="w-9 h-9 mb-3" />
+                  <span>Apply Leave</span>
+                </Button>
+                <Button variant="secondary" className="flex flex-col items-center py-8 px-4 min-h-[120px] min-w-[120px] text-base font-semibold shadow-sm" onClick={() => setExpenseDialogOpen(true)}>
+                  <ReceiptText className="w-9 h-9 mb-3" />
+                  <span>Submit Expense</span>
+                </Button>
+                <Button variant="secondary" className="flex flex-col items-center py-8 px-4 min-h-[120px] min-w-[120px] text-base font-semibold shadow-sm" onClick={() => setOtDialogOpen(true)}>
+                  <Clock className="w-9 h-9 mb-3" />
+                  <span>OT Request</span>
+                </Button>
+                <Button variant="secondary" className="flex flex-col items-center py-8 px-4 min-h-[120px] min-w-[120px] text-base font-semibold shadow-sm" onClick={() => setDiscussionDialogOpen(true)}>
+                  <MessageCircle className="w-9 h-9 mb-3" />
+                  <span>Start Discussion</span>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Second Row: Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
           <Card className="cursor-pointer hover:shadow-lg transition" onClick={openAttendanceDialog}>
             <CardHeader>
@@ -466,39 +500,7 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* Second Row: Card with Clock In/Out (left) and Action Buttons (right) */}
-        <Card className="mt-6 w-full">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-0 items-stretch min-h-[320px]">
-            {/* Left: Clock In/Out Widget, centered, no border, left-aligned text */}
-            <div className="flex items-center justify-center p-8 md:p-12">
-              <div className="w-full max-w-md text-left">
-                <h2 className="text-2xl font-bold text-[#1d1a4e] mb-2">Attendance</h2>
-                <AttendanceWidget />
-              </div>
-            </div>
-            {/* Right: 2x2 grid of action buttons, centered, larger buttons */}
-            <div className="flex items-center justify-center p-8 md:p-12">
-              <div className="grid grid-cols-2 gap-8 w-full max-w-md">
-                <Button variant="secondary" className="flex flex-col items-center py-8 px-4 min-h-[120px] min-w-[120px] text-base font-semibold shadow-sm" onClick={() => setLeaveDialogOpen(true)}>
-                  <CalendarIcon className="w-9 h-9 mb-3" />
-                  <span>Apply Leave</span>
-                </Button>
-                <Button variant="secondary" className="flex flex-col items-center py-8 px-4 min-h-[120px] min-w-[120px] text-base font-semibold shadow-sm" onClick={() => setExpenseDialogOpen(true)}>
-                  <ReceiptText className="w-9 h-9 mb-3" />
-                  <span>Submit Expense</span>
-                </Button>
-                <Button variant="secondary" className="flex flex-col items-center py-8 px-4 min-h-[120px] min-w-[120px] text-base font-semibold shadow-sm" onClick={() => setOtDialogOpen(true)}>
-                  <Clock className="w-9 h-9 mb-3" />
-                  <span>OT Request</span>
-                </Button>
-                <Button variant="secondary" className="flex flex-col items-center py-8 px-4 min-h-[120px] min-w-[120px] text-base font-semibold shadow-sm" onClick={() => setDiscussionDialogOpen(true)}>
-                  <MessageCircle className="w-9 h-9 mb-3" />
-                  <span>Start Discussion</span>
-                </Button>
-              </div>
-            </div>
-          </div>
-        </Card>
+        
 
         {/* Third Row: Monthly Attendance Chart (full width) */}
         <div className="mt-6">

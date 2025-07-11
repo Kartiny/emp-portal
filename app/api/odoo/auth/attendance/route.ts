@@ -77,15 +77,17 @@ export async function POST(req: Request) {
     }
     const records = allLines.map(r => ({
       id: r.id,
-      day: dayNames[Number(r.day)] ?? r.day,
+      day: r.date ? dayNames[new Date(r.date).getDay()] : r.day,
       date: r.date,
+      shiftCode: Array.isArray(r.schedule_code_id) ? r.schedule_code_id[1] : r.schedule_code_id || '-',
       checkIn: r.ac_sign_in,
       checkOut: r.ac_sign_out,
-      overtime: r.real_overtime,
-      approvedOvertime: r.overtime,
+      mealIn: r.meal_sign_in,
+      mealOut: r.meal_sign_out,
       workedHours: typeof r.total_working_time === 'number' && !isNaN(r.total_working_time)
         ? r.total_working_time
-        : 0
+        : 0,
+      status: (Array.isArray(r.status) && r.status.length > 1) ? r.status[1] : (r.status_name || r.status_display || r.status || '-'),
     }));
 
     // Calculate totals

@@ -57,16 +57,13 @@ interface AttendanceRecord {
   id: number;
   day: string;
   date: string;
-  checkIn: string;
-  checkOut: string | null;
+  checkIn: number | null | undefined;
+  checkOut: number | null | undefined;
   workedHours: number;
-  overtime: number;
-  approvedOvertime: number;
-  start_clock_actual?: string;
-  end_clock_actual?: string;
   shiftCode?: string;
-  lunchIn?: string;
-  lunchOut?: string;
+  mealIn?: number | null | undefined;
+  mealOut?: number | null | undefined;
+  status?: string | null;
 }
 
 interface AttendanceData {
@@ -94,6 +91,36 @@ function formatTimeKL(dt: string | null | undefined) {
   }
 }
 
+// Helper to format minutes as 'X hr Y min'
+function formatHrMin(mins: number) {
+  const absMins = Math.abs(Math.round(mins));
+  const h = Math.floor(absMins / 60);
+  const m = absMins % 60;
+  if (h > 0 && m > 0) return `${h} hr ${m} min`;
+  if (h > 0) return `${h} hr`;
+  return `${m} min`;
+}
+
+function floatToTimeString(floatVal: number | null | undefined) {
+  if (typeof floatVal !== 'number' || isNaN(floatVal)) return '-';
+  const hours = Math.floor(floatVal);
+  const minutes = Math.round((floatVal - hours) * 60);
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+}
+
+const statusLabels: Record<string, string> = {
+  ab: 'Absence',
+  weekend: 'Week End',
+  ph: 'Public Holiday',
+  leave: 'Leave',
+  medical: 'Medical',
+  annual: 'Annual',
+  maternity: 'Maternity',
+  unpaid: 'Unpaid',
+  other: 'Other Leave',
+  hospital: 'Hospital',
+};
+
 export default function AttendancePage() {
   const [attendanceData, setAttendanceData] = useState<AttendanceData | null>(null);
   const [todayData, setTodayData] = useState<{
@@ -101,6 +128,12 @@ export default function AttendancePage() {
     lastClockOut: string | null;
     start_clock_actual?: string | null;
     end_clock_actual?: string | null;
+    shiftConfig?: {
+      grace_period_late_in: number;
+      grace_period_early_out: number;
+      meal_hour_value: string;
+    };
+    records?: AttendanceRecord[]; // Added for parsing
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -214,19 +247,20 @@ export default function AttendancePage() {
     }
   };
 
-  // Fetch shift roster for selected month/year
   const fetchRoster = async () => {
     setRosterLoading(true);
     try {
       const uidStr = localStorage.getItem('uid');
       if (!uidStr) throw new Error('Not logged in');
+      // Send rosterMonth + 1 to backend (1-based)
       const res = await fetch('/api/odoo/auth/attendance/shift-roster', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid: Number(uidStr), year: rosterYear, month: rosterMonth }),
+        body: JSON.stringify({ uid: Number(uidStr), year: rosterYear, month: rosterMonth + 1 }),
       });
       if (!res.ok) throw new Error(`(${res.status}) ${await res.text()}`);
-      setRoster(await res.json());
+      const data = await res.json();
+      setRoster(data);
     } catch (err) {
       setRoster(null);
     } finally {
@@ -246,7 +280,6 @@ export default function AttendancePage() {
 
   useEffect(() => {
     fetchRoster();
-     
   }, [rosterMonth, rosterYear]);
 
   // Status computations
@@ -360,48 +393,137 @@ export default function AttendancePage() {
                   <CardDescription>Current attendance status</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {todayData ? (
+                  {todayData ? (() => {
+                    // Robustly parse today's records for check-in/out sequence
+                    const records = todayData.records || [];
+                    let firstCheckIn = null, firstCheckOut = null, secondCheckIn = null, secondCheckOut = null;
+                    let state = 'start';
+                    for (const rec of records) {
+                      if (state === 'start' && rec.attn_type === 'i') {
+                        firstCheckIn = rec.datetime;
+                        state = 'afterFirstIn';
+                      } else if (state === 'afterFirstIn' && rec.attn_type === 'o') {
+                        firstCheckOut = rec.datetime;
+                        state = 'afterFirstOut';
+                      } else if (state === 'afterFirstOut' && rec.attn_type === 'i') {
+                        secondCheckIn = rec.datetime;
+                        state = 'afterSecondIn';
+                      } else if (state === 'afterSecondIn' && rec.attn_type === 'o') {
+                        secondCheckOut = rec.datetime;
+                        state = 'done';
+                      }
+                    }
+                    // Button logic: disable after 2 check-ins and 2 check-outs
+                    const checkIns = [firstCheckIn, secondCheckIn].filter(Boolean);
+                    const checkOuts = [firstCheckOut, secondCheckOut].filter(Boolean);
+                    const disableButtons = checkIns.length >= 2 && checkOuts.length >= 2;
+                    return (
                     <div className="space-y-4">
+                        {/* Check-in Status */}
                       <div>
-                        <p className="text-sm">Check-in Status</p>
-                        <p className={
-                          !todayData.lastClockIn
-                            ? 'text-red-600'
-                            : calculateCheckInStatus(todayData.lastClockIn || '', todayData.start_clock_actual || undefined).isLate
-                              ? 'text-yellow-600'
-                                : 'text-green-600'
-                        }>
-                          {!todayData.lastClockIn
+                          <p className="text-sm font-semibold">Check-in Status</p>
+                          <p className={(() => {
+                            if (!firstCheckIn) return 'text-red-600';
+                            const grace = todayData.shiftConfig?.grace_period_late_in ?? 0;
+                            if (!todayData.start_clock_actual) return 'text-green-600';
+                            const [h, m] = todayData.start_clock_actual.split(':').map(Number);
+                            const checkIn = firstCheckIn ? new Date(firstCheckIn) : null;
+                            if (!checkIn) return 'text-red-600';
+                            const ref = new Date(checkIn); ref.setHours(h, m, 0, 0);
+                            const graceRef = new Date(ref.getTime() + grace * 60000); // shift start + grace
+                            if (checkIn <= graceRef) return 'text-green-600';
+                            return 'text-yellow-600';
+                          })()}>
+                            {!firstCheckIn
                             ? 'Not clocked in today'
-                            : calculateCheckInStatus(todayData.lastClockIn || '', todayData.start_clock_actual || undefined).status}
+                              : (() => {
+                                  const grace = todayData.shiftConfig?.grace_period_late_in ?? 0;
+                                  if (!todayData.start_clock_actual) return 'On time';
+                                  const [h, m] = todayData.start_clock_actual.split(':').map(Number);
+                                  const checkIn = firstCheckIn ? new Date(firstCheckIn) : null;
+                                  if (!checkIn) return 'N/A';
+                                  const ref = new Date(checkIn); ref.setHours(h, m, 0, 0);
+                                  const graceRef = new Date(ref.getTime() + grace * 60000); // shift start + grace
+                                  if (checkIn <= graceRef) return 'On time';
+                                  const minsLate = (checkIn.getTime() - graceRef.getTime()) / 60000;
+                                  return `Late in by ${formatHrMin(minsLate)}`;
+                                })()}
+                          </p>
+                        </div>
+                        {/* Meal Check in/out Status */}
+                        {firstCheckOut && secondCheckIn && (
+                          <div>
+                            <p className="text-sm font-semibold">Meal Check in/out Status</p>
+                            <p className={(() => {
+                              const mealHour = todayData.shiftConfig?.meal_hour_value;
+                              if (!mealHour) return 'text-muted-foreground';
+                              const mealStart = new Date(firstCheckOut);
+                              const mealEnd = new Date(secondCheckIn);
+                              const allowed = typeof mealHour === 'number' ? Math.round(mealHour * 60) : 60;
+                              const actual = (mealEnd.getTime() - mealStart.getTime()) / 60000;
+                              if (actual <= allowed) return 'text-green-600';
+                              return 'text-yellow-600';
+                            })()}>
+                              {(() => {
+                                const mealHour = todayData.shiftConfig?.meal_hour_value;
+                                if (!mealHour) return 'No meal record';
+                                const mealStart = new Date(firstCheckOut);
+                                const mealEnd = new Date(secondCheckIn);
+                                const allowed = typeof mealHour === 'number' ? Math.round(mealHour * 60) : 60;
+                                const actual = (mealEnd.getTime() - mealStart.getTime()) / 60000;
+                                if (actual <= allowed) return 'On time';
+                                return `Late back by ${formatHrMin(actual - allowed)}`;
+                              })()}
                         </p>
                       </div>
-                      {todayData.lastClockOut && (
-                        <>
+                        )}
+                        {/* Check-out Status */}
+                        {secondCheckOut && (
                           <div>
-                            <p className="text-sm">Check-out Status</p>
-                            <p className={calculateCheckOutStatus(
-                              todayData.lastClockOut || '',
-                              todayData.end_clock_actual || undefined
-                            ).isEarly ? 'text-red-600' : 'text-green-600'}>
-                              {calculateCheckOutStatus(
-                                todayData.lastClockOut || '',
-                                todayData.end_clock_actual || undefined
-                              ).status}
+                            <p className="text-sm font-semibold">Check-out Status</p>
+                            <p className={(() => {
+                              const grace = todayData.shiftConfig?.grace_period_early_out ?? 0;
+                              if (!todayData.end_clock_actual) return 'text-green-600';
+                              const [h, m] = todayData.end_clock_actual.split(':').map(Number);
+                              const checkOut = secondCheckOut ? new Date(secondCheckOut) : null;
+                              if (!checkOut) return 'text-muted-foreground';
+                              const ref = new Date(checkOut); ref.setHours(h, m, 0, 0);
+                              const graceRef = new Date(ref.getTime() - grace * 60000); // shift end - grace
+                              if (checkOut >= graceRef) return 'text-green-600';
+                              return 'text-yellow-600';
+                            })()}>
+                              {(() => {
+                                const grace = todayData.shiftConfig?.grace_period_early_out ?? 0;
+                                if (!todayData.end_clock_actual) return 'On time';
+                                const [h, m] = todayData.end_clock_actual.split(':').map(Number);
+                                const checkOut = secondCheckOut ? new Date(secondCheckOut) : null;
+                                if (!checkOut) return 'N/A';
+                                const ref = new Date(checkOut); ref.setHours(h, m, 0, 0);
+                                const graceRef = new Date(ref.getTime() - grace * 60000); // shift end - grace
+                                if (checkOut >= graceRef) return 'On time';
+                                const minsEarly = (graceRef.getTime() - checkOut.getTime()) / 60000;
+                                return `Early out by ${formatHrMin(minsEarly)}`;
+                              })()}
                             </p>
                           </div>
-                          {calculateOvertimeHours(todayData.lastClockOut) > 0 && (
+                        )}
+                        {/* Overtime */}
+                        {secondCheckOut && calculateOvertimeHours(secondCheckOut) > 0 && (
                             <div>
                               <p className="text-sm">Overtime</p>
                               <p className="text-lg text-blue-600">
-                                {formatHours(calculateOvertimeHours(todayData.lastClockOut))}
+                              {formatHours(calculateOvertimeHours(secondCheckOut))}
                               </p>
                             </div>
                           )}
-                        </>
-                      )}
+                        {/* Button logic: disable after 2 check-ins and 2 check-outs */}
+                        <style>{`
+                          .today-attendance-buttons button:disabled { opacity: 0.5; cursor: not-allowed; }
+                        `}</style>
+                        <div className="today-attendance-buttons" style={{ display: 'none' }} />
                     </div>
-                  ) : (
+                    );
+                  })() : (
                     <div className="text-muted-foreground">No attendance recorded for today</div>
                   )}
                 </CardContent>
@@ -470,63 +592,35 @@ export default function AttendancePage() {
                       <TableHead>Day</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Shift Code</TableHead>
-                      <TableHead>Approved Overtime</TableHead>
+                      <TableHead>Approved OT Hours</TableHead>
                       <TableHead>Check In</TableHead>
-                      <TableHead>Lunch Out</TableHead>
-                      <TableHead>Lunch In</TableHead>        
                       <TableHead>Check Out</TableHead>
+                      <TableHead>Meal In</TableHead>
+                      <TableHead>Meal Out</TableHead>
                       <TableHead>Worked Hours</TableHead>
-                      <TableHead>Overtime</TableHead>
+                      <TableHead>Total OT</TableHead>
                       <TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {attendanceData?.records.map((rec) => {
-                      const checkInStatus = calculateCheckInStatus(rec.checkIn, rec.start_clock_actual);
-                      const checkOutStatus = rec.checkOut
-                        ? calculateCheckOutStatus(rec.checkOut, rec.end_clock_actual)
-                        : null;
-                      return (
-                        <TableRow key={rec.id}>
-                          <TableCell>{rec.day}</TableCell>
-                          <TableCell>{formatDate(rec.date)}</TableCell>
-                          <TableCell>{rec.shiftCode || '-'}</TableCell>
-                          <TableCell>{rec.approvedOvertime ? formatHours(rec.approvedOvertime) : '-'}</TableCell>
-                          <TableCell>{rec.checkIn ? formatTimeKL(rec.checkIn) : '-'}</TableCell>
-                          <TableCell>{rec.lunchOut ? formatTimeKL(rec.lunchOut) : '-'}</TableCell>
-                          <TableCell>{rec.lunchIn ? formatTimeKL(rec.lunchIn) : '-'}</TableCell>
-                          <TableCell>{rec.checkOut ? formatTimeKL(rec.checkOut) : '-'}</TableCell>
-                          <TableCell>{rec.workedHours ? formatHours(rec.workedHours) : '-'}</TableCell>
-                          <TableCell>{rec.overtime ? formatHours(rec.overtime) : '-'}</TableCell>
-                         
-                          <TableCell>
-                            <div className="text-sm">
-                              {!rec.checkIn ? (
-                                <span className="text-red-600">Not clocked in</span>
-                              ) : checkInStatus.isLate ? (
-                                <span className="text-yellow-600">{checkInStatus.status}</span>
-                              ) : (
-                                <span className="text-green-600">{checkInStatus.status}</span>
-                              )}
-                              {rec.checkOut && checkOutStatus && (
-                                <>
-                                  <br />
-                                  {checkOutStatus.isEarly ? (
-                                    <span className="text-red-600">{checkOutStatus.status}</span>
-                                  ) : (
-                                    <span className="text-green-600">{checkOutStatus.status}</span>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                    {(!attendanceData?.records ||
-                      attendanceData.records.length === 0) && (
+                    {attendanceData?.records.map((rec) => (
+                      <TableRow key={rec.id}>
+                        <TableCell>{rec.day}</TableCell>
+                        <TableCell>{formatDate(rec.date)}</TableCell>
+                        <TableCell>{rec.shiftCode || '-'}</TableCell>
+                        <TableCell></TableCell>
+                        <TableCell>{floatToTimeString(rec.checkIn)}</TableCell>
+                        <TableCell>{floatToTimeString(rec.checkOut)}</TableCell>
+                        <TableCell>{floatToTimeString(rec.mealIn)}</TableCell>
+                        <TableCell>{floatToTimeString(rec.mealOut)}</TableCell>
+                        <TableCell>{rec.workedHours ? formatHours(rec.workedHours) : '-'}</TableCell>
+                        <TableCell></TableCell>
+                        <TableCell>{statusLabels[rec.status] || rec.status || '-'}</TableCell>
+                      </TableRow>
+                    ))}
+                    {(!attendanceData?.records || attendanceData.records.length === 0) && (
                       <TableRow>
-                        <TableCell colSpan={11} className="text-center">
+                        <TableCell colSpan={9} className="text-center">
                           No attendance records found
                         </TableCell>
                       </TableRow>
@@ -545,7 +639,7 @@ export default function AttendancePage() {
               <CardContent>
                 <div className="flex items-center gap-2 mb-4">
                   <Select value={String(rosterMonth)} onValueChange={v => setRosterMonth(Number(v))}>
-                    <SelectTrigger className="w-[120px]">
+                    <SelectTrigger className="w-[160px]">
                       <SelectValue placeholder="Month" />
                     </SelectTrigger>
                     <SelectContent>
@@ -568,25 +662,38 @@ export default function AttendancePage() {
                 </div>
                 {rosterLoading ? (
                   <div>Loading shift roster...</div>
-                ) : roster ? (
-                  <div className="overflow-x-auto">
+                ) : roster && roster.assigned === false ? (
+                  <div className="text-red-600">No duty roster assigned for this month.</div>
+                ) : roster && roster.assigned === true && roster.days ? (
+                  <>
+                  <div className="overflow-x-auto mb-8">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          {Array.from({ length: 31 }, (_, i) => (
-                            <TableHead key={i}>Day {i + 1}</TableHead>
+                          {roster.days.map((day: any, i: number) => (
+                            <TableHead key={i} className="text-center">{`Day${day.day}`}</TableHead>
                           ))}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         <TableRow>
-                          {Array.from({ length: 31 }, (_, i) => (
-                            <TableCell key={i}>{roster[`day_${i + 1}`] || '-'}</TableCell>
-                          ))}
+                          {roster.days.map((day: any, i: number) => {
+                            const dateObj = new Date(roster.year, roster.month - 1, day.day);
+                            const weekday = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
+                            return (
+                              <TableCell key={i} className="text-center">
+                                <div>{weekday}</div>
+                                <div className="font-semibold">{day.code || '-'}</div>
+                              </TableCell>
+                            );
+                          })}
                         </TableRow>
                       </TableBody>
                     </Table>
                   </div>
+                  </>
+                ) : roster && roster.assigned === true && !roster.days ? (
+                  <div className="text-muted-foreground">No shift data for this month.</div>
                 ) : (
                   <div className="text-muted-foreground">No shift roster found for this month.</div>
                 )}

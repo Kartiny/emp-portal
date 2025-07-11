@@ -66,8 +66,27 @@ export async function POST(req: Request) {
       if (lastClockIn && lastClockOut) break;
     }
 
-    // Get shift timings from raw attendance data
+    // Get shift timings from raw attendance data (actual check-in/check-out times)
     const shiftInfo = await client.getShiftTimingsFromRaw(employee.barcode, today);
+
+    // Get scheduled shift times from employee's work schedule
+    const scheduledShiftInfo = await client.getEmployeeShiftInfo(uid);
+
+    // Fetch today's shift code from the duty roster (if available)
+    let shiftConfig = { code: null, meal_hour_value: null, grace_period_late_in: null, grace_period_early_out: null };
+    try {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth() + 1;
+      const day = now.getDate();
+      const roster = await client.getMonthlyDutyRosterShift(uid, year, month);
+      if (roster && roster.assigned && roster.days && roster.days.length >= day) {
+        const todayShift = roster.days[day - 1];
+        shiftConfig = todayShift;
+      }
+    } catch (e) {
+      // ignore, fallback to nulls
+    }
 
     // 3️⃣ Fetch today's attendance sheet line for the employee
     const todaySheetLines = await client.getAttendanceSheetLinesByEmployee(employee.id, today, today);
@@ -82,10 +101,12 @@ export async function POST(req: Request) {
     const result = {
       lastClockIn,
       lastClockOut,
-      start_clock_actual: shiftInfo.start ? shiftInfo.start.slice(11, 16) : null,
-      end_clock_actual: shiftInfo.end ? shiftInfo.end.slice(11, 16) : null,
+      start_clock_actual: scheduledShiftInfo.start, // Use scheduled shift start time
+      end_clock_actual: scheduledShiftInfo.end,     // Use scheduled shift end time
+      schedule_name: scheduledShiftInfo.schedule_name, // Include schedule name
       empCode: employee.barcode, // Include employee barcode for reference
       workedHours, // Add workedHours from attendance.sheet.line
+      shiftConfig, // Add today's shift code config
       records: sortedAscRecs.map(r => ({
         id: r.id,
         datetime: r.datetime,
