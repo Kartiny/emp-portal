@@ -184,6 +184,14 @@ export default function AttendanceWidget() {
   const canClockIn = !lastRecord || lastRecord.attn_type === 'o';
   const canClockOut = lastRecord && lastRecord.attn_type === 'i';
 
+  const lastClockIn = today?.records && today.records.length > 0
+    ? [...today.records].reverse().find(r => r.attn_type === 'i')?.datetime || null
+    : today?.lastClockIn || null;
+
+  const lastClockOut = today?.records && today.records.length > 0
+    ? [...today.records].reverse().find(r => r.attn_type === 'o')?.datetime || null
+    : today?.lastClockOut || null;
+
   return (
     <div className="bg-white rounded-lg shadow p-6 flex flex-col w-full text-left max-w-xl min-w-[320px]" style={{ minWidth: '320px', maxWidth: '480px' }}>
       
@@ -202,9 +210,9 @@ export default function AttendanceWidget() {
       </div>
       <div className="mb-2">
         <div className="text-sm font-semibold">Last Clock In</div>
-        <div className="mb-1">{today?.lastClockIn ? formatTimeKL(today.lastClockIn) : '-'}</div>
+        <div className="mb-1">{lastClockIn ? formatTimeKL(lastClockIn) : '-'}</div>
         <div className="text-sm font-semibold">Last Clock Out</div>
-        <div className="mb-1">{today?.lastClockOut ? formatTimeKL(today.lastClockOut) : '-'}</div>
+        <div className="mb-1">{lastClockOut ? formatTimeKL(lastClockOut) : '-'}</div>
         <div className="text-sm font-semibold">Hours Today</div>
       </div>
       <div className="flex gap-4 mt-2">

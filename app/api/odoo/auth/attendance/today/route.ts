@@ -5,8 +5,14 @@ import { format as dfFormat } from 'date-fns';
 import { getOdooClient } from '@/lib/odooXml';
 import { parseISO } from 'date-fns';
 
-function parseTimeToDate(today: string, timeStr: string): Date {
-  // timeStr: 'HH:mm' or 'H:mm'
+function parseTimeToDate(today: string, timeStr: string | number | null | undefined): Date | null {
+  if (typeof timeStr === 'number' && !isNaN(timeStr)) {
+    // Convert float hour to HH:mm string
+    const hours = Math.floor(timeStr);
+    const minutes = Math.round((timeStr - hours) * 60);
+    timeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+  }
+  if (typeof timeStr !== 'string' || !timeStr.includes(':')) return null;
   const [h, m] = timeStr.split(':').map(Number);
   const d = new Date(today);
   d.setHours(h, m, 0, 0);
@@ -117,53 +123,148 @@ export async function POST(req: Request) {
         : 0;
     }
 
-    // Calculate lateness and early out
-    let latenessMins = 0;
-    let latenessStr = '';
-    let earlyOutMins = 0;
-    let earlyOutStr = '';
-    if (scheduledShiftInfo.start && shiftConfig.grace_period_late_in != null && lastClockIn) {
-      // scheduledShiftInfo.start: 'HH:mm', grace_period_late_in: float (hours)
+    // Extract first/second check-in and check-out
+    const checkIns = sortedAscRecs.filter(r => r.attn_type === 'i');
+    const checkOuts = sortedAscRecs.filter(r => r.attn_type === 'o');
+    const firstCheckIn = checkIns[0]?.datetime || null;
+    const firstCheckOut = checkOuts[0]?.datetime || null;
+    const secondCheckIn = checkIns[1]?.datetime || null;
+    const secondCheckOut = checkOuts[1]?.datetime || null;
+
+    // Fetch S03 meal times from the current day's schedule code
+    let mealStartActual = null;
+    let mealEndActual = null;
+    try {
+      if (shiftConfig && shiftConfig.code) {
+        // 1. Find the schedule code record for this code
+        const codeRecords = await client['execute'](
+          'hr.work.schedule.code',
+          'search_read',
+          [[['name', '=', shiftConfig.code]]],
+          { fields: ['id', 'name', 'line_ids'], limit: 1 }
+        );
+        if (codeRecords && codeRecords.length > 0) {
+          const codeRec = codeRecords[0];
+          const lineIds = codeRec.line_ids;
+          if (lineIds && Array.isArray(lineIds) && lineIds.length > 0) {
+            // 2. Find the S03 line in these line_ids
+            const s03Lines = await client['execute'](
+              'hr.work.schedule.code.line',
+              'search_read',
+              [[['id', 'in', lineIds], ['code', '=', 'S03']]],
+              { fields: ['start_clock_actual', 'end_clock_actual', 'code'], limit: 1 }
+            );
+            if (s03Lines && s03Lines.length > 0) {
+              mealStartActual = s03Lines[0].start_clock_actual;
+              mealEndActual = s03Lines[0].end_clock_actual;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // fallback to null
+    }
+
+    // Calculate statuses
+    let checkInStatus = 'N/A', checkInMins = null;
+    let mealCheckOutStatus = 'N/A', mealCheckOutMins = null;
+    let mealCheckInStatus = 'N/A', mealCheckInMins = null;
+    let checkOutStatus = 'N/A', checkOutMins = null;
+
+    // Check-in status
+    if (scheduledShiftInfo.start && shiftConfig.grace_period_late_in != null && firstCheckIn) {
       const shiftStart = parseTimeToDate(today, scheduledShiftInfo.start);
-      const graceMinutes = Number(shiftConfig.grace_period_late_in) * 60;
-      const graceStart = new Date(shiftStart.getTime() + graceMinutes * 60000);
-      const actualIn = parseISO(lastClockIn.replace(' ', 'T'));
-      if (actualIn > graceStart) {
-        latenessMins = Math.floor((actualIn.getTime() - graceStart.getTime()) / 60000);
-        latenessStr = `${minutesToHumanReadable(latenessMins)} late`;
+      if (shiftStart) {
+        const graceMinutes = Number(shiftConfig.grace_period_late_in) * 60;
+        const graceStart = new Date(shiftStart.getTime() + graceMinutes * 60000);
+        const actualIn = parseISO(firstCheckIn.replace(' ', 'T'));
+        if (actualIn > graceStart) {
+          checkInMins = Math.floor((actualIn.getTime() - graceStart.getTime()) / 60000);
+          checkInStatus = `${minutesToHumanReadable(checkInMins)} late`;
+        } else {
+          checkInMins = 0;
+          checkInStatus = 'On time';
+        }
       } else {
-        latenessMins = 0;
-        latenessStr = 'On time';
+        checkInStatus = 'N/A';
       }
     }
-    if (scheduledShiftInfo.end && shiftConfig.grace_period_early_out != null && lastClockOut) {
-      // scheduledShiftInfo.end: 'HH:mm', grace_period_early_out: float (hours)
-      const shiftEnd = parseTimeToDate(today, scheduledShiftInfo.end);
-      const graceMinutes = Number(shiftConfig.grace_period_early_out) * 60;
-      const graceEnd = new Date(shiftEnd.getTime() - graceMinutes * 60000);
-      const actualOut = parseISO(lastClockOut.replace(' ', 'T'));
-      if (actualOut < graceEnd) {
-        earlyOutMins = Math.floor((graceEnd.getTime() - actualOut.getTime()) / 60000);
-        earlyOutStr = `${minutesToHumanReadable(earlyOutMins)} early`;
+    // Meal Check Out status (first check-out vs mealStartActual)
+    if (mealStartActual && firstCheckOut) {
+      const mealStart = parseTimeToDate(today, mealStartActual);
+      if (mealStart) {
+        const actualOut = parseISO(firstCheckOut.replace(' ', 'T'));
+        if (actualOut < mealStart) {
+          mealCheckOutMins = Math.floor((mealStart.getTime() - actualOut.getTime()) / 60000);
+          mealCheckOutStatus = `${minutesToHumanReadable(mealCheckOutMins)} early`;
+        } else if (actualOut > mealStart) {
+          mealCheckOutMins = Math.floor((actualOut.getTime() - mealStart.getTime()) / 60000);
+          mealCheckOutStatus = `${minutesToHumanReadable(mealCheckOutMins)} late`;
+        } else {
+          mealCheckOutMins = 0;
+          mealCheckOutStatus = 'On time';
+        }
       } else {
-        earlyOutMins = 0;
-        earlyOutStr = 'On time';
+        mealCheckOutStatus = 'N/A';
+      }
+    }
+    // Meal Check In status (second check-in vs mealEndActual)
+    if (mealEndActual && secondCheckIn) {
+      const mealEnd = parseTimeToDate(today, mealEndActual);
+      if (mealEnd) {
+        const actualIn = parseISO(secondCheckIn.replace(' ', 'T'));
+        if (actualIn < mealEnd) {
+          mealCheckInMins = Math.floor((mealEnd.getTime() - actualIn.getTime()) / 60000);
+          mealCheckInStatus = `${minutesToHumanReadable(mealCheckInMins)} early`;
+        } else if (actualIn > mealEnd) {
+          mealCheckInMins = Math.floor((actualIn.getTime() - mealEnd.getTime()) / 60000);
+          mealCheckInStatus = `${minutesToHumanReadable(mealCheckInMins)} late`;
+        } else {
+          mealCheckInMins = 0;
+          mealCheckInStatus = 'On time';
+        }
+      } else {
+        mealCheckInStatus = 'N/A';
+      }
+    }
+    // Check-out status (second check-out vs shift end - grace)
+    if (scheduledShiftInfo.end && shiftConfig.grace_period_early_out != null && secondCheckOut) {
+      const shiftEnd = parseTimeToDate(today, scheduledShiftInfo.end);
+      if (shiftEnd) {
+        const graceMinutes = Number(shiftConfig.grace_period_early_out) * 60;
+        const graceEnd = new Date(shiftEnd.getTime() - graceMinutes * 60000);
+        const actualOut = parseISO(secondCheckOut.replace(' ', 'T'));
+        if (actualOut < graceEnd) {
+          checkOutMins = Math.floor((graceEnd.getTime() - actualOut.getTime()) / 60000);
+          checkOutStatus = `${minutesToHumanReadable(checkOutMins)} early`;
+        } else {
+          checkOutMins = 0;
+          checkOutStatus = 'On time';
+        }
+      } else {
+        checkOutStatus = 'N/A';
       }
     }
 
     const result = {
-      lastClockIn,
-      lastClockOut,
-      start_clock_actual: scheduledShiftInfo.start, // Use scheduled shift start time
-      end_clock_actual: scheduledShiftInfo.end,     // Use scheduled shift end time
-      schedule_name: scheduledShiftInfo.schedule_name, // Include schedule name
-      empCode: employee.barcode, // Include employee barcode for reference
-      workedHours, // Add workedHours from attendance.sheet.line
-      shiftConfig, // Add today's shift code config
-      latenessMins,
-      latenessStr,
-      earlyOutMins,
-      earlyOutStr,
+      firstCheckIn,
+      firstCheckOut,
+      secondCheckIn,
+      secondCheckOut,
+      checkInStatus,
+      checkInMins,
+      mealCheckOutStatus,
+      mealCheckOutMins,
+      mealCheckInStatus,
+      mealCheckInMins,
+      checkOutStatus,
+      checkOutMins,
+      start_clock_actual: mealStartActual,
+      end_clock_actual: mealEndActual,
+      schedule_name: scheduledShiftInfo.schedule_name,
+      empCode: employee.barcode,
+      workedHours,
+      shiftConfig,
       records: sortedAscRecs.map(r => ({
         id: r.id,
         datetime: r.datetime,
@@ -174,7 +275,6 @@ export async function POST(req: Request) {
         longitude: r.longitude
       }))
     };
-    
     return NextResponse.json(result);
   } catch (err: any) {
     console.error("Today's attendance error:", err);

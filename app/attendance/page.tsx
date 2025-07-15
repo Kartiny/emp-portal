@@ -144,6 +144,14 @@ export default function AttendancePage() {
     latenessStr?: string;
     earlyOutMins?: number;
     earlyOutStr?: string;
+    checkInMins?: number;
+    checkInStatus?: string;
+    mealCheckOutMins?: number;
+    mealCheckOutStatus?: string;
+    mealCheckInMins?: number;
+    mealCheckInStatus?: string;
+    checkOutMins?: number;
+    checkOutStatus?: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -380,6 +388,14 @@ export default function AttendancePage() {
     ? (todayData.records.filter(r => r.attn_type === 'o')[1]?.datetime || null)
     : null;
 
+  // Extract last clock in/out for display
+  const lastClockIn = todayData && Array.isArray(todayData.records)
+    ? [...todayData.records].reverse().find(r => r.attn_type === 'i')?.datetime || null
+    : null;
+  const lastClockOut = todayData && Array.isArray(todayData.records)
+    ? [...todayData.records].reverse().find(r => r.attn_type === 'o')?.datetime || null
+    : null;
+
   if (loading) {
     return (
       <MainLayout missedClockOut={missedClockOut}>
@@ -422,74 +438,36 @@ export default function AttendancePage() {
                       {/* Check-in Status */}
                       <div>
                         <p className="text-sm font-semibold">Check-in Status</p>
-                        <p className={(() => {
-                          if (!firstCheckIn) return 'text-muted-foreground';
-                          if (todayData.latenessMins && todayData.latenessMins > 0) return 'text-yellow-600';
-                          return 'text-green-600';
-                        })()}>
-                          {firstCheckIn ? (todayData.latenessStr || 'N/A') : 'N/A'}
+                        <p className={todayData.checkInMins && todayData.checkInMins > 0 ? 'text-yellow-600' : 'text-green-600'}>
+                          {todayData.checkInStatus || 'N/A'}
                         </p>
                       </div>
-                      {/* Meal Check in/out Status (leave as is) */}
-                      {firstCheckOut && secondCheckIn && (
-                        <div>
-                          <p className="text-sm font-semibold">Meal Check in/out Status</p>
-                          <p className={(() => {
-                            const mealHour = todayData.shiftConfig?.meal_hour_value;
-                            if (!mealHour) return 'text-muted-foreground';
-                            const mealStart = new Date(firstCheckOut);
-                            const mealEnd = new Date(secondCheckIn);
-                            const allowed = typeof mealHour === 'number' ? Math.round(mealHour * 60) : 60;
-                            const actual = (mealEnd.getTime() - mealStart.getTime()) / 60000;
-                            if (actual <= allowed) return 'text-green-600';
-                            return 'text-yellow-600';
-                          })()}>
-                            {(() => {
-                              const mealHour = todayData.shiftConfig?.meal_hour_value;
-                              if (!mealHour) return 'No meal record';
-                              const mealStart = new Date(firstCheckOut);
-                              const mealEnd = new Date(secondCheckIn);
-                              const allowed = typeof mealHour === 'number' ? Math.round(mealHour * 60) : 60;
-                              const actual = (mealEnd.getTime() - mealStart.getTime()) / 60000;
-                              if (actual <= allowed) return 'On time';
-                              return `Late back by ${formatHrMin(actual - allowed)}`;
-                            })()}
-                          </p>
-                        </div>
-                      )}
+                      {/* Meal Check Out Status */}
+                      <div>
+                        <p className="text-sm font-semibold">Meal Check Out Status</p>
+                        <p className={todayData.mealCheckOutMins && todayData.mealCheckOutMins !== 0 ? (todayData.mealCheckOutMins > 0 ? 'text-yellow-600' : 'text-green-600') : 'text-green-600'}>
+                          {todayData.mealCheckOutStatus || 'N/A'}
+                        </p>
+                      </div>
+                      {/* Meal Check In Status */}
+                      <div>
+                        <p className="text-sm font-semibold">Meal Check In Status</p>
+                        <p className={todayData.mealCheckInMins && todayData.mealCheckInMins !== 0 ? (todayData.mealCheckInMins > 0 ? 'text-yellow-600' : 'text-green-600') : 'text-green-600'}>
+                          {todayData.mealCheckInStatus || 'N/A'}
+                        </p>
+                      </div>
                       {/* Check-out Status */}
-                      {secondCheckOut && (
-                        <div>
-                          <p className="text-sm font-semibold">Check-out Status</p>
-                          <p className={(() => {
-                            if (todayData.earlyOutMins && todayData.earlyOutMins > 0) return 'text-yellow-600';
-                            return 'text-green-600';
-                          })()}>
-                            {(() => {
-                              // Use Math.floor for minutes in earlyOutMins
-                              if (typeof todayData.earlyOutMins === 'number') {
-                                if (todayData.earlyOutMins > 0) {
-                                  const mins = Math.floor(todayData.earlyOutMins);
-                                  const h = Math.floor(mins / 60);
-                                  const m = mins % 60;
-                                  let str = '';
-                                  if (h > 0) str += `${h} hour${h > 1 ? 's' : ''} `;
-                                  if (m > 0) str += `${m} minute${m > 1 ? 's' : ''}`;
-                                  return `${str.trim()} early`;
-                                } else {
-                                  return 'On time';
-                                }
-                              }
-                              return todayData.earlyOutStr || 'N/A';
-                            })()}
-                          </p>
-                        </div>
-                      )}
+                      <div>
+                        <p className="text-sm font-semibold">Check-out Status</p>
+                        <p className={todayData.checkOutMins && todayData.checkOutMins > 0 ? 'text-yellow-600' : 'text-green-600'}>
+                          {todayData.checkOutStatus || 'N/A'}
+                        </p>
+                      </div>
                       {/* Overtime (leave as is) */}
                       {secondCheckOut && calculateOvertimeHours(secondCheckOut) > 0 && (
                         <div>
-                          <p className="text-sm">Overtime</p>
-                          <p className="text-lg text-blue-600">
+                          <p className="text-sm font-semibold">Overtime</p>
+                          <p className="text-blue-600">
                             {(() => {
                               // Use Math.floor for overtime hours
                               const ot = calculateOvertimeHours(secondCheckOut);
