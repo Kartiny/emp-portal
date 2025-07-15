@@ -250,6 +250,13 @@ export default function DashboardPage() {
     fetchYearAttendance();
   }, []);
 
+  useEffect(() => {
+    const isVerified = localStorage.getItem('isVerified');
+    if (isVerified !== 'true') {
+      window.location.href = '/verify';
+    }
+  }, []);
+
   const refreshClaims = async () => {
     const uid = localStorage.getItem('uid');
     if (!uid) return;

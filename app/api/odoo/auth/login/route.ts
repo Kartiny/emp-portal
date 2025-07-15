@@ -1,6 +1,68 @@
 import { NextResponse } from 'next/server';
 import { loginToOdoo, getOdooClient, getEmployeeByUserId } from '@/lib/odooXml';
 
+// Helper function to get user roles
+async function getUserRoles(uid: number) {
+  const client = getOdooClient();
+  
+  try {
+    // Get user's groups from res.users
+    const userGroups = await (client as any).execute(
+      'res.users',
+      'read',
+      [[uid], ['groups_id']]
+    );
+
+    if (!userGroups || !userGroups[0]) {
+      return { roles: [], primaryRole: 'employee' };
+    }
+
+    const groupIds = userGroups[0].groups_id || [];
+    
+    // Get group details
+    const groups = await (client as any).execute(
+      'res.groups',
+      'read',
+      [groupIds, ['id', 'name', 'xml_id']]
+    );
+
+    // Map groups to roles
+    const roles = groups.map((group: any) => {
+      const xmlId = group.xml_id || '';
+      let role = 'employee'; // default role
+      
+      // Map Odoo groups to roles
+      if (xmlId.includes('base.group_system') || xmlId.includes('base.group_erp_manager')) {
+        role = 'admin';
+      } else if (xmlId.includes('hr.group_hr_manager') || xmlId.includes('hr.group_hr_user')) {
+        role = 'hr';
+      } else if (xmlId.includes('base.group_user')) {
+        role = 'employee';
+      }
+      
+      return {
+        id: group.id,
+        name: group.name,
+        xmlId: xmlId,
+        role: role
+      };
+    });
+
+    // Determine primary role (admin > hr > employee)
+    let primaryRole = 'employee';
+    if (roles.some((r: any) => r.role === 'admin')) {
+      primaryRole = 'admin';
+    } else if (roles.some((r: any) => r.role === 'hr')) {
+      primaryRole = 'hr';
+    }
+
+    return { roles, primaryRole };
+  } catch (error) {
+    console.error('Error fetching user roles:', error);
+    return { roles: [], primaryRole: 'employee' };
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const { email, password } = await req.json();
@@ -30,22 +92,28 @@ export async function POST(req: Request) {
     
     try {
       const employee = await getEmployeeByUserId(uid);
+      const { roles, primaryRole } = await getUserRoles(uid);
       
       if (employee) {
         console.log('✅ Found employee record:', employee);
+        console.log('✅ User roles:', { roles, primaryRole });
         
         return NextResponse.json({ 
           uid: uid,
           employeeId: employee.id,
           employeeName: employee.name,
           employeeEmail: employee.work_email,
-          jobTitle: employee.job_title
+          jobTitle: employee.job_title,
+          roles: roles,
+          primaryRole: primaryRole
         });
       } else {
         console.log('⚠️ No employee record found for user UID:', uid);
         return NextResponse.json({ 
           uid: uid,
           employeeId: null,
+          roles: roles,
+          primaryRole: primaryRole,
           error: 'No employee record found for this user'
         });
       }

@@ -40,7 +40,20 @@ export default function VerifyPage() {
       // For now, use hardcoded verification code '1234'
       if (code === '1234') {
         console.log('✅ Verification successful')
-        router.push('/dashboard')
+        localStorage.setItem('isVerified', 'true');
+        // Role-based redirect after verification
+        const primaryRole = localStorage.getItem('primaryRole') || 'employee';
+        switch (primaryRole) {
+          case 'admin':
+            router.push('/admin/dashboard');
+            break;
+          case 'hr':
+            router.push('/hr/dashboard');
+            break;
+          default:
+            router.push('/employee/dashboard');
+            break;
+        }
       } else {
         setError('Invalid verification code')
       }

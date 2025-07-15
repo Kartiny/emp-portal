@@ -8,8 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 
-const ADMIN_USER = 'e-global';
-const ADMIN_PWD = '12345';
+
 
 export default function LoginPage() {
   const router = useRouter();
@@ -39,37 +38,41 @@ export default function LoginPage() {
       const data = await response.json();
       console.log('📄 Response data:', data);
 
-      if (response.ok && data.uid) {
-        console.log('✅ Login successful, UID:', data.uid);
-        localStorage.setItem('uid', data.uid.toString());
-        
-        // Store employee information if available
-        if (data.employeeId) {
-          localStorage.setItem('employeeId', data.employeeId.toString());
-          localStorage.setItem('employeeName', data.employeeName || '');
-          localStorage.setItem('employeeEmail', data.employeeEmail || '');
-          localStorage.setItem('jobTitle', data.jobTitle || '');
-          console.log('👷 Employee info stored:', {
-            employeeId: data.employeeId,
-            employeeName: data.employeeName,
-            jobTitle: data.jobTitle
-          });
-        } else {
-          console.log('⚠️ No employee record found for user');
-          // Clear any existing employee data
-          localStorage.removeItem('employeeId');
-          localStorage.removeItem('employeeName');
-          localStorage.removeItem('employeeEmail');
-          localStorage.removeItem('jobTitle');
-        }
-        
-        console.log('📦 Stored in localStorage:', { 
-          uid: localStorage.getItem('uid'),
-          employeeId: localStorage.getItem('employeeId'),
-          employeeName: localStorage.getItem('employeeName')
-        });
-        
-        router.push('/verify');
+              if (response.ok && data.uid) {
+          console.log('✅ Login successful, UID:', data.uid);
+          localStorage.setItem('uid', data.uid.toString());
+          
+          // Store employee information if available
+          if (data.employeeId) {
+            localStorage.setItem('employeeId', data.employeeId.toString());
+            localStorage.setItem('employeeName', data.employeeName || '');
+            localStorage.setItem('employeeEmail', data.employeeEmail || '');
+            localStorage.setItem('jobTitle', data.jobTitle || '');
+            console.log('👷 Employee info stored:', {
+              employeeId: data.employeeId,
+              employeeName: data.employeeName,
+              jobTitle: data.jobTitle
+            });
+          } else {
+            console.log('⚠️ No employee record found for user');
+            // Clear any existing employee data
+            localStorage.removeItem('employeeId');
+            localStorage.removeItem('employeeName');
+            localStorage.removeItem('employeeEmail');
+            localStorage.removeItem('jobTitle');
+          }
+          
+          // Store role information
+          const jobTitle = data.jobTitle || '';
+          const primaryRole = data.primaryRole || 'employee';
+          localStorage.setItem('jobTitle', jobTitle);
+          localStorage.setItem('primaryRole', primaryRole);
+          localStorage.setItem('userRoles', JSON.stringify(data.roles || []));
+
+          console.log('🎭 User role:', primaryRole);
+
+          // Instead of redirecting to dashboard, redirect to verify page
+          router.push('/verify');
       } else {
         console.log('❌ Login failed:', data.error);
         setError(data.error || 'Invalid credentials');

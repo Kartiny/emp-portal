@@ -1,10 +1,39 @@
+'use client';
+
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { VersionBadge } from "@/components/version-badge"
+import { RoleBasedRedirect } from "@/components/RoleBasedRedirect"
+import { useEffect, useState } from "react"
 
 export default function LandingPage() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const uid = localStorage.getItem('uid');
+    setIsAuthenticated(!!uid);
+    setIsLoading(false);
+  }, []);
+
+  // If user is authenticated, redirect to appropriate dashboard
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isAuthenticated) {
+    return <RoleBasedRedirect />;
+  }
+
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
