@@ -152,6 +152,7 @@ export default function AttendancePage() {
     mealCheckInStatus?: string;
     checkOutMins?: number;
     checkOutStatus?: string;
+    workedHours?: number; // Added for today's worked hours
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -478,6 +479,7 @@ export default function AttendancePage() {
                           </p>
                         </div>
                       )}
+                      
                     </div>
                   ) : (
                     <div className="text-muted-foreground">No attendance recorded for today</div>

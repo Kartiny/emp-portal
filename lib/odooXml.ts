@@ -1232,6 +1232,37 @@ export class OdooClient {
       throw error;
     }
   }
+
+  /** Get all employees in a department */
+  async getEmployeesByDepartment(departmentId: number): Promise<any[]> {
+    const employees = await this.execute(
+      'hr.employee',
+      'search_read',
+      [[['department_id', '=', departmentId]]],
+      {
+        fields: [
+          'id', 'name', 'job_title', 'department_id',
+          'work_email', 'work_phone', 'mobile_phone', 'employee_type', 'user_id'
+        ],
+        order: 'name asc',
+      }
+    );
+    return employees;
+  }
+
+  /** Get all departments */
+  async getAllDepartments(): Promise<any[]> {
+    const departments = await this.execute(
+      'hr.department',
+      'search_read',
+      [[]],
+      {
+        fields: ['id', 'name'],
+        order: 'name asc',
+      }
+    );
+    return departments;
+  }
 }
 
 // ── single instance & top‐level helpers ────────────────────────────────────────
@@ -1323,5 +1354,13 @@ export async function uploadAttachmentToOdoo(opts: {
 export async function getEmployeeByUserId(uid: number) {
   const client = getOdooClient();
   return client.getEmployeeByUserId(uid);
+}
+
+export async function getEmployeesByDepartment(departmentId: number) {
+  return getOdooClient().getEmployeesByDepartment(departmentId);
+}
+
+export async function getAllDepartments() {
+  return getOdooClient().getAllDepartments();
 }
 

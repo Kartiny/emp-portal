@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useRouter } from "next/navigation"
@@ -21,14 +21,42 @@ export function MainLayout({ children, missedClockOut }: MainLayoutProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const router = useRouter();
 
-  const navigation = [
+  const [navigation, setNavigation] = useState([
     { name: "Dashboard", href: "/dashboard", icon: Home },
     { name: "Discuss", href: "/discuss", icon: MessageCircle },
     { name: "Attendance", href: "/attendance", icon: Clock },
     { name: "Leave", href: "/leave", icon: Calendar },
     { name: "Expenses", href: "/expenses", icon: Receipt },
     { name: "Profile", href: "/profile", icon: User },
-  ]
+  ]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    // Check both activeRole and primaryRole from localStorage
+    const activeRole = typeof window !== 'undefined' ? localStorage.getItem('activeRole') : null;
+    const primaryRole = typeof window !== 'undefined' ? localStorage.getItem('primaryRole') : null;
+    const role = activeRole || primaryRole;
+    if (role === 'hr') {
+      setNavigation([
+        { name: "HR Dashboard", href: "/hr/dashboard", icon: Home },
+        { name: "Logout", href: "/login", icon: User },
+      ]);
+    } else if (role === 'supervisor') {
+      setNavigation([
+        { name: "Supervisor Dashboard", href: "/supervisor/dashboard", icon: Home },
+        { name: "Logout", href: "/login", icon: User },
+      ]);
+    } else {
+      setNavigation([
+        { name: "Dashboard", href: "/dashboard", icon: Home },
+        { name: "Discuss", href: "/discuss", icon: MessageCircle },
+        { name: "Attendance", href: "/attendance", icon: Clock },
+        { name: "Leave", href: "/leave", icon: Calendar },
+        { name: "Expenses", href: "/expenses", icon: Receipt },
+        { name: "Profile", href: "/profile", icon: User },
+      ]);
+    }
+  }, []);
 
   return (
     <div className="flex min-h-screen flex-col">

@@ -213,7 +213,18 @@ export default function AttendanceWidget() {
         <div className="mb-1">{lastClockIn ? formatTimeKL(lastClockIn) : '-'}</div>
         <div className="text-sm font-semibold">Last Clock Out</div>
         <div className="mb-1">{lastClockOut ? formatTimeKL(lastClockOut) : '-'}</div>
-        <div className="text-sm font-semibold">Hours Today</div>
+        {today && today.workedHours && today.workedHours > 0 && (
+          <div>
+            <p className="text-sm font-semibold">Worked Hours Today</p>
+            <p className="text-600">
+              {(() => {
+                const h = Math.floor(today.workedHours!);
+                const m = Math.round((today.workedHours! % 1) * 60);
+                return `${h}h ${m}m`;
+              })()}
+            </p>
+          </div>
+        )}
       </div>
       <div className="flex gap-4 mt-2">
         <Button
