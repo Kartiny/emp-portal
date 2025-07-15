@@ -104,6 +104,7 @@ export async function POST(req: Request) {
           employeeName: employee.name,
           employeeEmail: employee.work_email,
           jobTitle: employee.job_title,
+          employeeType: employee.employee_type || null,
           roles: roles,
           primaryRole: primaryRole
         });

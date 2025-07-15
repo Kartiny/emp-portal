@@ -14,13 +14,7 @@ export default function VerifyPage() {
   const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
-    const uid = localStorage.getItem('uid');
-    const isVerified = localStorage.getItem('isVerified') === 'true';
-    if (!uid) {
-      router.replace('/login');
-    } else if (isVerified) {
-      router.replace('/employee/dashboard');
-    }
+    // No uid check; always show verification form
   }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -29,17 +23,23 @@ export default function VerifyPage() {
     setError('')
 
     try {
-      const uid = localStorage.getItem('uid')
-      if (!uid) {
-        router.push('/login')
-        return
-      }
+      // No uid check
 
       // For now, use hardcoded verification code '1234'
       if (code === '1234') {
         console.log('✅ Verification successful')
         localStorage.setItem('isVerified', 'true');
-        router.push('/employee/dashboard');
+        const activeRole = localStorage.getItem('activeRole');
+        // Redirect based on activeRole
+        if (activeRole === 'supervisor') {
+          router.push('/supervisor/dashboard');
+        } else if (activeRole === 'manager') {
+          router.push('/manager/dashboard');
+        } else if (activeRole === 'hr') {
+          router.push('/hr/dashboard');
+        } else {
+          router.push('/employee/dashboard');
+        }
       } else {
         setError('Invalid verification code')
       }

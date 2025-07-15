@@ -16,15 +16,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showRoleButtons, setShowRoleButtons] = useState(false);
+  const [pendingEmployeeType, setPendingEmployeeType] = useState<string | null>(null);
 
   useEffect(() => {
-    const uid = localStorage.getItem('uid');
-    const isVerified = localStorage.getItem('isVerified') === 'true';
-    if (uid && isVerified) {
-      router.replace('/employee/dashboard');
-    } else if (uid && !isVerified) {
-      router.replace('/verify');
-    }
+    // No auto-redirect based on uid in localStorage
   }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -48,34 +44,45 @@ export default function LoginPage() {
       const data = await response.json();
       console.log('📄 Response data:', data);
 
-              if (response.ok && data.uid) {
-          console.log('✅ Login successful, UID:', data.uid);
-          localStorage.setItem('uid', data.uid.toString());
-          
-          // Store employee information if available
-          if (data.employeeId) {
-            localStorage.setItem('employeeId', data.employeeId.toString());
-            localStorage.setItem('employeeName', data.employeeName || '');
-            localStorage.setItem('employeeEmail', data.employeeEmail || '');
-            localStorage.setItem('jobTitle', data.jobTitle || '');
-            console.log('👷 Employee info stored:', {
-              employeeId: data.employeeId,
-              employeeName: data.employeeName,
-              jobTitle: data.jobTitle
-            });
-          } else {
-            console.log('⚠️ No employee record found for user');
-            // Clear any existing employee data
-            localStorage.removeItem('employeeId');
-            localStorage.removeItem('employeeName');
-            localStorage.removeItem('employeeEmail');
-            localStorage.removeItem('jobTitle');
-          }
-          // Remove any role info
-          localStorage.removeItem('primaryRole');
-          localStorage.removeItem('userRoles');
-          // Redirect to verify page
+      if (response.ok && data.uid) {
+        console.log('✅ Login successful, UID:', data.uid);
+        // Store user and employee IDs
+        localStorage.setItem('uid', data.uid.toString());
+        if (data.employeeId) {
+          localStorage.setItem('employeeId', data.employeeId.toString());
+          localStorage.setItem('employeeName', data.employeeName || '');
+          localStorage.setItem('employeeEmail', data.employeeEmail || '');
+          localStorage.setItem('jobTitle', data.jobTitle || '');
+          console.log('👷 Employee info stored:', {
+            employeeId: data.employeeId,
+            employeeName: data.employeeName,
+            jobTitle: data.jobTitle
+          });
+        } else {
+          console.log('⚠️ No employee record found for user');
+          // Clear any existing employee data
+          localStorage.removeItem('employeeId');
+          localStorage.removeItem('employeeName');
+          localStorage.removeItem('employeeEmail');
+          localStorage.removeItem('jobTitle');
+        }
+        // Store employeeType if available
+        if (data.employeeType) {
+          localStorage.setItem('employeeType', data.employeeType);
+        } else {
+          localStorage.removeItem('employeeType');
+        }
+        // Remove any role info
+        localStorage.removeItem('primaryRole');
+        localStorage.removeItem('userRoles');
+        // If HR or Supervisor, show role selection buttons
+        if (data.employeeType === 'hr' || data.employeeType === 'supervisor') {
+          setShowRoleButtons(true);
+          setPendingEmployeeType(data.employeeType);
+          setIsLoading(false);
+        } else {
           router.push('/verify');
+        }
       } else {
         console.log('❌ Login failed:', data.error);
         setError(data.error || 'Invalid credentials');
@@ -86,6 +93,12 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleRoleSelect = (role: string) => {
+    localStorage.setItem('activeRole', role);
+    // Require verification for all roles before dashboard
+    router.push('/verify');
   };
 
   return (
@@ -120,7 +133,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  disabled={isLoading}
+                  disabled={isLoading || showRoleButtons}
                 />
               </div>
               <div className="space-y-2">
@@ -132,7 +145,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  disabled={isLoading}
+                  disabled={isLoading || showRoleButtons}
                 />
               </div>
               {error && (
@@ -143,11 +156,40 @@ export default function LoginPage() {
               <Button 
                 type="submit" 
                 className="w-full bg-[#1d1a4e] text-white hover:bg-[#1d1a4e]/90 text-lg py-6"
-                disabled={isLoading}
+                disabled={isLoading || showRoleButtons}
               >
                 {isLoading ? 'Logging in...' : 'Login'}
               </Button>
             </form>
+            {/* Role selection buttons for HR or Supervisor */}
+            {showRoleButtons && (
+              <div className="mt-8 space-y-4">
+                <div className="text-center font-semibold mb-2">Select Role</div>
+                <Button
+                  className="w-full text-lg py-6"
+                  variant="secondary"
+                  onClick={() => handleRoleSelect('employee')}
+                >
+                  Login as Employee
+                </Button>
+                {pendingEmployeeType === 'hr' && (
+                  <Button
+                    className="w-full text-lg py-6"
+                    onClick={() => handleRoleSelect('hr')}
+                  >
+                    Login as HR
+                  </Button>
+                )}
+                {pendingEmployeeType === 'supervisor' && (
+                  <Button
+                    className="w-full text-lg py-6"
+                    onClick={() => handleRoleSelect('supervisor')}
+                  >
+                    Login as Supervisor
+                  </Button>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       </main>

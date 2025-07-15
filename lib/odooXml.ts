@@ -1033,7 +1033,7 @@ export class OdooClient {
       console.log('🔍 Searching for employee with user_id:', uid);
       const employees = await this.execute('hr.employee', 'search_read', 
         [[['user_id', '=', uid]]], 
-        { fields: ['id', 'name', 'user_id', 'work_email', 'job_title'], limit: 1 }
+        { fields: ['id', 'name', 'user_id', 'work_email', 'job_title', 'employee_type'], limit: 1 }
       );
       
       console.log('👷 Employee search result:', employees);

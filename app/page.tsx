@@ -15,16 +15,7 @@ export default function LandingPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const uid = localStorage.getItem('uid');
-    const verified = localStorage.getItem('isVerified') === 'true';
-    setIsAuthenticated(!!uid);
-    setIsVerified(verified);
     setIsLoading(false);
-    if (uid && verified) {
-      router.replace('/employee/dashboard');
-    } else if (uid && !verified) {
-      router.replace('/verify');
-    }
   }, [router]);
 
   if (isLoading) {

@@ -79,8 +79,8 @@ export default function DashboardPage() {
   const [expenseFormLoading, setExpenseFormLoading] = useState(false);
 
   useEffect(() => {
-    const uid = localStorage.getItem('uid');
-    if (!uid) {
+    const employeeId = localStorage.getItem('employeeId');
+    if (!employeeId) {
       window.location.href = '/login';
       return;
     }
@@ -89,7 +89,7 @@ export default function DashboardPage() {
     fetch('/api/odoo/auth/profile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uid: Number(uid) }),
+      body: JSON.stringify({ employeeId: Number(employeeId) }),
     })
       .then(res => res.json())
       .then(data => {
@@ -103,7 +103,7 @@ export default function DashboardPage() {
     fetch('/api/odoo/leave/allocation', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uid: Number(uid) }),
+      body: JSON.stringify({ employeeId: Number(employeeId) }),
     })
       .then(res => res.json())
       .then(data => {
@@ -116,7 +116,7 @@ export default function DashboardPage() {
     fetch('/api/odoo/auth/attendance', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uid: Number(uid), range: 'monthly', customDate: format(now, 'yyyy-MM-dd') }),
+      body: JSON.stringify({ employeeId: Number(employeeId), range: 'monthly', customDate: format(now, 'yyyy-MM-dd') }),
     })
       .then(res => res.json())
       .then(data => {
@@ -129,7 +129,7 @@ export default function DashboardPage() {
     fetch('/api/odoo/leave/requests', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uid: Number(uid), filters: { status: 'confirm' } }),
+      body: JSON.stringify({ employeeId: Number(employeeId), filters: { status: 'confirm' } }),
     })
       .then(res => res.json())
       .then(data => {
@@ -138,7 +138,7 @@ export default function DashboardPage() {
       .catch(console.error)
       .finally(() => setLoading(false));
 
-    fetch(`/api/odoo/expense?uid=${uid}`)
+    fetch(`/api/odoo/expense?employeeId=${employeeId}`)
       .then(res => res.json())
       .then(data => {
         setClaims(data.claims || []);
@@ -154,7 +154,7 @@ export default function DashboardPage() {
     fetch('/api/odoo/auth/attendance', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uid: Number(uid), range: 'day', customDate: yDate }),
+      body: JSON.stringify({ employeeId: Number(employeeId), range: 'day', customDate: yDate }),
     })
       .then(res => res.json())
       .then(data => {
@@ -183,7 +183,7 @@ export default function DashboardPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            uid: Number(uid),
+            employeeId: Number(employeeId),
             range: 'custom',
             customRange: { from: start, to: end },
           }),
@@ -251,9 +251,9 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    const uid = localStorage.getItem('uid');
+    const employeeId = localStorage.getItem('employeeId');
     const isVerified = localStorage.getItem('isVerified') === 'true';
-    if (!uid) {
+    if (!employeeId) {
       window.location.href = '/login';
     } else if (!isVerified) {
       window.location.href = '/verify';
@@ -261,9 +261,9 @@ export default function DashboardPage() {
   }, []);
 
   const refreshClaims = async () => {
-    const uid = localStorage.getItem('uid');
-    if (!uid) return;
-    const res = await fetch(`/api/odoo/expense?uid=${uid}`);
+    const employeeId = localStorage.getItem('employeeId');
+    if (!employeeId) return;
+    const res = await fetch(`/api/odoo/expense?employeeId=${employeeId}`);
     const data = await res.json();
     setClaims(data.claims || []);
     setClaimRequests(Array.isArray(data.claims) ? data.claims.length : 0);
@@ -276,10 +276,10 @@ export default function DashboardPage() {
   const handleClaimSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setClaimFormLoading(true);
-    const uid = localStorage.getItem('uid');
-    if (!uid) return;
+    const employeeId = localStorage.getItem('employeeId');
+    if (!employeeId) return;
     const payload = {
-      uid: Number(uid),
+      employeeId: Number(employeeId),
       data: {
         name: claimForm.name,
         date: claimForm.date,
@@ -318,13 +318,13 @@ export default function DashboardPage() {
   const fetchAttendanceDialogData = async () => {
     setAttendanceDialogLoading(true);
     try {
-      const uid = localStorage.getItem('uid');
-      if (!uid) return;
+      const employeeId = localStorage.getItem('employeeId');
+      if (!employeeId) return;
       const now = new Date();
       const res = await fetch('/api/odoo/auth/attendance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid: Number(uid), range: 'monthly', customDate: format(now, 'yyyy-MM-dd') }),
+        body: JSON.stringify({ employeeId: Number(employeeId), range: 'monthly', customDate: format(now, 'yyyy-MM-dd') }),
       });
       const data = await res.json();
       setAttendanceDialogData({ totalHours: data.totalHours || 0, rate: data.rate || 0 });
@@ -337,12 +337,12 @@ export default function DashboardPage() {
   const fetchPendingRequestsData = async () => {
     setPendingLoading(true);
     try {
-      const uid = localStorage.getItem('uid');
-      if (!uid) return;
+      const employeeId = localStorage.getItem('employeeId');
+      if (!employeeId) return;
       const res = await fetch('/api/odoo/leave/requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid: Number(uid), filters: { status: 'confirm' } }),
+        body: JSON.stringify({ employeeId: Number(employeeId), filters: { status: 'confirm' } }),
       });
       const data = await res.json();
       setPendingRequestsData(Array.isArray(data) ? data : []);
@@ -355,12 +355,12 @@ export default function DashboardPage() {
   const fetchLeaveBalanceData = async () => {
     setLeaveBalanceLoading(true);
     try {
-      const uid = localStorage.getItem('uid');
-      if (!uid) return;
+      const employeeId = localStorage.getItem('employeeId');
+      if (!employeeId) return;
       const res = await fetch('/api/odoo/leave/allocation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid: Number(uid) }),
+        body: JSON.stringify({ employeeId: Number(employeeId) }),
       });
       const data = await res.json();
       setLeaveBalanceData(data.allocations || []);
@@ -390,10 +390,10 @@ export default function DashboardPage() {
   const handleExpenseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setExpenseFormLoading(true);
-    const uid = localStorage.getItem('uid');
-    if (!uid) return;
+    const employeeId = localStorage.getItem('employeeId');
+    if (!employeeId) return;
     const payload = {
-      uid: Number(uid),
+      employeeId: Number(employeeId),
       data: {
         name: expenseForm.name,
         date: expenseForm.date,
@@ -751,12 +751,12 @@ function LeaveRequestDashboardForm({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     const fetchTypes = async () => {
-      const uid = localStorage.getItem('uid');
-      if (!uid) return;
+      const employeeId = localStorage.getItem('employeeId');
+      if (!employeeId) return;
       const res = await fetch('/api/odoo/leave/types', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid: Number(uid) }),
+        body: JSON.stringify({ employeeId: Number(employeeId) }),
       });
       const data = await res.json();
       setLeaveTypes(data || []);
@@ -811,11 +811,11 @@ function LeaveRequestDashboardForm({ onClose }: { onClose: () => void }) {
     }
     setSubmitting(true);
     try {
-      const rawUid = localStorage.getItem('uid');
-      if (!rawUid) throw new Error('Not logged in');
-      const uid = Number(rawUid);
+      const rawEmployeeId = localStorage.getItem('employeeId');
+      if (!rawEmployeeId) throw new Error('Not logged in');
+      const employeeId = Number(rawEmployeeId);
       const payload: any = {
-        uid,
+        employeeId,
         request: {
           leaveTypeId: parseInt(selectedLeaveTypeId),
           request_date_from: startDate ? startDate.toISOString().slice(0, 10) : '',

@@ -5,6 +5,7 @@ import type React from "react"
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Calendar, Clock, FileText, Home, LogOut, Menu, Receipt, Settings, User, MessageCircle } from "lucide-react"
@@ -18,6 +19,7 @@ interface MainLayoutProps {
 export function MainLayout({ children, missedClockOut }: MainLayoutProps) {
   const pathname = usePathname()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const router = useRouter();
 
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: Home },
@@ -93,12 +95,25 @@ export function MainLayout({ children, missedClockOut }: MainLayoutProps) {
               })}
             </nav>
             <div className="mt-auto">
-              <Link href="/">
-                <Button variant="ghost" className="w-full justify-start gap-2">
-                  <LogOut className="h-4 w-4" />
-                  Logout
-                </Button>
-              </Link>
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-2"
+                onClick={() => {
+                  localStorage.removeItem('uid');
+                  localStorage.removeItem('isVerified');
+                  localStorage.removeItem('employeeId');
+                  localStorage.removeItem('employeeName');
+                  localStorage.removeItem('employeeEmail');
+                  localStorage.removeItem('jobTitle');
+                  localStorage.removeItem('employeeType');
+                  localStorage.removeItem('primaryRole');
+                  localStorage.removeItem('userRoles');
+                  router.replace('/login');
+                }}
+              >
+                <LogOut className="h-4 w-4" />
+                Logout
+              </Button>
             </div>
           </div>
         </aside>
