@@ -251,8 +251,11 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    const isVerified = localStorage.getItem('isVerified');
-    if (isVerified !== 'true') {
+    const uid = localStorage.getItem('uid');
+    const isVerified = localStorage.getItem('isVerified') === 'true';
+    if (!uid) {
+      window.location.href = '/login';
+    } else if (!isVerified) {
       window.location.href = '/verify';
     }
   }, []);

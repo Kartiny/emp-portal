@@ -21,6 +21,10 @@ interface TodayAttendance {
     longitude?: number;
   }>;
   workedHours?: number;
+  latenessStr?: string;
+  latenessMins?: number;
+  earlyOutStr?: string;
+  earlyOutMins?: number;
 }
 
 interface ShiftInfo {

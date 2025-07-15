@@ -5,20 +5,28 @@ import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { VersionBadge } from "@/components/version-badge"
-import { RoleBasedRedirect } from "@/components/RoleBasedRedirect"
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 
 export default function LandingPage() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isVerified, setIsVerified] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     const uid = localStorage.getItem('uid');
+    const verified = localStorage.getItem('isVerified') === 'true';
     setIsAuthenticated(!!uid);
+    setIsVerified(verified);
     setIsLoading(false);
-  }, []);
+    if (uid && verified) {
+      router.replace('/employee/dashboard');
+    } else if (uid && !verified) {
+      router.replace('/verify');
+    }
+  }, [router]);
 
-  // If user is authenticated, redirect to appropriate dashboard
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -30,10 +38,7 @@ export default function LandingPage() {
     );
   }
 
-  if (isAuthenticated) {
-    return <RoleBasedRedirect />;
-  }
-
+  // If not authenticated, show login button
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">

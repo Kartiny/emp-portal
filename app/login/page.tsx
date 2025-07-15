@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,16 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const uid = localStorage.getItem('uid');
+    const isVerified = localStorage.getItem('isVerified') === 'true';
+    if (uid && isVerified) {
+      router.replace('/employee/dashboard');
+    } else if (uid && !isVerified) {
+      router.replace('/verify');
+    }
+  }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,17 +71,10 @@ export default function LoginPage() {
             localStorage.removeItem('employeeEmail');
             localStorage.removeItem('jobTitle');
           }
-          
-          // Store role information
-          const jobTitle = data.jobTitle || '';
-          const primaryRole = data.primaryRole || 'employee';
-          localStorage.setItem('jobTitle', jobTitle);
-          localStorage.setItem('primaryRole', primaryRole);
-          localStorage.setItem('userRoles', JSON.stringify(data.roles || []));
-
-          console.log('🎭 User role:', primaryRole);
-
-          // Instead of redirecting to dashboard, redirect to verify page
+          // Remove any role info
+          localStorage.removeItem('primaryRole');
+          localStorage.removeItem('userRoles');
+          // Redirect to verify page
           router.push('/verify');
       } else {
         console.log('❌ Login failed:', data.error);

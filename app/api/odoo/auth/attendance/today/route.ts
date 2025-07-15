@@ -3,6 +3,25 @@ import { NextResponse } from 'next/server';
 import { toZonedTime } from 'date-fns-tz';
 import { format as dfFormat } from 'date-fns';
 import { getOdooClient } from '@/lib/odooXml';
+import { parseISO } from 'date-fns';
+
+function parseTimeToDate(today: string, timeStr: string): Date {
+  // timeStr: 'HH:mm' or 'H:mm'
+  const [h, m] = timeStr.split(':').map(Number);
+  const d = new Date(today);
+  d.setHours(h, m, 0, 0);
+  return d;
+}
+
+function minutesToHumanReadable(mins: number): string {
+  const abs = Math.abs(mins);
+  const h = Math.floor(abs / 60);
+  const m = abs % 60;
+  let str = '';
+  if (h > 0) str += `${h} hour${h > 1 ? 's' : ''} `;
+  if (m > 0) str += `${m} minute${m > 1 ? 's' : ''}`;
+  return str.trim() || '0 minutes';
+}
 
 export async function POST(req: Request) {
   console.log('[DEBUG] Today attendance API route called');
@@ -98,6 +117,40 @@ export async function POST(req: Request) {
         : 0;
     }
 
+    // Calculate lateness and early out
+    let latenessMins = 0;
+    let latenessStr = '';
+    let earlyOutMins = 0;
+    let earlyOutStr = '';
+    if (scheduledShiftInfo.start && shiftConfig.grace_period_late_in != null && lastClockIn) {
+      // scheduledShiftInfo.start: 'HH:mm', grace_period_late_in: float (hours)
+      const shiftStart = parseTimeToDate(today, scheduledShiftInfo.start);
+      const graceMinutes = Number(shiftConfig.grace_period_late_in) * 60;
+      const graceStart = new Date(shiftStart.getTime() + graceMinutes * 60000);
+      const actualIn = parseISO(lastClockIn.replace(' ', 'T'));
+      if (actualIn > graceStart) {
+        latenessMins = Math.floor((actualIn.getTime() - graceStart.getTime()) / 60000);
+        latenessStr = `${minutesToHumanReadable(latenessMins)} late`;
+      } else {
+        latenessMins = 0;
+        latenessStr = 'On time';
+      }
+    }
+    if (scheduledShiftInfo.end && shiftConfig.grace_period_early_out != null && lastClockOut) {
+      // scheduledShiftInfo.end: 'HH:mm', grace_period_early_out: float (hours)
+      const shiftEnd = parseTimeToDate(today, scheduledShiftInfo.end);
+      const graceMinutes = Number(shiftConfig.grace_period_early_out) * 60;
+      const graceEnd = new Date(shiftEnd.getTime() - graceMinutes * 60000);
+      const actualOut = parseISO(lastClockOut.replace(' ', 'T'));
+      if (actualOut < graceEnd) {
+        earlyOutMins = Math.floor((graceEnd.getTime() - actualOut.getTime()) / 60000);
+        earlyOutStr = `${minutesToHumanReadable(earlyOutMins)} early`;
+      } else {
+        earlyOutMins = 0;
+        earlyOutStr = 'On time';
+      }
+    }
+
     const result = {
       lastClockIn,
       lastClockOut,
@@ -107,6 +160,10 @@ export async function POST(req: Request) {
       empCode: employee.barcode, // Include employee barcode for reference
       workedHours, // Add workedHours from attendance.sheet.line
       shiftConfig, // Add today's shift code config
+      latenessMins,
+      latenessStr,
+      earlyOutMins,
+      earlyOutStr,
       records: sortedAscRecs.map(r => ({
         id: r.id,
         datetime: r.datetime,
