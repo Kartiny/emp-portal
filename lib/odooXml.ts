@@ -34,6 +34,7 @@ export type DateRange = 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'custom';
 export interface LeaveType {
   id: number;
   name: string;
+  name2?: string;
   requires_allocation: string;
   virtual_remaining_leaves: number;
   color?: number;
@@ -351,6 +352,7 @@ export class OdooClient {
         fields: [
           'id',
           'display_name',
+          'name2',
           'requires_allocation',
           'virtual_remaining_leaves',
           'color',
@@ -365,6 +367,7 @@ export class OdooClient {
     return raw.map(r => ({
       id: r.id,
       name: r.display_name,
+      name2: r.name2,
       requires_allocation: r.requires_allocation,
       virtual_remaining_leaves: r.virtual_remaining_leaves,
       color: r.color,
@@ -471,42 +474,45 @@ export class OdooClient {
   async createLeaveRequest(
     uid: number,
     data: {
-      leaveTypeId: number;
+      holiday_status_id: string | number;
       request_date_from: string;
       request_date_to: string;
-      reason: string;
-      request_unit?: 'day';
-      request_unit_half_day?: 'am' | 'pm';
-      request_unit_hours?: boolean;
-      request_hour_from?: string;
-      request_hour_to?: string;
-      number_of_days?: number;
-      number_of_days_display?: number;
-      attachment_id?: number;
+      request_unit_half: boolean;
+      request_unit_half_session?: 'am' | 'pm';
+      request_unit_hours: boolean;
+      request_hour_from: string;
+      request_hour_to: string;
+      number_of_days_display: number;
+      name: string;
+      supported_attachment_ids: number[];
     }
   ): Promise<number> {
     const profile: any = await this.getFullUserProfile(uid);
     const empId: number = profile.id;
-    const vals: any = {
-      employee_id: empId,
-      holiday_status_id: data.leaveTypeId,
-      date_from: data.request_date_from,
-      date_to: data.request_date_to,
-      name: data.reason,
+
+    // Format dates to Odoo datetime
+    const formatOdooDatetime = (dateStr: string) => {
+      if (dateStr.length === 10) return dateStr + ' 00:00:00';
+      return dateStr.replace('T', ' ').slice(0, 19);
     };
 
-    // Day-based or half-day
-    if (data.request_unit === 'day') {
-      if (data.request_unit_half_day) {
-        vals.request_unit = 'half';
-        vals.request_unit_half_day = data.request_unit_half_day;
-        vals.number_of_days = 0.5;
-      } else {
-        vals.number_of_days = data.number_of_days != null ? data.number_of_days : 1.0;
-      }
-    }
+    const vals: any = {
+      employee_id: empId,
+      holiday_status_id: parseInt(data.holiday_status_id as string, 10),
+      date_from: formatOdooDatetime(data.request_date_from),
+      date_to: formatOdooDatetime(data.request_date_to),
+      name: data.name,
+      number_of_days_display: data.number_of_days_display,
+      number_of_days: data.number_of_days_display,
+    };
 
-    // Hour-based
+    if (data.request_unit_half) {
+      vals.request_unit_half = true;
+      if (data.request_unit_half_session) {
+        vals.request_unit_half_session = data.request_unit_half_session;
+      }
+        vals.number_of_days = 0.5;
+      }
     if (data.request_unit_hours) {
       vals.request_unit_hours = true;
       const fromFloat = data.request_hour_from
@@ -523,16 +529,13 @@ export class OdooClient {
         : 0.0;
       vals.request_hour_from = parseFloat(fromFloat.toFixed(2));
       vals.request_hour_to = parseFloat(toFloat.toFixed(2));
-      if (data.number_of_days_display != null) {
         vals.number_of_days_display = data.number_of_days_display;
-      }
+      vals.number_of_days = data.number_of_days_display;
     }
-
-    // Attachment
-    if (data.attachment_id) {
-      vals.attachment_ids = [[6, 0, [data.attachment_id]]];
+    // Attachments (one2many)
+    if (data.supported_attachment_ids && data.supported_attachment_ids.length > 0) {
+      vals.attachment_ids = [[6, 0, data.supported_attachment_ids.map(Number)]];
     }
-
     const newId: number = await this.execute('hr.leave', 'create', [vals]);
     return newId;
   }
@@ -768,7 +771,7 @@ export class OdooClient {
   }
 
   public async postMessage(model: string, recordIds: number[], body: string) {
-    return this.execute(model, 'message_post', [recordIds, { body }]);
+    return this.execute(model, 'message_post', [recordIds], { body, message_type: 'notification' });
   }
 
   /**
@@ -1302,18 +1305,17 @@ export async function getLeaveRequests(
 export async function createLeaveRequest(
   uid: number,
   data: {
-    leaveTypeId: number;
+    holiday_status_id: string;
     request_date_from: string;
     request_date_to: string;
-    reason: string;
-    request_unit?: 'day';
-    request_unit_half_day?: 'am' | 'pm';
-    request_unit_hours?: boolean;
-    request_hour_from?: string;
-    request_hour_to?: string;
-    number_of_days?: number;
-    number_of_days_display?: number;
-    attachment_id?: number;
+    request_unit_half: boolean;
+    request_unit_half_session?: 'am' | 'pm';
+    request_unit_hours: boolean;
+    request_hour_from: string;
+    request_hour_to: string;
+    number_of_days_display: number;
+    name: string;
+    supported_attachment_ids: File[];
   }
 ) {
   return getOdooClient().createLeaveRequest(uid, data);

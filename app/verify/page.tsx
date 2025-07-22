@@ -38,7 +38,7 @@ export default function VerifyPage() {
         } else if (activeRole === 'hr') {
           router.push('/hr/dashboard');
         } else {
-          router.push('/employee/dashboard');
+        router.push('/employee/dashboard');
         }
       } else {
         setError('Invalid verification code')

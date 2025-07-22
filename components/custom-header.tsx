@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { AlertTriangle, ListTodo, MessageCircle } from "lucide-react";
+import { AlertTriangle, ListTodo, MessageCircle, LogOut } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import RoleSwitcher from './RoleSwitcher';
+import { useRole } from '../context/RoleContext';
 
 interface UserProfile {
   name: string;
@@ -22,6 +24,7 @@ export function CustomHeader({ missedClockOut }: CustomHeaderProps) {
   const [showActivities, setShowActivities] = useState(false);
   const [activities, setActivities] = useState<any[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(false);
+  const { roles } = useRole();
 
   useEffect(() => {
     const uid = localStorage.getItem('uid');
@@ -77,7 +80,8 @@ export function CustomHeader({ missedClockOut }: CustomHeaderProps) {
   };
 
   return (
-    <div className="container flex h-20 items-center justify-between px-8">
+    <div className="w-full bg-white border-b">
+      <div className="max-w-screen-xl mx-auto w-full flex h-20 items-center justify-between px-8">
       {/* Left: Avatar + Hi, Name */}
       <div className="flex items-center space-x-3">
         <Link href="/profile" className="flex items-center">
@@ -92,7 +96,7 @@ export function CustomHeader({ missedClockOut }: CustomHeaderProps) {
         </Link>
         <span className="text-lg font-semibold">Hi, {profile?.name || 'User'}</span>
       </div>
-      {/* Right: Warning, Tasks, Notifications, Logo, Activities */}
+        {/* Right: Warning, Tasks, Notifications, Logo, Activities, Role Switcher */}
       <div className="flex items-center space-x-6">
         {missedClockOut ? (
           <Popover open={showMissedPopover} onOpenChange={setShowMissedPopover}>
@@ -148,6 +152,17 @@ export function CustomHeader({ missedClockOut }: CustomHeaderProps) {
         <button title="Chat" className="hover:text-blue-600 transition-colors" onClick={() => alert('Open chat!')}>
           <MessageCircle className="h-6 w-6" />
         </button>
+        <button
+          title="Logout"
+          className="hover:text-red-600 transition-colors flex items-center gap-1"
+          onClick={() => {
+            localStorage.clear();
+            window.location.href = '/login';
+          }}
+        >
+          <LogOut className="h-6 w-6" />
+          <span className="hidden md:inline">Logout</span>
+        </button>
         <Image
           src="/logo.png"
           alt="KPRJ Logo"
@@ -155,6 +170,9 @@ export function CustomHeader({ missedClockOut }: CustomHeaderProps) {
           height={60}
           className="rounded-lg ml-2"
         />
+          {/* Role Switcher (only if user has multiple roles) */}
+          {roles.length > 1 && <RoleSwitcher />}
+        </div>
       </div>
     </div>
   );
