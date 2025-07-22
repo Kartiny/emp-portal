@@ -104,6 +104,79 @@ export default function HrDashboardPage() {
                 </div>
               </CardContent>
             </Card>
+            <Card className="w-full max-w-4xl shadow-md mt-8">
+              <CardHeader>
+                <CardTitle className="text-lg">New Joinees This Month</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {data?.newJoinees?.length ? (
+                  <ul className="divide-y">
+                    {data.newJoinees.map((emp: any) => (
+                      <li key={emp.id} className="py-2 flex flex-col md:flex-row md:items-center md:gap-4">
+                        <span className="font-medium">{emp.name}</span>
+                        <span className="text-sm text-muted-foreground">{emp.job_title}</span>
+                        <span className="text-sm text-muted-foreground">{emp.department_id?.[1]}</span>
+                        <span className="text-sm text-muted-foreground">Joined: {emp.join_date}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="text-muted-foreground">No new joinees this month.</div>
+                )}
+              </CardContent>
+            </Card>
+            <Card className="w-full max-w-4xl shadow-md mt-8">
+              <CardHeader>
+                <CardTitle className="text-lg">Recent Exits This Month</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {data?.recentExits?.length ? (
+                  <ul className="divide-y">
+                    {data.recentExits.map((emp: any) => (
+                      <li key={emp.id} className="py-2 flex flex-col md:flex-row md:items-center md:gap-4">
+                        <span className="font-medium">{emp.name}</span>
+                        <span className="text-sm text-muted-foreground">{emp.job_title}</span>
+                        <span className="text-sm text-muted-foreground">{emp.department_id?.[1]}</span>
+                        <span className="text-sm text-muted-foreground">Left: {emp.cessation_date}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="text-muted-foreground">No recent exits this month.</div>
+                )}
+              </CardContent>
+            </Card>
+            <Card className="w-full max-w-4xl shadow-md mt-8">
+              <CardHeader>
+                <CardTitle className="text-lg">Contract Expiry Alerts (Next 30 Days)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {data?.contractExpiryAlerts?.length ? (
+                  <ul className="divide-y">
+                    {data.contractExpiryAlerts.map((c: any) => (
+                      <li key={c.id} className="py-2 flex flex-col md:flex-row md:items-center md:gap-4">
+                        <span className="font-medium">{c.employee_id?.[1]}</span>
+                        <span className="text-sm text-muted-foreground">Contract End: {c.date_end}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="text-muted-foreground">No contracts expiring in the next 30 days.</div>
+                )}
+              </CardContent>
+            </Card>
+            <Card className="w-full max-w-4xl shadow-md mt-8">
+              <CardHeader>
+                <CardTitle className="text-lg">Quick Links</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-4">
+                  <a href="/hr/employees" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Add Employee</a>
+                  <a href="/hr/reports" className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">HR Reports</a>
+                  {/* Add more links as needed */}
+                </div>
+              </CardContent>
+            </Card>
           </>
         )}
       </div>

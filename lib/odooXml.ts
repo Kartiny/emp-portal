@@ -1245,7 +1245,8 @@ export class OdooClient {
       {
         fields: [
           'id', 'name', 'job_title', 'department_id',
-          'work_email', 'work_phone', 'mobile_phone', 'employee_type', 'user_id'
+          'work_email', 'work_phone', 'mobile_phone', 'employee_type', 'user_id',
+          'contract_id', 'join_date', 'cessation_date'
         ],
         order: 'name asc',
       }
@@ -1315,7 +1316,7 @@ export async function createLeaveRequest(
     request_hour_to: string;
     number_of_days_display: number;
     name: string;
-    supported_attachment_ids: File[];
+    supported_attachment_ids: number[];
   }
 ) {
   return getOdooClient().createLeaveRequest(uid, data);

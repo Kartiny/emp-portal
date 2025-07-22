@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAllDepartments, getEmployeesByDepartment } from '@/lib/odooXml';
+import { addDays, isWithinInterval, parseISO, startOfMonth, endOfMonth, isAfter, isBefore } from 'date-fns';
 
 // Helper: get leave requests for multiple employees
 async function getLeaveRequestsForEmployees(empIds: number[]): Promise<any[]> {
@@ -47,11 +48,22 @@ export async function GET() {
     let totalEmployees = 0;
     const barChart: { department: string; count: number }[] = [];
 
+    // For new widgets
+    const allEmployees: any[] = [];
+    const contractsToFetch: number[] = [];
+
     for (const dept of departments) {
       const employees = await getEmployeesByDepartment(dept.id);
       const empIds = employees.map((e: any) => e.id);
       totalEmployees += empIds.length;
       barChart.push({ department: dept.name, count: empIds.length });
+      allEmployees.push(...employees);
+      // Collect contract ids for expiry check
+      employees.forEach(e => {
+        if (e.contract_id && Array.isArray(e.contract_id) && e.contract_id[0]) {
+          contractsToFetch.push(e.contract_id[0]);
+        }
+      });
 
       // Leave requests
       const leaveRequests = await getLeaveRequestsForEmployees(empIds);
@@ -73,6 +85,42 @@ export async function GET() {
       // totalOTRequests += ...
     }
 
+    // --- New Joinees This Month ---
+    const now = new Date();
+    const monthStart = startOfMonth(now);
+    const monthEnd = endOfMonth(now);
+    const newJoinees = allEmployees.filter(e => {
+      if (!e.join_date) return false;
+      const d = parseISO(e.join_date);
+      return isWithinInterval(d, { start: monthStart, end: monthEnd });
+    });
+
+    // --- Recent Exits This Month ---
+    const recentExits = allEmployees.filter(e => {
+      if (!e.cessation_date) return false;
+      const d = parseISO(e.cessation_date);
+      return isWithinInterval(d, { start: monthStart, end: monthEnd });
+    });
+
+    // --- Contract Expiry Alerts (next 30 days) ---
+    let contractExpiryAlerts: any[] = [];
+    if (contractsToFetch.length > 0) {
+      const odoo = require('@/lib/odooXml').getOdooClient();
+      const contracts = await odoo.execute(
+        'hr.contract',
+        'search_read',
+        [[['id', 'in', contractsToFetch]]],
+        { fields: ['id', 'employee_id', 'date_end'], order: 'date_end asc' }
+      );
+      const today = new Date();
+      const in30Days = addDays(today, 30);
+      contractExpiryAlerts = contracts.filter((c: any) => {
+        if (!c.date_end) return false;
+        const d = parseISO(c.date_end);
+        return isAfter(d, today) && isBefore(d, in30Days);
+      });
+    }
+
     return NextResponse.json({
       onLeaveCount: totalOnLeave,
       absenceCount: totalAbsence,
@@ -81,6 +129,9 @@ export async function GET() {
       claimRequestsCount: totalClaimRequests,
       totalEmployees,
       barChart,
+      newJoinees,
+      recentExits,
+      contractExpiryAlerts,
     });
   } catch (err: any) {
     console.error('HR dashboard API error:', err);
