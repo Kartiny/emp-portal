@@ -9,8 +9,8 @@ export async function POST(req: Request) {
     // hr.leave.type (no per-user filtering), but you could check credentials
     // or pass an “admin login” token if you want to.
     const types = await getLeaveTypes();
-    // Return the array of LeaveType objects directly
-    return NextResponse.json(types, { status: 200 });
+    // Return the array of LeaveType objects directly, including name2
+    return NextResponse.json(types.map(t => ({ ...t, name2: t.name2 })), { status: 200 });
   } catch (err: any) {
     return NextResponse.json(
       { error: err.message || 'Unknown error' },

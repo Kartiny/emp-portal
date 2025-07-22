@@ -15,18 +15,17 @@ export async function POST(req: Request) {
 
     // 1) Create the hr.leave record
     const newRequestId = await createLeaveRequest(uid, {
-      leaveTypeId:                 request.leaveTypeId,
-      request_date_from:           request.request_date_from,
-      request_date_to:             request.request_date_to,
-      reason:                      request.reason,
-      request_unit:                request.request_unit,          // 'day' if day-based
-      request_unit_half_day:       request.request_unit_half_day, // 'am' | 'pm' if half-day
-      request_unit_hours:          request.request_unit_hours,    // true if hours
-      request_hour_from:           request.request_hour_from,     // '09:00'
-      request_hour_to:             request.request_hour_to,       // '13:30'
-      number_of_days:              request.number_of_days,        // 0.5 for half-day or 1.0 for full-day
-      number_of_days_display:      request.number_of_days_display,// e.g. 3.5 if hours
-      attachment_id:               request.attachment_id,         // optional attachment
+      holiday_status_id:           request.holiday_status_id, // Time off type
+      request_date_from:           request.request_date_from, // Start date
+      request_date_to:             request.request_date_to,   // End date
+      request_unit_half:           request.request_unit_half, // Half day
+      request_unit_half_session:   request.request_unit_half_session, // Morning/Afternoon
+      request_unit_hours:          request.request_unit_hours, // Custom hours
+      request_hour_from:           request.request_hour_from,   // Start time
+      request_hour_to:             request.request_hour_to,     // End time
+      number_of_days_display:      request.number_of_days_display, // Duration
+      name:                        request.name, // Reason
+      supported_attachment_ids:     request.supported_attachment_ids, // Supporting doc
     });
 
     // 2) Post a message in the chatter (so HR gets notified)
