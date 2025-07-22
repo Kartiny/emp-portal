@@ -1,4 +1,3 @@
-// app/dashboard/page.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -418,15 +417,15 @@ export default function DashboardPage() {
   }
 
   return (
-    <MainLayout>
+    <>
       <div className="space-y-8">
         <div>
           <h1 className="text-3xl font-bold text-[#1d1a4e]">Dashboard</h1>
           <p className="text-gray-500 mt-2">Overview of your attendance and leave management</p>
         </div>
 
-{/* Top Row: Card with Clock In/Out (left) and Action Buttons (right) */}
-<Card className="mt-6 w-full">
+        {/* Top Row: Card with Clock In/Out (left) and Action Buttons (right) */}
+        <Card className="mt-6 w-full">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-0 items-stretch min-h-[320px]">
             {/* Left: Clock In/Out Widget, centered, no border, left-aligned text */}
             <div className="flex items-center justify-center p-8 md:p-12">
@@ -510,8 +509,6 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        
-
         {/* Third Row: Monthly Attendance Chart (full width) */}
         <div className="mt-6">
           <div className="bg-white rounded-lg shadow p-6 w-full">
@@ -531,6 +528,7 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+
       <Dialog open={claimDialogOpen} onOpenChange={setClaimDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -572,6 +570,7 @@ export default function DashboardPage() {
       <Dialog open={attendanceDialogOpen} onOpenChange={setAttendanceDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
+          {/* End of Selection */}
             <DialogTitle>Attendance Rate (This Month)</DialogTitle>
           </DialogHeader>
           {attendanceDialogLoading ? (
@@ -672,7 +671,7 @@ export default function DashboardPage() {
           <DialogHeader>
             <DialogTitle>Apply for Leave</DialogTitle>
           </DialogHeader>
-          <LeaveRequestDashboardForm onClose={() => setLeaveDialogOpen(false)} />
+          <LeaveRequestForm onClose={() => setLeaveDialogOpen(false)} />
         </DialogContent>
       </Dialog>
       <Dialog open={expenseDialogOpen} onOpenChange={setExpenseDialogOpen}>
@@ -731,234 +730,9 @@ export default function DashboardPage() {
           <div className="py-4 text-center text-gray-500">Coming soon</div>
         </DialogContent>
       </Dialog>
-    </MainLayout>
+    </>
   );
 }
+ 
 
-// --- Dashboard Leave Request Form (copied from leave page) ---
-function LeaveRequestDashboardForm({ onClose }: { onClose: () => void }) {
-  const [leaveTypes, setLeaveTypes] = useState<any[]>([]);
-  const [selectedLeaveTypeId, setSelectedLeaveTypeId] = useState('');
-  const [selectedType, setSelectedType] = useState<any | null>(null);
-  const [startDate, setStartDate] = useState<Date | undefined>();
-  const [endDate, setEndDate] = useState<Date | undefined>();
-  const [duration, setDuration] = useState('');
-  const [startTime, setStartTime] = useState('');
-  const [endTime, setEndTime] = useState('');
-  const [reason, setReason] = useState('');
-  const [document, setDocument] = useState<File | null>(null);
-  const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    const fetchTypes = async () => {
-      const employeeId = localStorage.getItem('employeeId');
-      if (!employeeId) return;
-      const res = await fetch('/api/odoo/leave/types', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ employeeId: Number(employeeId) }),
-      });
-      const data = await res.json();
-      setLeaveTypes(data || []);
-      if (data && data.length > 0) {
-        setSelectedLeaveTypeId(data[0].id.toString());
-      }
-    };
-    fetchTypes();
-  }, []);
-
-  useEffect(() => {
-    const found = leaveTypes.find((t) => t.id.toString() === selectedLeaveTypeId);
-    setSelectedType(found || null);
-    setDuration('');
-    setStartTime('');
-    setEndTime('');
-    setDocument(null);
-  }, [selectedLeaveTypeId, leaveTypes]);
-
-  function calculateHours(start: string, end: string): number {
-    const [sh, sm] = start.split(':').map(Number);
-    const [eh, em] = end.split(':').map(Number);
-    const startFloat = sh + sm / 60;
-    const endFloat = eh + em / 60;
-    return Math.max(0, parseFloat((endFloat - startFloat).toFixed(2)));
-  }
-  function timeStringToFloat(time: string): number | null {
-    if (!time) return null;
-    const [h, m] = time.split(':').map(Number);
-    if (isNaN(h) || isNaN(m)) return null;
-    return h + m / 60;
-  }
-  const isValid = (): boolean => {
-    if (!selectedLeaveTypeId || !startDate || !endDate) return false;
-    if (selectedType) {
-      if (selectedType.request_unit === 'hour') {
-        if (duration !== 'hour') return false;
-        if (!startTime || !endTime) return false;
-        if (calculateHours(startTime, endTime) <= 0) return false;
-      } else {
-        if (!['full', 'half', 'second_half'].includes(duration)) return false;
-      }
-    }
-    if (selectedType?.support_document && !document) return false;
-    return true;
-  };
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isValid()) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const rawEmployeeId = localStorage.getItem('employeeId');
-      if (!rawEmployeeId) throw new Error('Not logged in');
-      const employeeId = Number(rawEmployeeId);
-      const payload: any = {
-        employeeId,
-        request: {
-          leaveTypeId: parseInt(selectedLeaveTypeId),
-          request_date_from: startDate ? startDate.toISOString().slice(0, 10) : '',
-          request_date_to: endDate ? endDate.toISOString().slice(0, 10) : '',
-          reason,
-        },
-      };
-      if (duration === 'hour') {
-        const fromFloat = timeStringToFloat(startTime);
-        const toFloat = timeStringToFloat(endTime);
-        if (fromFloat === null || toFloat === null) {
-          toast.error('Invalid start/end times');
-          setSubmitting(false);
-          return;
-        }
-        const hours = calculateHours(startTime, endTime);
-        if (hours <= 0) {
-          toast.error('End time must be after start time');
-          setSubmitting(false);
-          return;
-        }
-        payload.request.request_unit_hours = true;
-        payload.request.request_hour_from = parseFloat(fromFloat.toFixed(2));
-        payload.request.request_hour_to = parseFloat(toFloat.toFixed(2));
-        payload.request.number_of_days_display = parseFloat(hours.toFixed(2));
-      } else if (duration === 'half' || duration === 'second_half') {
-        payload.request.request_unit_hours = false;
-        payload.request.number_of_days = 0.5;
-      } else if (duration === 'full') {
-        payload.request.request_unit_hours = false;
-      }
-      if (selectedType?.support_document && document) {
-        const formData = new FormData();
-        formData.append('file', document);
-        const uploadRes = await fetch('/api/odoo/upload', {
-          method: 'POST',
-          body: formData,
-        });
-        const uploadJson = await uploadRes.json();
-        if (uploadJson.error) throw new Error(uploadJson.error);
-        payload.request.attachment_id = uploadJson.attachmentId;
-      }
-      const response = await fetch('/api/odoo/leave/request', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const result = await response.json();
-      if (result.error) throw new Error(result.error);
-      toast.success('Leave request submitted successfully');
-      onClose();
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to submit leave request');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label className="block mb-1 font-medium">Leave Type</label>
-        <Select value={selectedLeaveTypeId} onValueChange={setSelectedLeaveTypeId}>
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Select leave type" />
-          </SelectTrigger>
-          <SelectContent>
-            {leaveTypes.map((type) => (
-              <SelectItem key={type.id} value={type.id.toString()}>
-                {type.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="flex gap-2">
-        <div className="flex-1">
-          <label className="block mb-1 font-medium">Start Date</label>
-          <Input
-            type="date"
-            value={startDate ? startDate.toISOString().slice(0, 10) : ''}
-            onChange={(e) => setStartDate(new Date(e.target.value))}
-            required
-          />
-        </div>
-        <div className="flex-1">
-          <label className="block mb-1 font-medium">End Date</label>
-          <Input
-            type="date"
-            value={endDate ? endDate.toISOString().slice(0, 10) : ''}
-            onChange={(e) => setEndDate(new Date(e.target.value))}
-            required
-          />
-        </div>
-      </div>
-      {selectedType && (
-        <div>
-          <label className="block mb-1 font-medium">Duration</label>
-          <div className="flex gap-4">
-            <label className="flex items-center gap-1">
-              <input type="radio" name="duration" value="half" checked={duration === 'half'} onChange={() => setDuration('half')} />
-              Half Day (AM)
-            </label>
-            <label className="flex items-center gap-1">
-              <input type="radio" name="duration" value="second_half" checked={duration === 'second_half'} onChange={() => setDuration('second_half')} />
-              Second Half (PM)
-            </label>
-            <label className="flex items-center gap-1">
-              <input type="radio" name="duration" value="hour" checked={duration === 'hour'} onChange={() => setDuration('hour')} />
-              Hours
-            </label>
-            <label className="flex items-center gap-1">
-              <input type="radio" name="duration" value="full" checked={duration === 'full'} onChange={() => setDuration('full')} />
-              Full Day
-            </label>
-          </div>
-        </div>
-      )}
-      {duration === 'hour' && (
-        <div className="flex gap-2">
-          <div className="flex-1">
-            <label className="block mb-1 font-medium">Start Time</label>
-            <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} required />
-          </div>
-          <div className="flex-1">
-            <label className="block mb-1 font-medium">End Time</label>
-            <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} required />
-          </div>
-        </div>
-      )}
-      <div>
-        <label className="block mb-1 font-medium">Reason</label>
-        <Textarea value={reason} onChange={(e) => setReason(e.target.value)} required />
-      </div>
-      {selectedType?.support_document && (
-        <div>
-          <label className="block mb-1 font-medium">Supporting Document</label>
-          <Input type="file" onChange={(e) => setDocument(e.target.files?.[0] || null)} required />
-        </div>
-      )}
-      <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>Cancel</Button>
-        <Button type="submit" disabled={!isValid() || submitting}>{submitting ? 'Submitting...' : 'Submit'}</Button>
-      </div>
-    </form>
-  );
-}
