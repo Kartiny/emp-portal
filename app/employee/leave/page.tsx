@@ -45,7 +45,7 @@ import { DayClickEventHandler } from 'react-day-picker';
 import { LeaveType, LeaveRequest } from '@/lib/odooXml'; // your type definitions
 import { LeaveRequestForm } from '@/components/leave-request-form';
 import { useRole } from '@/context/RoleContext';
-import RoleSwitcher from '../../components/RoleSwitcher';
+import RoleSwitcher from '@/components/RoleSwitcher';
 
 interface LeaveAllocationUI {
   id: number;
@@ -353,20 +353,18 @@ export default function LeavePage() {
 
   // ───── Main JSX ───────────────────────────────────────────────────────────
   return (
-    return (
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold">{activeRole === 'employee' ? 'Employee Portal' : activeRole === 'hr' ? 'HR Portal' : 'Supervisor Portal'}</h1>
-        <RoleSwitcher />
+    <>
+      <div className="flex items-center justify-between mb-4">        <RoleSwitcher />
       </div>
       <div className="space-y-6">
         <Tabs defaultValue="calendar" className="w-full">
           <div className="flex items-center justify-between mb-4">
             <TabsList>
               <TabsTrigger value="calendar">Calendar</TabsTrigger>
-              <TabsTrigger value="balance" onClick={() => router.push('/leave/balance')}>
+              <TabsTrigger value="balance">
                 Leave Balance
               </TabsTrigger>
-              <TabsTrigger value="history" onClick={() => router.push('/leave/history')}>
+              <TabsTrigger value="history">
                 Leave History
               </TabsTrigger>
             </TabsList>
@@ -412,7 +410,8 @@ export default function LeavePage() {
                         <TableCell>
                           {alloc.date_from
                             ? `${alloc.date_from} – ${alloc.date_to || '-'}`
-                            : '-'}
+                            : '-'
+                          }
                         </TableCell>
                         <TableCell>
                           {alloc.number_of_days_display || alloc.number_of_days || '-'}
@@ -421,8 +420,45 @@ export default function LeavePage() {
                         <TableCell>
                           {alloc.number_of_days !== undefined && alloc.leaves_taken !== undefined
                             ? (alloc.number_of_days - alloc.leaves_taken).toFixed(2)
-                            : '-'}
+                            : '-'
+                          }
                         </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+
+          {/* ─── History Tab ───────────────────────────────────────────────── ── */}
+          <TabsContent value="history">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Leave Type</TableHead>
+                    <TableHead>Start Date</TableHead>
+                    <TableHead>End Date</TableHead>
+                    <TableHead>Days</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {leaveRequests.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center">
+                        No leave requests found.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    leaveRequests.map((req) => (
+                      <TableRow key={req.id}>
+                        <TableCell>{req.holiday_status_id?.[1] || '-'}</TableCell>
+                        <TableCell>{req.request_date_from || '-'}</TableCell>
+                        <TableCell>{req.request_date_to || '-'}</TableCell>
+                        <TableCell>{req.number_of_days_display || req.number_of_days || '-'}</TableCell>
+                        <TableCell>{req.state || '-'}</TableCell>
                       </TableRow>
                     ))
                   )}
@@ -442,5 +478,6 @@ export default function LeavePage() {
           </DialogContent>
         </Dialog>
       </div>
+    </>
   );
 }

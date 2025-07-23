@@ -259,13 +259,17 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      
+      <div className="flex items-center justify-center h-64">
+        <p>Loading profile data...</p>
+      </div>
     );
   }
 
   if (error) {
     return (
-      
+      <Card>
+        <CardContent className="text-red-600 p-6">{error}</CardContent>
+      </Card>
     );
   }
 
