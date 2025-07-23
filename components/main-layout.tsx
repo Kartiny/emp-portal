@@ -51,37 +51,36 @@ export function MainLayout({ children, missedClockOut }: MainLayoutProps) {
 
   return (
     <SidebarProvider>
+      {/* Entire page background */}
       <div className="min-h-screen bg-gray-50">
+
         {/* Top Bar */}
         <div className="fixed top-0 left-0 right-0 h-20 bg-white border-b z-30">
           <CustomHeader missedClockOut={missedClockOut} />
         </div>
 
-        {/* Content below Top Bar */}
-        <div className="flex pt-20">
-          {/* Sidebar */}
-          <aside className="w-56 h-[calc(100vh-5rem)] bg-white border-r z-20 overflow-y-auto">
-            <Sidebar>
-              <nav className="flex flex-col gap-2 p-4">
-                {menu[activeRole].map(item => (
-                  <a
-                    key={item.name}
-                    href={item.href}
-                    className="flex items-center gap-2 p-2 rounded hover:bg-gray-100"
-                  >
-                    <item.icon className="w-5 h-5" />
-                    <span>{item.name}</span>
-                  </a>
-                ))}
-              </nav>
-            </Sidebar>
-          </aside>
+        {/* Sidebar */}
+        <aside className="fixed top-20 left-0 bottom-0 w-56 bg-white border-r z-20 overflow-y-auto">
+          <Sidebar>
+            <nav className="flex flex-col gap-4 p-4">
+              {menu[activeRole].map(item => (
+                <a
+                  key={item.name}
+                  href={item.href}
+                  className="flex items-center gap-2 p-2 rounded hover:bg-gray-100"
+                >
+                  <item.icon className="w-5 h-5" />
+                  <span>{item.name}</span>
+                </a>
+              ))}
+            </nav>
+          </Sidebar>
+        </aside>
 
-          {/* Main Content */}
-          <main className="flex-1 bg-gray-50 px-8 py-8 overflow-x-auto">
-            {children}
-          </main>
-        </div>
+        {/* Main Content */}
+        <main className="fixed top-20 left-60 right-0 bottom-0 overflow-y-auto px-8 py-8 bg-gray-50">
+          {children}
+        </main>
       </div>
     </SidebarProvider>
   )
