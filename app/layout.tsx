@@ -20,31 +20,7 @@ export default function RootLayout({
   const noLayoutRoutes = ['/login', '/verify', '/'];
   const showLayout = !noLayoutRoutes.includes(pathname);
 
-  const validRoles: Role[] = ['employee', 'hr', 'supervisor'];
-  let roles: Role[] = ['employee'];
-  let activeRole: Role = 'employee';
-  if (typeof window !== 'undefined') {
-    try {
-      const storedRoles = JSON.parse(localStorage.getItem('roles') || '[]');
-      if (Array.isArray(storedRoles)) {
-        roles = storedRoles.filter((r: any) => validRoles.includes(r)) as Role[];
-        if (roles.length === 0) roles = ['employee'];
-        // Only add 'employee' if the only role is 'supervisor' or 'hr'
-        if (roles.length === 1 && (roles[0] === 'supervisor' || roles[0] === 'hr') && !roles.includes('employee')) {
-          roles = ['employee', roles[0]];
-        }
-      }
-      const storedActiveRole = localStorage.getItem('activeRole');
-      if (storedActiveRole && validRoles.includes(storedActiveRole as Role)) {
-        activeRole = storedActiveRole as Role;
-      } else {
-        activeRole = roles[0];
-      }
-    } catch {
-      roles = ['employee'];
-      activeRole = 'employee';
-    }
-  }
+  
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -53,7 +29,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/favicon.png" />
       </head>
       <body className={inter.className}>
-        <RoleProvider initialRoles={roles} initialActiveRole={activeRole}>
+        <RoleProvider>
         <ThemeProvider
           attribute="class"
           defaultTheme="light"

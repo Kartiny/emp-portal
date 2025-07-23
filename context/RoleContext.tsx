@@ -12,9 +12,9 @@ interface RoleContextType {
 
 const RoleContext = createContext<RoleContextType | undefined>(undefined);
 
-export const RoleProvider = ({ children, initialRoles, initialActiveRole }: { children: React.ReactNode; initialRoles: Role[]; initialActiveRole: Role }) => {
-  const [roles, setRoles] = useState<Role[]>(initialRoles);
-  const [activeRole, setActiveRole] = useState<Role>(initialActiveRole);
+export const RoleProvider = ({ children }: { children: React.ReactNode }) => {
+  const [roles, setRoles] = useState<Role[]>(['employee']);
+  const [activeRole, setActiveRole] = useState<Role>('employee');
 
   // On mount, always sync roles and activeRole from localStorage (client-side)
   useEffect(() => {

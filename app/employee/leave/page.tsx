@@ -354,8 +354,6 @@ export default function LeavePage() {
   // ───── Main JSX ───────────────────────────────────────────────────────────
   return (
     <>
-      <div className="flex items-center justify-between mb-4">        <RoleSwitcher />
-      </div>
       <div className="space-y-6">
         <Tabs defaultValue="calendar" className="w-full">
           <div className="flex items-center justify-between mb-4">
