@@ -36,8 +36,7 @@ export default function SupervisorDashboardPage() {
   }, []);
 
   return (
-    <MainLayout>
-      <div className="flex flex-col items-center justify-center min-h-screen py-8">
+    <div className="flex flex-col items-center justify-center min-h-screen py-8">
         {loading ? (
           <div className="text-lg text-muted-foreground">Loading...</div>
         ) : error ? (
@@ -117,6 +116,5 @@ export default function SupervisorDashboardPage() {
           </>
         )}
       </div>
-    </MainLayout>
   );
 } 

@@ -1,36 +1,25 @@
+"use client";
+
 import type React from "react";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { RoleProvider, Role } from '../context/RoleContext';
+import { MainLayout } from "@/components/main-layout";
+import { usePathname } from "next/navigation";
 
 const inter = Inter({ subsets: ["latin"] });
-
-export const metadata: Metadata = {
-  title: "Employee Portal",
-  description: "Employee Portal",
-  icons: {
-    icon: [
-      {
-        url: "/favicon.png",
-        type: "image/png",
-      },
-    ],
-    apple: [
-      {
-        url: "/favicon.png",
-        type: "image/png",
-      },
-    ],
-  },
-};
 
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const pathname = usePathname();
+  const noLayoutRoutes = ['/login', '/verify', '/'];
+  const showLayout = !noLayoutRoutes.includes(pathname);
+
   const validRoles: Role[] = ['employee', 'hr', 'supervisor'];
   let roles: Role[] = ['employee'];
   let activeRole: Role = 'employee';
@@ -71,7 +60,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          {showLayout ? <MainLayout>{children}</MainLayout> : children}
         </ThemeProvider>
         </RoleProvider>
       </body>

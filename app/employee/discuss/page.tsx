@@ -1,6 +1,6 @@
 "use client";
 import { DiscussSidebar } from "@/components/discuss/DiscussSidebar";
-import { MainLayout } from '@/components/main-layout';
+
 
 export default function DiscussPage() {
   return (

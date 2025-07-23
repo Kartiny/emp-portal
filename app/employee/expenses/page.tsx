@@ -129,8 +129,7 @@ export default function ExpensesPage() {
   };
 
   return (
-    <MainLayout>
-      <div className="space-y-8">
+    <div className="space-y-8">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Expenses</h1>
           <p className="text-muted-foreground">Submit and view your expense (claim) requests</p>
@@ -257,6 +256,5 @@ export default function ExpensesPage() {
           </DialogContent>
         </Dialog>
       </div>
-    </MainLayout>
   );
 } 

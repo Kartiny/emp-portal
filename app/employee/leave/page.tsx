@@ -337,27 +337,23 @@ export default function LeavePage() {
   // ───── Render Loading / Error States ──────────────────────────────────────
   if (loading) {
     return (
-      <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <p>Loading leave data...</p>
-        </div>
-      </MainLayout>
+      <div className="flex items-center justify-center h-64">
+        <p>Loading leave data...</p>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <MainLayout>
         <Card>
           <CardContent className="text-red-600 p-6">{error}</CardContent>
         </Card>
-      </MainLayout>
     );
   }
 
   // ───── Main JSX ───────────────────────────────────────────────────────────
   return (
-    <MainLayout>
+    return (
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold">{activeRole === 'employee' ? 'Employee Portal' : activeRole === 'hr' ? 'HR Portal' : 'Supervisor Portal'}</h1>
         <RoleSwitcher />
@@ -446,6 +442,5 @@ export default function LeavePage() {
           </DialogContent>
         </Dialog>
       </div>
-    </MainLayout>
   );
 }

@@ -259,26 +259,17 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <p>Loading profile...</p>
-        </div>
-      </MainLayout>
+      
     );
   }
 
   if (error) {
     return (
-      <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <p className="text-red-500">{error}</p>
-        </div>
-      </MainLayout>
+      
     );
   }
 
   return (
-    <MainLayout>
       <div className="space-y-6">
         {/* Header with Edit/Save buttons */}
         <div className="flex justify-between items-center">
@@ -1008,6 +999,5 @@ export default function ProfilePage() {
           </>
         )}
       </div>
-    </MainLayout>
   );
 }

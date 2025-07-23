@@ -50,7 +50,6 @@ export default function LeaveBalancePage() {
   }, []);
 
   return (
-      <MainLayout>
       <div className="space-y-6">
         <Tabs defaultValue="history" className="w-full">
           <TabsList>
@@ -106,6 +105,5 @@ export default function LeaveBalancePage() {
           </div>
         )}
       </div>
-    </MainLayout>
   );
 } 

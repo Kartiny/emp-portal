@@ -98,24 +98,20 @@ export default function LeaveHistoryPage() {
 
   if (loading) {
     return (
-      <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <p>Loading leave data...</p>
-        </div>
-      </MainLayout>
+      <div className="flex items-center justify-center h-64">
+        <p>Loading leave data...</p>
+      </div>
     );
   }
   if (error) {
     return (
-      <MainLayout>
         <Card>
           <CardContent className="text-red-600 p-6">{error}</CardContent>
         </Card>
-      </MainLayout>
     );
   }
   return (
-    <MainLayout>
+    return (
       <div className="flex justify-end mb-4">
         <button
           className="px-4 py-2 bg-blue-900 text-white rounded hover:bg-blue-800 transition-colors"
@@ -231,6 +227,5 @@ export default function LeaveHistoryPage() {
           </CardContent>
         </Card>
       </div>
-    </MainLayout>
   );
 } 

@@ -1,32 +1,27 @@
 "use client"
 
 import type React from "react"
-
-import { useState, useEffect } from "react"
-import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Calendar, Clock, FileText, Home, LogOut, Menu, Receipt, Settings, User, MessageCircle, ListTodo } from "lucide-react"
+import { useRole } from '../context/RoleContext'
+import { Sidebar, SidebarProvider } from './ui/sidebar'
 import { CustomHeader } from "@/components/custom-header"
-import RoleSwitcher from './RoleSwitcher';
-import { useRole } from '../context/RoleContext';
-import { Sidebar, SidebarProvider } from './ui/sidebar';
+import {
+  Calendar,
+  Clock,
+  Home,
+  ListTodo,
+  MessageCircle,
+  Receipt,
+  User
+} from "lucide-react"
 
 interface MainLayoutProps {
   children: React.ReactNode
   missedClockOut?: boolean
 }
 
-interface NavigationItem {
-  name: string;
-  href: string;
-  icon: React.ElementType;
-}
-
 export function MainLayout({ children, missedClockOut }: MainLayoutProps) {
-  const { activeRole } = useRole();
+  const { activeRole } = useRole()
+
   const menu = {
     employee: [
       { name: "Dashboard", href: "/employee/dashboard", icon: Home },
@@ -52,31 +47,42 @@ export function MainLayout({ children, missedClockOut }: MainLayoutProps) {
       { name: "Approve Expenses", href: "/supervisor/approve-expenses", icon: Receipt },
       { name: "Profile", href: "/supervisor/profile", icon: User },
     ],
-  };
+  }
+
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex flex-col">
-        {/* Top nav bar: sticky and above sidebar */}
-        <div className="sticky top-0 z-30 bg-white border-b h-20">
+      <div className="min-h-screen bg-gray-50">
+        {/* Top Bar */}
+        <div className="fixed top-0 left-0 right-0 h-20 bg-white border-b z-30">
           <CustomHeader missedClockOut={missedClockOut} />
         </div>
-        {/* Fixed Sidebar */}
-        <div className="fixed left-0 top-20 h-[calc(100vh-5rem)] w-56 bg-white border-r z-20">
-          <Sidebar>
-            <nav className="flex flex-col gap-2 p-4">
-              {menu[activeRole].map(item => (
-                <a key={item.name} href={item.href} className="flex items-center gap-2 p-2 rounded hover:bg-gray-100">
-                  <item.icon className="w-5 h-5" />
-                  <span>{item.name}</span>
-                </a>
-              ))}
-            </nav>
-          </Sidebar>
-            </div>
-        {/* Main content with left margin and top margin for header */}
-        <main className="flex-1 max-w-screen-xl mx-auto w-full px-8 py-8 ml-56 mt-5">{children}</main>
+
+        {/* Content below Top Bar */}
+        <div className="flex pt-20">
+          {/* Sidebar */}
+          <aside className="w-56 h-[calc(100vh-5rem)] bg-white border-r z-20 overflow-y-auto">
+            <Sidebar>
+              <nav className="flex flex-col gap-2 p-4">
+                {menu[activeRole].map(item => (
+                  <a
+                    key={item.name}
+                    href={item.href}
+                    className="flex items-center gap-2 p-2 rounded hover:bg-gray-100"
+                  >
+                    <item.icon className="w-5 h-5" />
+                    <span>{item.name}</span>
+                  </a>
+                ))}
+              </nav>
+            </Sidebar>
+          </aside>
+
+          {/* Main Content */}
+          <main className="flex-1 bg-gray-50 px-8 py-8 overflow-x-auto">
+            {children}
+          </main>
+        </div>
       </div>
     </SidebarProvider>
-  );
+  )
 }
-
