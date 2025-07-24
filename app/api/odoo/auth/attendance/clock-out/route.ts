@@ -10,8 +10,11 @@ export async function POST(req: Request) {
     }
     await clockOut(uid);
     return NextResponse.json({ success: true });
-  } catch (err: any) {
+  } catch (err) {
     console.error('Clock-out API error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    if (err instanceof Error) {
+      return NextResponse.json({ error: err.message }, { status: 500 });
+    }
+    return NextResponse.json({ error: 'An unknown error occurred' }, { status: 500 });
   }
 }

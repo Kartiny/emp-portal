@@ -16,7 +16,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         'Content-Disposition': `inline; filename="${encodeURIComponent(att.name || 'file')}"`,
       },
     });
-  } catch (err) {
+  } catch (_err) {
     return new NextResponse('Failed to fetch attachment', { status: 500 });
   }
 } 

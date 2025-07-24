@@ -10,7 +10,10 @@ export async function POST(req: Request) {
     const client = getOdooClient();
     const activities = await client.getEmployeeActivities(uid);
     return NextResponse.json({ activities });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err) {
+    if (err instanceof Error) {
+      return NextResponse.json({ error: err.message }, { status: 500 });
+    }
+    return NextResponse.json({ error: 'An unknown error occurred' }, { status: 500 });
   }
 } 

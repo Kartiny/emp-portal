@@ -1,11 +1,12 @@
-import React from 'react';
 import { useRole } from '../context/RoleContext';
 import { useRouter } from 'next/navigation';
 
 export default function RoleSwitcher() {
-  const { roles, activeRole, setActiveRole } = useRole();
+  const { roles, activeRole, setActiveRole, isHydrated } = useRole();
   const router = useRouter();
-  if (roles.length <= 1) return null;
+
+  if (!isHydrated || roles.length <= 1) return null;
+  
   return (
     <select
       value={activeRole}

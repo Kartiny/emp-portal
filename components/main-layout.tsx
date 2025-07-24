@@ -20,7 +20,15 @@ interface MainLayoutProps {
 }
 
 export function MainLayout({ children, missedClockOut }: MainLayoutProps) {
-  const { activeRole } = useRole()
+  const { activeRole, isHydrated } = useRole()
+
+  if (!isHydrated) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-lg">Loading...</div>
+      </div>
+    )
+  }
 
   const menu = {
     employee: [

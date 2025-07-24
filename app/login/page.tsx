@@ -6,11 +6,13 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useRole } from '@/context/RoleContext';
 import { Label } from "@/components/ui/label";
 
 
 
 export default function LoginPage() {
+  const { setRoles, setActiveRole } = useRole();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -85,8 +87,8 @@ export default function LoginPage() {
         let defaultRole = 'employee';
         if (roles.includes('hr')) defaultRole = 'hr';
         else if (roles.includes('supervisor')) defaultRole = 'supervisor';
-        localStorage.setItem('roles', JSON.stringify(roles));
-        localStorage.setItem('activeRole', defaultRole);
+        setRoles(roles);
+        setActiveRole(defaultRole);
         // Always redirect to verify page after login
         router.push('/verify');
       } else {

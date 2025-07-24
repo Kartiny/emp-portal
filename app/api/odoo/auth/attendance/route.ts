@@ -1,7 +1,7 @@
 // app/api/odoo/auth/attendance/route.ts
 import { NextResponse } from 'next/server';
 import { getOdooClient } from '@/lib/odooXml';
-import { parseISO, differenceInCalendarDays, differenceInMinutes } from 'date-fns';
+import { parseISO, differenceInCalendarDays } from 'date-fns';
 
 const STANDARD_HOURS = 12; // 7am–7pm
 
