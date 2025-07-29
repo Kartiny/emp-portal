@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 
 
 export default function LoginPage() {
-  const { setRoles, setActiveRole } = useRole();
+  const { setRoles } = useRole();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -88,7 +88,7 @@ export default function LoginPage() {
         if (roles.includes('hr')) defaultRole = 'hr';
         else if (roles.includes('supervisor')) defaultRole = 'supervisor';
         setRoles(roles);
-        setActiveRole(defaultRole);
+        
         // Always redirect to verify page after login
         router.push('/verify');
       } else {

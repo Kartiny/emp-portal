@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AlertTriangle, ListTodo, MessageCircle, LogOut } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import RoleSwitcher from './RoleSwitcher';
+
 import { useRole } from '../context/RoleContext';
 
 interface UserProfile {
@@ -170,8 +170,7 @@ export function CustomHeader({ missedClockOut }: CustomHeaderProps) {
           height={60}
           className="rounded-lg ml-2"
         />
-          {/* Role Switcher (only if user has multiple roles) */}
-          {roles.length > 1 && <RoleSwitcher />}
+          
         </div>
       </div>
     </div>

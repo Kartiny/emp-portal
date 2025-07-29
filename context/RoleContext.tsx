@@ -7,8 +7,6 @@ export type Role = 'employee' | 'hr' | 'supervisor';
 interface RoleContextType {
   roles: Role[];
   setRoles: (roles: Role[]) => void;
-  activeRole: Role;
-  setActiveRole: (role: Role) => void;
   isHydrated: boolean;
 }
 
@@ -16,10 +14,9 @@ const RoleContext = createContext<RoleContextType | undefined>(undefined);
 
 export const RoleProvider = ({ children }: { children: React.ReactNode }) => {
   const [roles, setRoles] = useState<Role[]>(['employee']);
-  const [activeRole, setActiveRole] = useState<Role>('employee');
   const [isHydrated, setIsHydrated] = useState(false);
 
-  // On mount, always sync roles and activeRole from localStorage (client-side)
+  // On mount, always sync roles from localStorage (client-side)
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const validRoles: Role[] = ['employee', 'hr', 'supervisor'];
@@ -34,25 +31,19 @@ export const RoleProvider = ({ children }: { children: React.ReactNode }) => {
       } else {
         storedRoles = ['employee'];
       }
-      let storedActiveRole = localStorage.getItem('activeRole');
-      if (!storedActiveRole || !validRoles.includes(storedActiveRole as Role)) {
-        storedActiveRole = storedRoles[0];
-      }
-      console.log('Hydrating RoleContext:', { storedRoles, storedActiveRole });
+      console.log('Hydrating RoleContext:', { storedRoles });
       setRoles(storedRoles);
-      setActiveRole(storedActiveRole as Role);
       setIsHydrated(true); // Set to true after hydration
     }
   }, []);
 
-  // Persist activeRole in localStorage
+  // Persist roles in localStorage
   useEffect(() => {
-    localStorage.setItem('activeRole', activeRole);
     localStorage.setItem('roles', JSON.stringify(roles));
-  }, [activeRole, roles]);
+  }, [roles]);
 
   return (
-    <RoleContext.Provider value={{ roles, setRoles, activeRole, setActiveRole, isHydrated }}>
+    <RoleContext.Provider value={{ roles, setRoles, isHydrated }}>
       {children}
     </RoleContext.Provider>
   );

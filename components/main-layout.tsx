@@ -20,7 +20,7 @@ interface MainLayoutProps {
 }
 
 export function MainLayout({ children, missedClockOut }: MainLayoutProps) {
-  const { activeRole, isHydrated } = useRole()
+  const { roles, isHydrated } = useRole()
 
   if (!isHydrated) {
     return (
@@ -30,7 +30,7 @@ export function MainLayout({ children, missedClockOut }: MainLayoutProps) {
     )
   }
 
-  const menu = {
+  const allMenus = {
     employee: [
       { name: "Dashboard", href: "/employee/dashboard", icon: Home },
       { name: "Discuss", href: "/employee/discuss", icon: MessageCircle },
@@ -49,13 +49,36 @@ export function MainLayout({ children, missedClockOut }: MainLayoutProps) {
       { name: "Profile", href: "/hr/profile", icon: User },
     ],
     supervisor: [
-      { name: "Dashboard", href: "/supervisor/dashboard", icon: Home },
       { name: "Team Attendance", href: "/supervisor/team-attendance", icon: Clock },
       { name: "Approve Leaves", href: "/supervisor/approve-leaves", icon: Calendar },
       { name: "Approve Expenses", href: "/supervisor/approve-expenses", icon: Receipt },
-      { name: "Profile", href: "/supervisor/profile", icon: User },
     ],
   }
+
+  const getFilteredMenu = () => {
+    let menu = []
+    if (roles.includes('employee')) {
+      menu.push({
+        title: 'My Tools',
+        items: allMenus.employee,
+      })
+    }
+    if (roles.includes('supervisor')) {
+      menu.push({
+        title: 'Supervisor Tools',
+        items: allMenus.supervisor,
+      })
+    }
+    if (roles.includes('hr')) {
+      menu.push({
+        title: 'HR Tools',
+        items: allMenus.hr,
+      })
+    }
+    return menu
+  }
+
+  const menu = getFilteredMenu()
 
   return (
     <SidebarProvider>
@@ -71,15 +94,20 @@ export function MainLayout({ children, missedClockOut }: MainLayoutProps) {
         <aside className="fixed top-20 left-0 bottom-0 w-56 bg-white border-r z-20 overflow-y-auto">
           <Sidebar>
             <nav className="flex flex-col gap-4 p-4">
-              {menu[activeRole].map(item => (
-                <a
-                  key={item.name}
-                  href={item.href}
-                  className="flex items-center gap-2 p-2 rounded hover:bg-gray-100"
-                >
-                  <item.icon className="w-5 h-5" />
-                  <span>{item.name}</span>
-                </a>
+              {menu.map(group => (
+                <div key={group.title}>
+                  <h2 className="font-bold text-lg mb-2">{group.title}</h2>
+                  {group.items.map(item => (
+                    <a
+                      key={item.name}
+                      href={item.href}
+                      className="flex items-center gap-2 p-2 rounded hover:bg-gray-100"
+                    >
+                      <item.icon className="w-5 h-5" />
+                      <span>{item.name}</span>
+                    </a>
+                  ))}
+                </div>
               ))}
             </nav>
           </Sidebar>
