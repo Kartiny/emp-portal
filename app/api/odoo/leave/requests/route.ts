@@ -3,18 +3,17 @@
 import { NextResponse } from 'next/server';
 import { getLeaveRequests } from '@/lib/odooXml';
 
-export async function POST(req: Request) {
+export async function GET(req: Request) {
   try {
-    const { uid, filters } = await req.json();
-    if (typeof uid !== 'number') {
+    const { searchParams } = new URL(req.url);
+    const uid = searchParams.get('uid');
+    if (!uid) {
       return NextResponse.json(
         { error: 'Missing or invalid uid' },
         { status: 400 }
       );
     }
-    // `filters` can be undefined or { year?: number, leaveType?: number, status?: string }
-    const requests = await getLeaveRequests(uid, filters);
-    // Return the array directly; React code expects an array of LeaveRequest
+    const requests = await getLeaveRequests(parseInt(uid, 10));
     return NextResponse.json(requests, { status: 200 });
   } catch (err: any) {
     return NextResponse.json(
