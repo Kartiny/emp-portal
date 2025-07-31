@@ -10,7 +10,7 @@ export async function GET() {
     const balances = await odoo.execute_kw('hr.leave.allocation', 'search_read', [
       [],
       {
-        fields: ['employee_id', 'number_of_days', 'leave_type_id'],
+        fields: ['employee_id', 'number_of_days', 'holiday_status_id'],
       },
     ]);
 

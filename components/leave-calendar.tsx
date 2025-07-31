@@ -13,6 +13,7 @@ interface LeaveRequest {
   employee_id: [number, string];
   date_from: string;
   date_to: string;
+  holiday_status_id: [number, string]; // Added for consistency, though not directly used in calendar display
 }
 
 export default function LeaveCalendar() {

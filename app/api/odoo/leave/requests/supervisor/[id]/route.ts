@@ -37,7 +37,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     const leaveRequests = await odoo.execute_kw('hr.leave', 'search_read', [
       [['employee_id', 'in', employeeIds]],
       {
-        fields: ['employee_id', 'leave_type_id', 'date_from', 'date_to', 'state'],
+        fields: ['employee_id', 'holiday_status_id', 'date_from', 'date_to', 'state'],
       },
     ]);
 

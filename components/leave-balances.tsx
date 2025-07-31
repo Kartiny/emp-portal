@@ -56,7 +56,7 @@ export default function LeaveBalances() {
         {leaveBalances.map((balance) => (
           <TableRow key={balance.id}>
             <TableCell>{balance.employee_id && balance.employee_id[1] ? balance.employee_id[1] : 'N/A'}</TableCell>
-            <TableCell>{balance.leave_type_id && balance.leave_type_id[1] ? balance.leave_type_id[1] : 'N/A'}</TableCell>
+            <TableCell>{balance.holiday_status_id && balance.holiday_status_id[1] ? balance.holiday_status_id[1] : 'N/A'}</TableCell>
             <TableCell>{balance.number_of_days}</TableCell>
           </TableRow>
         ))}
