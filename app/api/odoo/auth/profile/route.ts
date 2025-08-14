@@ -19,14 +19,14 @@ export async function POST(req: Request) {
     }
 
     // Fetch employeeId from user.id (from hr.employee)
-    const employeeId = user.id;
+    const userEmployeeId = user.id;
     // Fetch bank details
     let bankDetails = [];
-    if (employeeId) {
+    if (userEmployeeId) {
       bankDetails = await (client as any).execute(
         'hr.bank.details',
         'search_read',
-        [[['bank_emp_id', '=', employeeId]]],
+        [[['bank_emp_id', '=', userEmployeeId]]],
         {
           fields: [
             'id',
@@ -38,27 +38,27 @@ export async function POST(req: Request) {
         }
       );
     }
-    // Fetch status history
-    let statusHistory = [];
-    if (employeeId) {
-      statusHistory = await (client as any).execute(
-        'hr.employee.status.history',
-        'search_read',
-        [[['employee_id', '=', employeeId]]],
-        {
-          fields: [
-            'id',
-            'employee_id',
-            'state',
-            'start_date',
-            'end_date',
-            'duration',
-          ],
-          order: 'start_date desc'
-        }
-      );
-    }
-    return NextResponse.json({ user, bankDetails, statusHistory });
+    // // Fetch status history - Temporarily commented out due to "Object hr.employee.status.history doesn't exist" error
+    // let statusHistory = [];
+    // if (userEmployeeId) {
+    //   statusHistory = await (client as any).execute(
+    //     'hr.employee.status.history',
+    //     'search_read',
+    //     [[['employee_id', '=', userEmployeeId]]],
+    //     {
+    //       fields: [
+    //         'id',
+    //         'employee_id',
+    //         'state',
+    //         'start_date',
+    //         'end_date',
+    //         'duration',
+    //       ],
+    //       order: 'start_date desc'
+    //     }
+    //   );
+    // }
+    return NextResponse.json({ user, bankDetails /*, statusHistory */ });
   } catch (err: any) {
     console.error('❌ Profile API error:', err);
     
