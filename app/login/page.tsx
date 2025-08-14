@@ -44,10 +44,16 @@ export default function LoginPage() {
       const data = await response.json();
       console.log('📄 Response data:', data);
 
-              if (response.ok && data.uid) {
-          console.log('✅ Login successful, UID:', data.uid);
+      if (response.ok && data.uid) {
+        console.log('✅ Login successful, UID:', data.uid);
+        console.log('🔍 Backend response details:');
+        console.log('  - data.roles:', data.roles);
+        console.log('  - data.primaryRole:', data.primaryRole);
+        console.log('  - data.employeeType:', data.employeeType);
+        console.log('  - data.availableFeatures:', data.availableFeatures);
+        
         // Store user and employee IDs
-          localStorage.setItem('uid', data.uid.toString());
+        localStorage.setItem('uid', data.uid.toString());
           if (data.employeeId) {
             localStorage.setItem('employeeId', data.employeeId.toString());
             localStorage.setItem('employeeName', data.employeeName || '');
@@ -72,21 +78,60 @@ export default function LoginPage() {
         } else {
           localStorage.removeItem('employeeType');
         }
-        // After successful login and fetching roles from backend (assume data is your login response)
-        let roles = Array.isArray(data.roles) && data.roles.length > 0 ? data.roles : [];
-        if (data.employeeType && !roles.includes(data.employeeType)) roles.push(data.employeeType);
-        if (data.primaryRole && !roles.includes(data.primaryRole)) roles.push(data.primaryRole);
-        if (roles.length === 0) roles.push('employee'); // fallback
-        // Only add 'employee' if the only role is 'supervisor' or 'hr'
-        if (
-          roles.length === 1 && (roles[0] === 'supervisor' || roles[0] === 'hr') &&
-          !roles.includes('employee')
-        ) {
-          roles = ['employee', roles[0]];
+        // Store permission data from backend
+        if (data.permissions) {
+          localStorage.setItem('userPermissions', JSON.stringify(data.permissions));
         }
-        let defaultRole = 'employee';
-        if (roles.includes('hr')) defaultRole = 'hr';
-        else if (roles.includes('supervisor')) defaultRole = 'supervisor';
+        if (data.availableFeatures) {
+          localStorage.setItem('availableFeatures', JSON.stringify(data.availableFeatures));
+        }
+        
+        // Store primary role
+        if (data.primaryRole) {
+          localStorage.setItem('primaryRole', data.primaryRole);
+        }
+        
+        // Store roles array
+        if (Array.isArray(data.roles) && data.roles.length > 0) {
+          localStorage.setItem('userRoles', JSON.stringify(data.roles));
+        }
+        
+        // Set roles in context
+        let roles = Array.isArray(data.roles) && data.roles.length > 0 ? data.roles.map((r: any) => r.role) : [];
+        console.log('🔍 Initial roles from backend:', roles);
+        
+        if (data.primaryRole && !roles.includes(data.primaryRole)) {
+          roles.push(data.primaryRole);
+          console.log('🔍 Added primaryRole to roles:', data.primaryRole);
+        }
+        
+        if (roles.length === 0) {
+          roles.push('employee'); // fallback
+          console.log('🔍 No roles found, added employee fallback');
+        }
+
+        // Add employeeType to roles if it's 'hr'
+        if (data.employeeType === 'hr' && !roles.includes('hr')) {
+          roles.push('hr');
+          console.log('🔍 Added employeeType hr to roles');
+        }
+        
+        // Map 'hr' role to 'administrator' for frontend compatibility
+        roles = roles.map((role: string) => {
+          if (role === 'hr') {
+            console.log('🔍 Mapping hr role to administrator');
+            return 'administrator';
+          }
+          return role;
+        });
+        
+        // Ensure employee role is included for managers and administrators
+        if (roles.length === 1 && (roles[0] === 'manager' || roles[0] === 'administrator') && !roles.includes('employee')) {
+          roles = ['employee', roles[0]];
+          console.log('🔍 Added employee role for manager/administrator');
+        }
+        
+        console.log('🎭 Final roles for frontend:', roles);
         setRoles(roles);
         
         // Always redirect to verify page after login
