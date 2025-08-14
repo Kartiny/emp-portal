@@ -32,9 +32,10 @@ export default function LeaveRequests() {
         }
 
         let url = `/api/odoo/leave/requests?uid=${uid}`;
-        if (roles.includes('supervisor')) {
-          url = `/api/odoo/leave/requests/supervisor/${uid}`;
+        if (roles.includes('manager')) {
+          url = `/api/odoo/leave/requests/manager/${uid}`;
         }
+
         const response = await fetch(url);
         if (!response.ok) {
           throw new Error('Failed to fetch leave requests');

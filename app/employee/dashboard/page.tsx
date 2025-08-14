@@ -78,17 +78,31 @@ export default function DashboardPage() {
   const [expenseFormLoading, setExpenseFormLoading] = useState(false);
 
   useEffect(() => {
-    const employeeId = localStorage.getItem('employeeId');
-    if (!employeeId) {
+    const uid = localStorage.getItem('uid');
+    console.log('🔍 Dashboard useEffect - uid from localStorage:', uid);
+    console.log('🔍 Dashboard useEffect - uid type:', typeof uid);
+    console.log('🔍 Dashboard useEffect - uid as number:', Number(uid));
+    
+    if (!uid) {
+      console.log('❌ No uid found in localStorage, redirecting to login');
       window.location.href = '/login';
       return;
     }
+
+    const uidNum = Number(uid);
+    if (isNaN(uidNum) || uidNum <= 0) {
+      console.log('❌ Invalid uid:', uid, 'redirecting to login');
+      window.location.href = '/login';
+      return;
+    }
+
+    console.log('✅ Valid uid found:', uidNum);
 
     // Fetch user profile
     fetch('/api/odoo/auth/profile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ employeeId: Number(employeeId) }),
+      body: JSON.stringify({ uid: uidNum }),
     })
       .then(res => res.json())
       .then(data => {
@@ -102,7 +116,7 @@ export default function DashboardPage() {
     fetch('/api/odoo/leave/allocation', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ employeeId: Number(employeeId) }),
+      body: JSON.stringify({ uid: uidNum }),
     })
       .then(res => res.json())
       .then(data => {
@@ -115,7 +129,7 @@ export default function DashboardPage() {
     fetch('/api/odoo/auth/attendance', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ employeeId: Number(employeeId), range: 'monthly', customDate: format(now, 'yyyy-MM-dd') }),
+      body: JSON.stringify({ uid: uidNum, range: 'monthly', customDate: format(now, 'yyyy-MM-dd') }),
     })
       .then(res => res.json())
       .then(data => {
@@ -128,7 +142,7 @@ export default function DashboardPage() {
     fetch('/api/odoo/leave/requests', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ employeeId: Number(employeeId), filters: { status: 'confirm' } }),
+      body: JSON.stringify({ uid: uidNum, filters: { status: 'confirm' } }),
     })
       .then(res => res.json())
       .then(data => {
@@ -137,7 +151,7 @@ export default function DashboardPage() {
       .catch(console.error)
       .finally(() => setLoading(false));
 
-    fetch(`/api/odoo/expense?employeeId=${employeeId}`)
+    fetch(`/api/odoo/expense?uid=${uidNum}`)
       .then(res => res.json())
       .then(data => {
         setClaims(data.claims || []);
@@ -153,7 +167,7 @@ export default function DashboardPage() {
     fetch('/api/odoo/auth/attendance', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ employeeId: Number(employeeId), range: 'day', customDate: yDate }),
+      body: JSON.stringify({ uid: uidNum, range: 'day', customDate: yDate }),
     })
       .then(res => res.json())
       .then(data => {
@@ -182,7 +196,7 @@ export default function DashboardPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            employeeId: Number(employeeId),
+            uid: uidNum,
             range: 'custom',
             customRange: { from: start, to: end },
           }),

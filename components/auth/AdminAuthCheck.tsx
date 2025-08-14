@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 
 interface AdminAuthCheckProps {
   children: React.ReactNode;
-  requiredRole?: 'admin' | 'hr' | 'employee';
+  requiredRole?: 'admin' | 'manager' | 'employee';
 }
 
 export function AdminAuthCheck({ children, requiredRole = 'admin' }: AdminAuthCheckProps) {
@@ -15,13 +15,19 @@ export function AdminAuthCheck({ children, requiredRole = 'admin' }: AdminAuthCh
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const checkAuth = () => {
+    const checkAuth = async () => {
       const uid = localStorage.getItem('uid');
       const primaryRole = localStorage.getItem('primaryRole');
-      const jobTitle = localStorage.getItem('jobTitle');
+      const availableFeatures = JSON.parse(localStorage.getItem('availableFeatures') || '[]');
+      const isVerified = localStorage.getItem('isVerified') === 'true';
 
       if (!uid) {
         router.push('/login');
+        return;
+      }
+
+      if (!isVerified) {
+        router.push('/verify');
         return;
       }
 
@@ -30,10 +36,10 @@ export function AdminAuthCheck({ children, requiredRole = 'admin' }: AdminAuthCh
       
       switch (requiredRole) {
         case 'admin':
-          hasAccess = primaryRole === 'admin';
+          hasAccess = primaryRole === 'administrator';
           break;
-        case 'hr':
-          hasAccess = primaryRole === 'hr' || primaryRole === 'admin';
+        case 'manager':
+          hasAccess = primaryRole === 'manager' || primaryRole === 'administrator';
           break;
         case 'employee':
           hasAccess = true; // All authenticated users can access employee pages
@@ -42,11 +48,28 @@ export function AdminAuthCheck({ children, requiredRole = 'admin' }: AdminAuthCh
           hasAccess = false;
       }
 
-      // Fallback to job title check for backward compatibility
-      if (!hasAccess && jobTitle) {
-        if (requiredRole === 'admin' && 
-            (jobTitle.includes('Manager') || jobTitle.includes('Administrator') || jobTitle.includes('Director'))) {
-          hasAccess = true;
+      // Additional check: verify permissions with backend if needed
+      if (hasAccess && requiredRole !== 'employee') {
+        try {
+          const response = await fetch('/api/odoo/auth/permissions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ uid: Number(uid) }),
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            // Update localStorage with fresh permission data
+            if (data.availableFeatures) {
+              localStorage.setItem('availableFeatures', JSON.stringify(data.availableFeatures));
+            }
+            if (data.primaryRole) {
+              localStorage.setItem('primaryRole', data.primaryRole);
+            }
+          }
+        } catch (error) {
+          console.warn('Could not verify permissions with backend:', error);
+          // Continue with cached permissions
         }
       }
 

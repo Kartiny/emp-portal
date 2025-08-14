@@ -111,7 +111,7 @@ export default function LeaveHistoryPage() {
     );
   }
   return (
-    return (
+    <div className="space-y-6">
       <div className="flex justify-end mb-4">
         <button
           className="px-4 py-2 bg-blue-900 text-white rounded hover:bg-blue-800 transition-colors"
@@ -120,112 +120,114 @@ export default function LeaveHistoryPage() {
           Request Leave
         </button>
       </div>
-      <div className="space-y-6">
-        <Tabs defaultValue="history" className="w-full">
-          <TabsList>
-            <TabsTrigger value="calendar" onClick={() => router.push('/leave')}>Calendar</TabsTrigger>
-            <TabsTrigger value="balance" onClick={() => router.push('/leave/balance')}>Leave Balance</TabsTrigger>
-            <TabsTrigger value="history" onClick={() => router.push('/leave/history')}>Leave History</TabsTrigger>
-          </TabsList>
-        </Tabs>
-        <Card>
-          <CardHeader>
-            <CardTitle>Filters</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-4">
-              <Select value={yearFilter} onValueChange={setYearFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Select year" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((year) => (
-                    <SelectItem key={year} value={year.toString()}>
-                      {year}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Leave type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  {leaveTypes.map((type) => (
-                    <SelectItem key={type.id} value={type.id.toString()}>
-                      {type.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="validate">Approved</SelectItem>
-                  <SelectItem value="refuse">Rejected</SelectItem>
-                  <SelectItem value="confirm">Pending</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Leave History</CardTitle>
-            <CardDescription>Your leave requests and their status</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date Range</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Days</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Reason</TableHead>
-                  <TableHead>Approved By</TableHead>
-                  <TableHead>Start Time</TableHead>
-                  <TableHead>End Time</TableHead>
-                  <TableHead>Remarks</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {leaveRequests.map((request) => (
-                  <TableRow key={request.id}>
-                    <TableCell>
-                      {format(new Date(request.request_date_from), 'dd/MM/yyyy')} - {format(new Date(request.request_date_to), 'dd/MM/yyyy')}
-                    </TableCell>
-                    <TableCell>{request.holiday_status_id[1]}</TableCell>
-                    <TableCell>{request.number_of_days}</TableCell>
-                    <TableCell>
-                      <span className={getStatusColor(request.state)}>
-                        {getStatusText(request.state)}
-                      </span>
-                    </TableCell>
-                    <TableCell>{request.name}</TableCell>
-                    <TableCell>
-                      {request.state === 'validate' ? request.user_id[1] : '-'}
-                    </TableCell>
-                    <TableCell>{floatToTimeString(request.request_hour_from)}</TableCell>
-                    <TableCell>{floatToTimeString(request.request_hour_to)}</TableCell>
-                    <TableCell></TableCell>
-                  </TableRow>
+      
+      <Tabs defaultValue="history" className="w-full">
+        <TabsList>
+          <TabsTrigger value="calendar" onClick={() => router.push('/leave')}>Calendar</TabsTrigger>
+          <TabsTrigger value="balance" onClick={() => router.push('/leave/balance')}>Leave Balance</TabsTrigger>
+          <TabsTrigger value="history" onClick={() => router.push('/leave/history')}>Leave History</TabsTrigger>
+        </TabsList>
+      </Tabs>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>Filters</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-4">
+            <Select value={yearFilter} onValueChange={setYearFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Select year" />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((year) => (
+                  <SelectItem key={year} value={year.toString()}>
+                    {year}
+                  </SelectItem>
                 ))}
-                {leaveRequests.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center">
-                      No leave requests found
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
+              </SelectContent>
+            </Select>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Leave type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                {leaveTypes.map((type) => (
+                  <SelectItem key={type.id} value={type.id.toString()}>
+                    {type.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="validate">Approved</SelectItem>
+                <SelectItem value="refuse">Rejected</SelectItem>
+                <SelectItem value="confirm">Pending</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>Leave History</CardTitle>
+          <CardDescription>Your leave requests and their status</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date Range</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Days</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Reason</TableHead>
+                <TableHead>Approved By</TableHead>
+                <TableHead>Start Time</TableHead>
+                <TableHead>End Time</TableHead>
+                <TableHead>Remarks</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {leaveRequests.map((request) => (
+                <TableRow key={request.id}>
+                  <TableCell>
+                    {format(new Date(request.request_date_from), 'dd/MM/yyyy')} - {format(new Date(request.request_date_to), 'dd/MM/yyyy')}
+                  </TableCell>
+                  <TableCell>{request.holiday_status_id[1]}</TableCell>
+                  <TableCell>{request.number_of_days}</TableCell>
+                  <TableCell>
+                    <span className={getStatusColor(request.state)}>
+                      {getStatusText(request.state)}
+                    </span>
+                  </TableCell>
+                  <TableCell>{request.name}</TableCell>
+                  <TableCell>
+                    {request.state === 'validate' ? request.user_id[1] : '-'}
+                  </TableCell>
+                  <TableCell>{floatToTimeString(request.request_hour_from)}</TableCell>
+                  <TableCell>{floatToTimeString(request.request_hour_to)}</TableCell>
+                  <TableCell></TableCell>
+                </TableRow>
+              ))}
+              {leaveRequests.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={9} className="text-center">
+                    No leave requests found
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
   );
 } 

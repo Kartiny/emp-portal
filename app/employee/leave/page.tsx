@@ -105,18 +105,18 @@ export default function LeavePage() {
           fetch('/api/odoo/leave/types', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ uid }),
+            body: JSON.stringify({ employeeId: uid }),
           }).then(res => res.json()),
           fetch('/api/odoo/leave/allocation', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ uid }),
+            body: JSON.stringify({ employeeId: uid }),
           }).then(res => res.json()),
           fetch('/api/odoo/leave/requests', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              uid,
+              employeeId: uid,
               filters: {
                 year: parseInt(yearFilter),
                 leaveType:
@@ -316,7 +316,7 @@ export default function LeavePage() {
       const newRequests = await fetch('/api/odoo/leave/requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid }),
+        body: JSON.stringify({ employeeId: uid }),
       }).then((res) => res.json());
       if (newRequests.error) throw new Error(newRequests.error);
       setLeaveRequests(newRequests);

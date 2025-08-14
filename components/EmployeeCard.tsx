@@ -17,16 +17,19 @@ interface EmployeeCardProps {
 
 export default function EmployeeCard({ employee }: EmployeeCardProps) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{employee.name}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p><strong>Email:</strong> {employee.work_email}</p>
-        <p><strong>Phone:</strong> {employee.work_phone}</p>
-        <p><strong>Job Title:</strong> {employee.job_title}</p>
-        <p><strong>Department:</strong> {employee.department_id ? employee.department_id[1] : 'N/A'}</p>
-      </CardContent>
+    <Card className="w-full max-w-sm rounded-lg overflow-hidden shadow-lg bg-white">
+      <div className="relative">
+        <img
+          className="w-full h-40 object-cover"
+          src={`/placeholder-user.jpg`}
+          alt={`${employee.name} profile picture`}
+        />
+        <div className="absolute top-0 left-0 w-full h-full bg-black bg-opacity-25"></div>
+        <div className="absolute bottom-0 left-0 p-3">
+          <h2 className="text-md font-bold text-white">{employee.name}</h2>
+          <p className="text-xs text-gray-200">{employee.job_title}</p>
+        </div>
+      </div>
     </Card>
   );
 }

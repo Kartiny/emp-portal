@@ -192,6 +192,11 @@ export default function AttendanceWidget() {
     ? [...today.records].reverse().find(r => r.attn_type === 'o')?.datetime || null
     : today?.lastClockOut || null;
 
+  const checkInStatus = 'N/A';
+  const mealCheckOutStatus = 'N/A';
+  const mealCheckInStatus = 'N/A';
+  const checkOutStatus = 'N/A';
+
   return (
     <div className="bg-white rounded-lg shadow p-6 flex flex-col w-full text-left max-w-xl min-w-[320px]" style={{ minWidth: '320px', maxWidth: '480px' }}>
       
@@ -254,15 +259,29 @@ export default function AttendanceWidget() {
               <tr>
                 <th className="border px-2 py-1">Time</th>
                 <th className="border px-2 py-1">Type</th>
+                <th className="border px-2 py-1">Status</th>
               </tr>
             </thead>
             <tbody>
-              {today.records.map((rec) => (
-                <tr key={rec.id}>
-                  <td className="border px-2 py-1">{formatTimeKL(rec.datetime)}</td>
-                  <td className="border px-2 py-1">{rec.attn_type === 'i' ? 'In' : rec.attn_type === 'o' ? 'Out' : rec.attn_type}</td>
-                </tr>
-              ))}
+              {today.records.map((rec, index) => {
+                let status = 'N/A';
+                if (index === 0) {
+                  status = checkInStatus;
+                } else if (index === 1) {
+                  status = mealCheckOutStatus;
+                } else if (index === 2) {
+                  status = mealCheckInStatus;
+                } else if (index === 3) {
+                  status = checkOutStatus;
+                }
+                return (
+                  <tr key={rec.id}>
+                    <td className="border px-2 py-1">{formatTimeKL(rec.datetime)}</td>
+                    <td className="border px-2 py-1">{rec.attn_type === 'i' ? 'In' : rec.attn_type === 'o' ? 'Out' : rec.attn_type}</td>
+                    <td className="border px-2 py-1">{status}</td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

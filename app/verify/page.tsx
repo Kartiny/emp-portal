@@ -29,16 +29,31 @@ export default function VerifyPage() {
       if (code === '1234') {
         console.log('✅ Verification successful')
         localStorage.setItem('isVerified', 'true');
-        const activeRole = localStorage.getItem('activeRole');
-        // Redirect based on activeRole
-        if (activeRole === 'supervisor') {
-          router.push('/supervisor/dashboard');
-        } else if (activeRole === 'manager') {
+        
+        // Get primary role from localStorage
+        const primaryRole = localStorage.getItem('primaryRole');
+        const availableFeatures = JSON.parse(localStorage.getItem('availableFeatures') || '[]');
+        const employeeType = localStorage.getItem('employeeType');
+        const roles = JSON.parse(localStorage.getItem('userRoles') || '[]');
+        
+        console.log('🔍 Debug redirect data:');
+        console.log('  - primaryRole from localStorage:', primaryRole);
+        console.log('  - employeeType from localStorage:', employeeType);
+        console.log('  - roles from localStorage:', roles);
+        console.log('  - availableFeatures from localStorage:', availableFeatures);
+        
+        console.log('🎭 Redirecting based on role:', primaryRole, 'with features:', availableFeatures);
+        
+        // Redirect based on primary role and available features
+        if (primaryRole === 'administrator') {
+          console.log('✅ Redirecting to administrator dashboard');
+          router.push('/administrator/dashboard');
+        } else if (primaryRole === 'manager') {
+          console.log('✅ Redirecting to manager dashboard');
           router.push('/manager/dashboard');
-        } else if (activeRole === 'hr') {
-          router.push('/hr/dashboard');
         } else {
-        router.push('/employee/dashboard');
+          console.log('⚠️ Defaulting to employee dashboard (primaryRole:', primaryRole, ')');
+          router.push('/employee/dashboard');
         }
       } else {
         setError('Invalid verification code')

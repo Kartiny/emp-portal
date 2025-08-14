@@ -1,16 +1,21 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AlertTriangle, ListTodo, MessageCircle, LogOut } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useRole } from '../context/RoleContext';
 
 interface UserProfile {
   name: string;
   email: string;
   image?: string;
+}
+
+interface Company {
+  id: number;
+  name: string;
 }
 
 interface CustomHeaderProps {
@@ -24,7 +29,8 @@ export function CustomHeader({ missedClockOut }: CustomHeaderProps) {
   const [showActivities, setShowActivities] = useState(false);
   const [activities, setActivities] = useState<any[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(false);
-  const { roles } = useRole();
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const { roles, selectedCompanyId, setSelectedCompanyId } = useRole();
 
   useEffect(() => {
     const uid = localStorage.getItem('uid');
@@ -53,7 +59,23 @@ export function CustomHeader({ missedClockOut }: CustomHeaderProps) {
       .finally(() => {
         setIsLoading(false);
       });
-  }, []);
+
+    // Fetch companies if user has multiple roles
+    if (roles.length > 1) {
+      fetch('/api/odoo/company')
+        .then(res => res.json())
+        .then(data => {
+          if (data.companies) {
+            setCompanies(data.companies);
+            // If no company is selected, default to the first one
+            if (selectedCompanyId === undefined && data.companies.length > 0) {
+              setSelectedCompanyId(data.companies[0].id);
+            }
+          }
+        })
+        .catch(console.error);
+    }
+  }, [roles, selectedCompanyId, setSelectedCompanyId]);
 
   const fetchActivities = async () => {
     setActivitiesLoading(true);
@@ -79,6 +101,10 @@ export function CustomHeader({ missedClockOut }: CustomHeaderProps) {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
 
+  const handleCompanyChange = (companyIdStr: string) => {
+    setSelectedCompanyId(Number(companyIdStr));
+  };
+
   return (
     <div className="w-full bg-white border-b">
       <div className="max-w-screen-xl mx-auto w-full flex h-20 items-center justify-between px-8">
@@ -98,6 +124,20 @@ export function CustomHeader({ missedClockOut }: CustomHeaderProps) {
       </div>
         {/* Right: Warning, Tasks, Notifications, Logo, Activities, Role Switcher */}
       <div className="flex items-center space-x-6">
+        {roles.length > 1 && companies.length > 0 && (
+          <Select onValueChange={handleCompanyChange} value={selectedCompanyId ? String(selectedCompanyId) : ''}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select Company" />
+            </SelectTrigger>
+            <SelectContent>
+              {companies.map((company) => (
+                <SelectItem key={company.id} value={String(company.id)}>
+                  {company.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         {missedClockOut ? (
           <Popover open={showMissedPopover} onOpenChange={setShowMissedPopover}>
             <PopoverTrigger asChild>
@@ -175,4 +215,4 @@ export function CustomHeader({ missedClockOut }: CustomHeaderProps) {
       </div>
     </div>
   );
-} 
+}

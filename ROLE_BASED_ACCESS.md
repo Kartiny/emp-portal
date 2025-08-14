@@ -18,15 +18,15 @@ The application implements a comprehensive role-based access control system that
   - System-wide reports and analytics
   - User management capabilities
 
-### 2. HR Role
-- **Odoo Groups**: `hr.group_hr_manager`, `hr.group_hr_user`
-- **Access Level**: HR management access
-- **Dashboard**: `/hr/dashboard`
+### 2. Administrator Role
+- **Odoo Groups**: `administrator.group_administrator_manager`, `administrator.group_administrator_user`
+- **Access Level**: Administrator management access
+- **Dashboard**: `/administrator/dashboard`
 - **Features**:
   - Employee management
   - Leave request approval/rejection
   - Expense request approval/rejection
-  - HR-specific reports
+  - Administrator-specific reports
   - Can access admin features (inherited from admin role)
 
 ### 3. Employee Role
@@ -139,7 +139,7 @@ if (xmlId.includes('your.custom.group')) {
 
 ### Role Hierarchy
 The system implements a role hierarchy:
-- **Admin** > **HR** > **Employee**
+- **Admin** > **Administrator** > **Employee**
 
 Higher-level roles inherit access to lower-level features.
 

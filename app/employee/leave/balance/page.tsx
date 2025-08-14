@@ -50,15 +50,15 @@ export default function LeaveBalancePage() {
   }, []);
 
   return (
-      <div className="space-y-6">
-        <Tabs defaultValue="history" className="w-full">
-          <TabsList>
-            <TabsTrigger value="calendar" onClick={() => router.push('/leave')}>Calendar</TabsTrigger>
-            <TabsTrigger value="balance" onClick={() => router.push('/leave/balance')}>Leave Balance</TabsTrigger>
-            <TabsTrigger value="history" onClick={() => router.push('/leave/history')}>Leave History</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
+    <div className="space-y-6">
+      <Tabs defaultValue="history" className="w-full">
+        <TabsList>
+          <TabsTrigger value="calendar" onClick={() => router.push('/leave')}>Calendar</TabsTrigger>
+          <TabsTrigger value="balance" onClick={() => router.push('/leave/balance')}>Leave Balance</TabsTrigger>
+          <TabsTrigger value="history" onClick={() => router.push('/leave/history')}>Leave History</TabsTrigger>
+        </TabsList>
+      </Tabs>
+      
       <div className="flex justify-end mb-4">
         <button
           className="px-4 py-2 bg-blue-900 text-white rounded hover:bg-blue-800 transition-colors"
@@ -67,6 +67,7 @@ export default function LeaveBalancePage() {
           Request Leave
         </button>
       </div>
+      
       <div className="w-full py-8 px-4">
         {loading ? (
           <div className="text-center py-8">Loading leave allocations...</div>
@@ -105,5 +106,6 @@ export default function LeaveBalancePage() {
           </div>
         )}
       </div>
+    </div>
   );
 } 

@@ -12,38 +12,53 @@ export function RoleBasedRedirect() {
     const redirectUser = () => {
       const uid = localStorage.getItem('uid');
       const primaryRole = localStorage.getItem('primaryRole');
-      const jobTitle = localStorage.getItem('jobTitle');
+      const isVerified = localStorage.getItem('isVerified') === 'true';
+      const availableFeatures = JSON.parse(localStorage.getItem('availableFeatures') || '[]');
+      const employeeType = localStorage.getItem('employeeType');
+
+      console.log('🔍 RoleBasedRedirect debug:');
+      console.log('  - uid:', uid);
+      console.log('  - primaryRole:', primaryRole);
+      console.log('  - isVerified:', isVerified);
+      console.log('  - employeeType:', employeeType);
+      console.log('  - availableFeatures:', availableFeatures);
 
       if (!uid) {
+        console.log('❌ No UID found, redirecting to login');
         router.push('/login');
         return;
       }
 
-      // Determine redirect path based on role
+      if (!isVerified) {
+        console.log('❌ Not verified, redirecting to verify');
+        router.push('/verify');
+        return;
+      }
+
+      // Determine redirect path based on role and available features
       let redirectPath = '/employee/dashboard'; // default
 
       if (primaryRole) {
         switch (primaryRole) {
-          case 'admin':
-            redirectPath = '/admin/dashboard';
+          case 'administrator':
+            redirectPath = '/administrator/dashboard';
+            console.log('✅ Redirecting to administrator dashboard');
             break;
-          case 'hr':
-            redirectPath = '/hr/dashboard';
+          case 'manager':
+            redirectPath = '/manager/dashboard';
+            console.log('✅ Redirecting to manager dashboard');
             break;
+          case 'employee':
           default:
             redirectPath = '/employee/dashboard';
+            console.log('⚠️ Defaulting to employee dashboard (primaryRole:', primaryRole, ')');
             break;
         }
-      } else if (jobTitle) {
-        // Fallback to job title check for backward compatibility
-        if (jobTitle.includes('Manager') || jobTitle.includes('Administrator') || jobTitle.includes('Director')) {
-          redirectPath = '/admin/dashboard';
-        } else {
-          redirectPath = '/employee/dashboard';
-        }
+      } else {
+        console.log('⚠️ No primaryRole found, defaulting to employee dashboard');
       }
 
-      console.log(`🎭 Redirecting user with role '${primaryRole}' to: ${redirectPath}`);
+      console.log(`🎭 Redirecting user with role '${primaryRole}' and features:`, availableFeatures, 'to:', redirectPath);
       router.push(redirectPath);
     };
 
@@ -68,4 +83,4 @@ export function RoleBasedRedirect() {
   }
 
   return null;
-} 
+}

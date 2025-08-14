@@ -184,10 +184,11 @@ export class OdooClient {
           'job_title',
           'department_id',
           'parent_id',
-          'expense_manager_id',
+         
           'leave_manager_id',
           'attendance_manager_id',
           'contract_id',
+          'employee_type',
           // 3. Private Information
           'private_street',
           'private_street2',
@@ -984,6 +985,16 @@ export class OdooClient {
     });
   }
 
+  async getPendingRequests(uid: number): Promise<any[]> {
+    const profile = await this.getFullUserProfile(uid);
+    const empId = profile.id;
+
+    const leaves = await this.getLeaveRequests(uid, { status: 'confirm' });
+    const expenses = await this.getExpenseRequests(uid);
+
+    return [...leaves, ...expenses];
+  }
+
   /**
    * Fetch an ir.attachment by id (public helper for API route)
    */
@@ -1254,13 +1265,18 @@ export class OdooClient {
     return employees;
   }
 
-  async getAllEmployees(): Promise<any[]> {
+  async getAllEmployees(filters?: { companyId?: number }): Promise<any[]> {
+    const domain: any[] = [];
+    if (filters?.companyId) {
+      domain.push(['company_id', '=', filters.companyId]);
+    }
+    console.log('[DEBUG] getAllEmployees domain:', domain);
     return this.execute(
       'hr.employee',
       'search_read',
-      [[]],
+      [domain],
       {
-        fields: ['name', 'work_email', 'work_phone', 'job_title', 'department_id'],
+        fields: ['name', 'work_email', 'work_phone', 'job_title', 'department_id', 'emp_status', 'rem_days', 'company_id'],
         order: 'name asc',
       }
     );
@@ -1279,6 +1295,102 @@ export class OdooClient {
     );
     return departments;
   }
+
+  async getAllCompanies(): Promise<any[]> {
+    return this.execute(
+      'res.company',
+      'search_read',
+      [[]],
+      {
+        fields: ['id', 'name'],
+        order: 'name asc',
+      }
+    );
+  }
+
+  async createEmployee(data: any): Promise<number> {
+    return this.execute('hr.employee', 'create', [data]);
+  }
+
+  async deleteEmployees(ids: number[]): Promise<boolean> {
+    return this.execute('hr.employee', 'unlink', [ids]);
+  }
+
+  async getAllContracts(filters?: { status?: string }): Promise<any[]> {
+    const domain: any[] = [];
+    if (filters?.status) {
+      domain.push(['state', '=', filters.status]);
+    }
+    console.log('[DEBUG] getAllContracts domain:', domain);
+    return this.execute(
+      'hr.contract',
+      'search_read',
+      [domain],
+      {
+        fields: [
+          'employee_id',
+          'name',
+          'department_id',
+          'job_id',
+          'date_start',
+          'date_end',
+          'resource_calendar_id',
+          'state',
+        ],
+        order: 'date_start desc',
+      }
+    );
+  }
+
+  async getAllJobPositions(): Promise<any[]> {
+    return this.execute(
+      'hr.job',
+      'search_read',
+      [[]],
+      {
+        fields: ['id', 'name'],
+        order: 'name asc',
+      }
+    );
+  }
+
+  async getAllWorkingSchedules(): Promise<any[]> {
+    return this.execute(
+      'resource.calendar',
+      'search_read',
+      [[]],
+      {
+        fields: ['id', 'name'],
+        order: 'name asc',
+      }
+    );
+  }
+
+  async getGracePeriod(uid: number): Promise<any> {
+    const shiftInfo = await this.getEmployeeShiftInfo(uid);
+    if (shiftInfo && shiftInfo.schedule_name) {
+      const schedule = await this.execute(
+        'hr.work.schedule.code',
+        'search_read',
+        [['name', '=', shiftInfo.schedule_name]],
+        {
+          fields: ['grace_period_late_in', 'grace_period_early_out', 'meal_check_out', 'meal_check_in'],
+          limit: 1,
+        }
+      );
+      if (schedule && schedule.length > 0) {
+        return {
+          grace_period_late_in: schedule[0].grace_period_late_in,
+          grace_period_early_out: schedule[0].grace_period_early_out,
+          meal_check_out: schedule[0].meal_check_out,
+          meal_check_in: schedule[0].meal_check_in,
+        };
+      }
+    }
+    return null;
+  }
+
+  
 }
 
 // ── single instance & top‐level helpers ────────────────────────────────────────
@@ -1385,5 +1497,9 @@ export async function getAllEmployees() {
 
 export async function getAllDepartments() {
   return getOdooClient().getAllDepartments();
+}
+
+export async function getPendingRequests(uid: number) {
+  return getOdooClient().getPendingRequests(uid);
 }
 

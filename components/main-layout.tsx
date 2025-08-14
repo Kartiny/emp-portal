@@ -39,19 +39,24 @@ export function MainLayout({ children, missedClockOut }: MainLayoutProps) {
       { name: "Expenses", href: "/employee/expenses", icon: Receipt },
       { name: "Profile", href: "/employee/profile", icon: User },
     ],
-    hr: [
-      { name: "Dashboard", href: "/hr/dashboard", icon: Home },
-      { name: "Employees", href: "/hr/employees", icon: User },
-      { name: "Attendance Management", href: "/hr/attendance-management", icon: Clock },
-      { name: "Leave Management", href: "/hr/leave-management", icon: Calendar },
-      { name: "Expense Management", href: "/hr/expense-management", icon: Receipt },
-      { name: "Reports", href: "/hr/reports", icon: ListTodo },
-      { name: "Profile", href: "/hr/profile", icon: User },
+    administrator: [
+      { name: "Dashboard", href: "/administrator/dashboard", icon: Home },
+      { name: "Employees", href: "/administrator/employees", icon: User },
+      { name: "Attendance Management", href: "/administrator/attendance-management", icon: Clock },
+      { name: "Leave Management", href: "/administrator/leave-management", icon: Calendar },
+      { name: "Expense Management", href: "/administrator/expense-management", icon: Receipt },
+      { name: "Reports", href: "/administrator/reports", icon: ListTodo },
+      { name: "Approvals", href: "/administrator/approvals", icon: ListTodo },
+      { name: "Contracts", href: "/administrator/contracts", icon: ListTodo },
+      { name: "Profile", href: "/administrator/profile", icon: User },
     ],
-    supervisor: [
-      { name: "Team Attendance", href: "/supervisor/team-attendance", icon: Clock },
-      { name: "Approve Leaves", href: "/supervisor/approve-leaves", icon: Calendar },
-      { name: "Approve Expenses", href: "/supervisor/approve-expenses", icon: Receipt },
+    manager: [
+      { name: "Dashboard", href: "/manager/dashboard", icon: Home },
+      { name: "Team Attendance", href: "/manager/team-attendance", icon: Clock },
+      { name: "Approve Leaves", href: "/manager/approve-leaves", icon: Calendar },
+      { name: "Approve Expenses", href: "/manager/approve-expenses", icon: Receipt },
+      { name: "Team Reports", href: "/manager/reports", icon: ListTodo },
+      { name: "Profile", href: "/manager/profile", icon: User },
     ],
   }
 
@@ -63,16 +68,16 @@ export function MainLayout({ children, missedClockOut }: MainLayoutProps) {
         items: allMenus.employee,
       })
     }
-    if (roles.includes('supervisor')) {
+    if (roles.includes('manager')) {
       menu.push({
-        title: 'Supervisor Tools',
-        items: allMenus.supervisor,
+        title: 'Manager Tools',
+        items: allMenus.manager,
       })
     }
-    if (roles.includes('hr')) {
+    if (roles.includes('administrator')) {
       menu.push({
-        title: 'HR Tools',
-        items: allMenus.hr,
+        title: 'Administrator Tools',
+        items: allMenus.administrator,
       })
     }
     return menu
@@ -96,12 +101,12 @@ export function MainLayout({ children, missedClockOut }: MainLayoutProps) {
             <nav className="flex flex-col gap-4 p-4">
               {menu.map(group => (
                 <div key={group.title}>
-                  <h2 className="font-bold text-lg mb-2">{group.title}</h2>
+                  <h2 className="font-bold text-md mb-2">{group.title}</h2>
                   {group.items.map(item => (
                     <a
                       key={item.name}
                       href={item.href}
-                      className="flex items-center gap-2 p-2 rounded hover:bg-gray-100"
+                      className="flex items-center gap-2 p-2 rounded hover:bg-gray-100 text-sm"
                     >
                       <item.icon className="w-5 h-5" />
                       <span>{item.name}</span>
