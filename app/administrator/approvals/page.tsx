@@ -87,11 +87,23 @@ export default function ApprovalsPage() {
       }
 
       // Load pending requests
-      const pendingResponse = await fetch(`/api/odoo/approvals/leaves/pending?uid=${uid}`);
-      const pendingLeaves = await pendingResponse.json();
+      const pendingLeavesResponse = await fetch(`/api/odoo/approvals/leaves/pending?uid=${uid}`);
+      const pendingLeaves = await pendingLeavesResponse.json();
       
       const pendingExpensesResponse = await fetch(`/api/odoo/approvals/expenses/pending?uid=${uid}`);
       const pendingExpenses = await pendingExpensesResponse.json();
+
+      // Load approved requests
+      const approvedLeavesResponse = await fetch(`/api/odoo/approvals/leaves/approved?uid=${uid}`);
+      const approvedLeaves = await approvedLeavesResponse.json();
+      const approvedExpensesResponse = await fetch(`/api/odoo/approvals/expenses/approved?uid=${uid}`);
+      const approvedExpenses = await approvedExpensesResponse.json();
+
+      // Load refused requests
+      const refusedLeavesResponse = await fetch(`/api/odoo/approvals/leaves/refused?uid=${uid}`);
+      const refusedLeaves = await refusedLeavesResponse.json();
+      const refusedExpensesResponse = await fetch(`/api/odoo/approvals/expenses/refused?uid=${uid}`);
+      const refusedExpenses = await refusedExpensesResponse.json();
 
       if (pendingLeaves.success) {
         setPendingData({
@@ -100,9 +112,19 @@ export default function ApprovalsPage() {
         });
       }
 
-      // TODO: Load approved and refused data from separate endpoints
-      setApprovedData({ leaves: [], expenses: [] });
-      setRefusedData({ leaves: [], expenses: [] });
+      if (approvedLeaves.success) {
+        setApprovedData({
+          leaves: approvedLeaves.data.leaves || [],
+          expenses: approvedExpenses.success ? approvedExpenses.data.expenses || [] : []
+        });
+      }
+
+      if (refusedLeaves.success) {
+        setRefusedData({
+          leaves: refusedLeaves.data.leaves || [],
+          expenses: refusedExpenses.success ? refusedExpenses.data.expenses || [] : []
+        });
+      }
 
     } catch (error) {
       console.error('Error loading approval data:', error);

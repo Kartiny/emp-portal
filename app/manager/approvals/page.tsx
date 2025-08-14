@@ -1,20 +1,59 @@
 
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { SearchIcon, XIcon } from "lucide-react";
 import LeaveRequestsTable from "./leave-requests-table";
 import ExpenseClaimsTable from "./expense-claims-table";
+import { toast } from 'sonner';
 
 export default function ApprovalsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("Pending");
+  const [leaveCounts, setLeaveCounts] = useState({ pending: 0, approved: 0, refused: 0 });
+  const [expenseCounts, setExpenseCounts] = useState({ pending: 0, approved: 0, refused: 0 });
+  const [loadingCounts, setLoadingCounts] = useState(true);
 
-  const pendingLeaveRequests = 5;
-  const pendingExpenseClaims = 3;
-  const totalPending = pendingLeaveRequests + pendingExpenseClaims;
+  const fetchCounts = async () => {
+    setLoadingCounts(true);
+    try {
+      const uid = localStorage.getItem('uid');
+      if (!uid) {
+        toast.error('Not logged in');
+        return;
+      }
+
+      const leaveResponse = await fetch(`/api/odoo/approvals/leaves/counts?uid=${uid}`);
+      const leaveData = await leaveResponse.json();
+      if (leaveData.success) {
+        setLeaveCounts(leaveData.data);
+      } else {
+        toast.error(leaveData.error || 'Failed to fetch leave counts');
+      }
+
+      const expenseResponse = await fetch(`/api/odoo/approvals/expenses/counts?uid=${uid}`);
+      const expenseData = await expenseResponse.json();
+      if (expenseData.success) {
+        setExpenseCounts(expenseData.data);
+      } else {
+        toast.error(expenseData.error || 'Failed to fetch expense counts');
+      }
+
+    } catch (error) {
+      console.error('Error fetching counts:', error);
+      toast.error('Failed to fetch counts');
+    } finally {
+      setLoadingCounts(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCounts();
+  }, []);
+
+  const totalPending = leaveCounts.pending + expenseCounts.pending;
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -31,19 +70,23 @@ export default function ApprovalsPage() {
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="leave-requests">
             Leave Requests
-            {pendingLeaveRequests > 0 && (
+            {loadingCounts ? (
+              <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-800 animate-pulse">...</span>
+            ) : leaveCounts.pending > 0 ? (
               <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                {pendingLeaveRequests}
+                {leaveCounts.pending}
               </span>
-            )}
+            ) : null}
           </TabsTrigger>
           <TabsTrigger value="expense-claims">
             Expense Claims
-            {pendingExpenseClaims > 0 && (
+            {loadingCounts ? (
+              <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-800 animate-pulse">...</span>
+            ) : expenseCounts.pending > 0 ? (
               <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                {pendingExpenseClaims}
+                {expenseCounts.pending}
               </span>
-            )}
+            ) : null}
           </TabsTrigger>
         </TabsList>
         <div className="mt-6">
