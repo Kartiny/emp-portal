@@ -115,6 +115,12 @@ export default function LoginPage() {
           roles.push('hr');
           console.log('🔍 Added employeeType hr to roles');
         }
+
+        // Add employeeType to roles if it's 'manager'
+        if (data.employeeType === 'manager' && !roles.includes('manager')) {
+          roles.push('manager');
+          console.log('🔍 Added employeeType manager to roles');
+        }
         
         // Map 'hr' role to 'administrator' for frontend compatibility
         roles = roles.map((role: string) => {
