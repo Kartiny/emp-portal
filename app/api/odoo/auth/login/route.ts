@@ -62,6 +62,31 @@ async function getUserRoles(uid: number, employeeType?: string) {
     }
     console.log(`🎭 Base role from employee type: ${baseRole}`);
 
+    // Get access rights for all groups in a single call
+    let allAccessRights: any[] = [];
+    if (groupIds.length > 0) {
+      try {
+        allAccessRights = await (client as any).execute(
+          'ir.model.access',
+          'search_read',
+          [[['group_id', 'in', groupIds]], ['name', 'model_id', 'perm_read', 'perm_write', 'perm_create', 'perm_unlink', 'group_id']]
+        );
+      } catch (err) {
+        console.warn('Could not fetch all access rights in one go:', err);
+        // Fallback to individual fetches if batch fails, though this is less efficient
+      }
+    }
+
+    // Map access rights to groups
+    const accessRightsMap = new Map<number, any[]>();
+    for (const ar of allAccessRights) {
+      const groupId = ar.group_id[0];
+      if (!accessRightsMap.has(groupId)) {
+        accessRightsMap.set(groupId, []);
+      }
+      accessRightsMap.get(groupId)?.push(ar);
+    }
+
     for (const group of groups) {
       const categoryName = group.category_id ? group.category_id[1] : '';
       const groupName = group.name || '';
@@ -104,65 +129,38 @@ async function getUserRoles(uid: number, employeeType?: string) {
         console.log(`   → Keeping role: ${role} (from employee type)`);
       }
 
-      // Get access rights for this group
-      try {
-        const accessRights = await (client as any).execute(
-          'ir.model.access',
-          'search_read',
-          [[['group_id', '=', group.id]], ['name', 'model_id', 'perm_read', 'perm_write', 'perm_create', 'perm_unlink']]
-        );
+      // Get access rights for this group from the pre-fetched map
+      const groupAccessRights = accessRightsMap.get(group.id) || [];
 
-        // Map model access to feature permissions
-        const groupPermissions = accessRights.map((access: any) => {
-          const modelName = access.model_id ? access.model_id[1] : '';
-          return {
-            model: modelName,
-            read: access.perm_read,
-            write: access.perm_write,
-            create: access.perm_create,
-            delete: access.perm_unlink
-          };
-        });
+      // Map model access to feature permissions
+      const groupPermissions = groupAccessRights.map((access: any) => {
+        const modelName = access.model_id ? access.model_id[1] : '';
+        return {
+          model: modelName,
+          read: access.perm_read,
+          write: access.perm_write,
+          create: access.perm_create,
+          delete: access.perm_unlink
+        };
+      });
 
-        permissions.push({
-          groupId: group.id,
-          groupName: groupName,
-          category: categoryName,
-          role: role,
-          accessLevel: accessLevel,
-          permissions: groupPermissions
-        });
+      permissions.push({
+        groupId: group.id,
+        groupName: groupName,
+        category: categoryName,
+        role: role,
+        accessLevel: accessLevel,
+        permissions: groupPermissions
+      });
 
-        roles.push({
-          id: group.id,
-          name: groupName,
-          xmlId: xmlId,
-          category: categoryName,
-          role: role,
-          accessLevel: accessLevel
-        });
-
-      } catch (accessError) {
-        console.warn(`Could not fetch access rights for group ${group.id}:`, accessError);
-        // Still add the group with basic info
-        permissions.push({
-          groupId: group.id,
-          groupName: groupName,
-          category: categoryName,
-          role: role,
-          accessLevel: accessLevel,
-          permissions: []
-        });
-
-        roles.push({
-          id: group.id,
-          name: groupName,
-          xmlId: xmlId,
-          category: categoryName,
-          role: role,
-          accessLevel: accessLevel
-        });
-      }
+      roles.push({
+        id: group.id,
+        name: groupName,
+        xmlId: xmlId,
+        category: categoryName,
+        role: role,
+        accessLevel: accessLevel
+      });
     }
 
     // Determine primary role (administrator > manager > employee)
