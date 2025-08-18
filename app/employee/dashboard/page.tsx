@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { MainLayout } from "@/components/main-layout";
 import AttendanceWidget from '@/components/attendance-widget';
+import StatusWidget from '@/components/status-widget';
 import { LeaveBalanceCard } from '@/components/leave-balance-card';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -31,6 +32,32 @@ interface UserProfile {
 interface LeaveBalance {
   days: number;
   used: number;
+}
+
+interface TodayAttendance {
+  lastClockIn: string | null;
+  lastClockOut: string | null;
+  records?: Array<{
+    id: number;
+    datetime: string;
+    attn_type: string;
+    job_id?: number;
+    machine_id?: string;
+    latitude?: number;
+    longitude?: number;
+  }>;
+  workedHours?: number;
+  latenessStr?: string;
+  latenessMins?: number;
+  earlyOutStr?: string;
+  earlyOutMins?: number;
+  gracePeriod?: any;
+}
+
+interface ShiftInfo {
+  schedule_name: string | null;
+  start: string | null;
+  end: string | null;
 }
 
 export default function DashboardPage() {
@@ -76,29 +103,51 @@ export default function DashboardPage() {
     total_amount: '',
   });
   const [expenseFormLoading, setExpenseFormLoading] = useState(false);
+  const [todayAttendance, setTodayAttendance] = useState<TodayAttendance | null>(null);
+  const [shiftInfo, setShiftInfo] = useState<ShiftInfo | null>(null);
+
+  const fetchAttendanceData = () => {
+    const uid = localStorage.getItem('uid');
+    if (!uid) return;
+    const uidNum = Number(uid);
+    if (isNaN(uidNum) || uidNum <= 0) return;
+
+    fetch('/api/odoo/auth/attendance/today', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid: uidNum }),
+    })
+      .then(res => res.json())
+      .then(data => {
+        setTodayAttendance(data);
+      })
+      .catch(console.error);
+
+    fetch('/api/odoo/auth/attendance/shift', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: uidNum }),
+      })
+      .then(res => res.json())
+      .then(data => {
+        setShiftInfo(data);
+      })
+      .catch(console.error);
+  }
 
   useEffect(() => {
     const uid = localStorage.getItem('uid');
-    console.log('🔍 Dashboard useEffect - uid from localStorage:', uid);
-    console.log('🔍 Dashboard useEffect - uid type:', typeof uid);
-    console.log('🔍 Dashboard useEffect - uid as number:', Number(uid));
-    
     if (!uid) {
-      console.log('❌ No uid found in localStorage, redirecting to login');
       window.location.href = '/login';
       return;
     }
 
     const uidNum = Number(uid);
     if (isNaN(uidNum) || uidNum <= 0) {
-      console.log('❌ Invalid uid:', uid, 'redirecting to login');
       window.location.href = '/login';
       return;
     }
 
-    console.log('✅ Valid uid found:', uidNum);
-
-    // Fetch user profile
     fetch('/api/odoo/auth/profile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -112,7 +161,6 @@ export default function DashboardPage() {
       })
       .catch(console.error);
 
-    // Fetch leave allocations
     fetch('/api/odoo/leave/allocation', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -124,7 +172,6 @@ export default function DashboardPage() {
       })
       .catch(console.error);
 
-    // Fetch attendance summary (total hours, attendance rate)
     const now = new Date();
     fetch('/api/odoo/auth/attendance', {
       method: 'POST',
@@ -138,7 +185,6 @@ export default function DashboardPage() {
       })
       .catch(console.error);
 
-    // Fetch pending leave requests
     fetch('/api/odoo/leave/requests', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -159,7 +205,6 @@ export default function DashboardPage() {
       })
       .catch(console.error);
 
-    // Check for missed clock-out yesterday
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const yDate = yesterday.toISOString().slice(0, 10);
@@ -171,7 +216,6 @@ export default function DashboardPage() {
     })
       .then(res => res.json())
       .then(data => {
-        // Adjust this logic based on your API response structure
         if (Array.isArray(data.attendance)) {
           const missed = data.attendance.some(
             (rec: any) => rec.check_in && !rec.check_out
@@ -184,7 +228,6 @@ export default function DashboardPage() {
       })
       .catch(console.error);
 
-    // Fetch all attendance records for the current year
     const fetchYearAttendance = async () => {
       setMonthlyAttendanceLoading(true);
       try {
@@ -203,28 +246,22 @@ export default function DashboardPage() {
         });
         const data = await res.json();
         const records = Array.isArray(data.records) ? data.records : [];
-        // Build a map: month index (0-11) => { present, late, absent }
         const months = Array.from({ length: 12 }, (_, i) => ({ present: 0, late: 0, absent: 0 }));
-        // Helper: get month index from date string
         const getMonthIdx = (dateStr: string) => {
           try { return new Date(dateStr).getMonth(); } catch { return null; }
         };
-        // Reference: 9am for late
         const WORK_START_HOUR = 9;
-        // Build a set of all days in the year (for absent calculation)
         const allDays = new Set<string>();
         const today = new Date();
         for (let m = 0; m < 12; m++) {
           const daysInMonth = new Date(year, m + 1, 0).getDate();
           for (let d = 1; d <= daysInMonth; d++) {
             const dt = new Date(year, m, d);
-            // Only count weekdays (Mon-Fri)
             if (dt.getDay() !== 0 && dt.getDay() !== 6 && dt <= today) {
               allDays.add(dfFormat(dt, 'yyyy-MM-dd'));
             }
           }
         }
-        // Track which days have a record
         const daysWithRecord = new Set<string>();
         records.forEach((rec: any) => {
           if (!rec.checkIn || typeof rec.checkIn !== 'string') return;
@@ -232,9 +269,7 @@ export default function DashboardPage() {
           daysWithRecord.add(dt);
           const mIdx = getMonthIdx(rec.checkIn);
           if (mIdx === null) return;
-          // Present: has check-in and check-out
           if (rec.checkIn && rec.checkOut) {
-            // Late: check-in after 9am
             const checkInDate = parseISO(rec.checkIn);
             const ref = new Date(checkInDate); ref.setHours(WORK_START_HOUR, 0, 0, 0);
             const mins = differenceInMinutes(checkInDate, ref);
@@ -245,14 +280,12 @@ export default function DashboardPage() {
             }
           }
         });
-        // Absent: working days with no record (only up to today)
         allDays.forEach(dt => {
           if (!daysWithRecord.has(dt)) {
             const mIdx = getMonthIdx(dt + 'T00:00:00');
             if (mIdx !== null) months[mIdx].absent++;
           }
         });
-        // Build chart data
         const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         const chartData = months.map((m, i) => ({ name: monthNames[i], ...m }));
         setMonthlyAttendanceData(chartData);
@@ -261,6 +294,7 @@ export default function DashboardPage() {
       }
     };
     fetchYearAttendance();
+    fetchAttendanceData();
   }, []);
 
   useEffect(() => {
@@ -312,22 +346,18 @@ export default function DashboardPage() {
     }
   };
 
-  // Helper for payment mode label
   const paymentModeLabel = (mode: string) => {
     if (mode === 'own_account') return 'Employee';
     if (mode === 'company_account') return 'Company';
     return mode;
   };
-  // Helper for state label
   const stateLabel = (state: string) => {
     if (state === 'draft') return 'To Approve';
     if (!state) return '';
     return state.charAt(0).toUpperCase() + state.slice(1);
   };
-  // Helper for name label
   const nameLabel = (name: string) => name;
 
-  // Fetch attendance data for dialog
   const fetchAttendanceDialogData = async () => {
     setAttendanceDialogLoading(true);
     try {
@@ -346,7 +376,6 @@ export default function DashboardPage() {
     }
   };
 
-  // Fetch pending leave requests for dialog
   const fetchPendingRequestsData = async () => {
     setPendingLoading(true);
     try {
@@ -364,7 +393,6 @@ export default function DashboardPage() {
     }
   };
 
-  // Fetch leave balance for dialog
   const fetchLeaveBalanceData = async () => {
     setLeaveBalanceLoading(true);
     try {
@@ -382,7 +410,6 @@ export default function DashboardPage() {
     }
   };
 
-  // Open dialog handlers
   const openAttendanceDialog = () => {
     fetchAttendanceDialogData();
     setAttendanceDialogOpen(true);
@@ -444,6 +471,12 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* Attendance and Status Widgets */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <AttendanceWidget today={todayAttendance} shift={shiftInfo} onUpdate={fetchAttendanceData} />
+          <StatusWidget today={todayAttendance} shift={shiftInfo} />
+        </div>
+
         {/* Main Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           <Card className="shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => setAttendanceDialogOpen(true)}>
@@ -492,7 +525,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Action Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4 sm:gap-6">
           <Card className="shadow-sm hover:shadow-md transition-shadow">
             <CardHeader>
               <CardTitle className="text-base sm:text-lg">Quick Actions</CardTitle>
@@ -539,15 +572,6 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <LeaveBalanceCard leaveAllocations={leaveAllocations} />
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-sm hover:shadow-md transition-shadow">
-            <CardHeader>
-              <CardTitle className="text-base sm:text-lg">Attendance Widget</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <AttendanceWidget />
             </CardContent>
           </Card>
         </div>
@@ -796,6 +820,3 @@ export default function DashboardPage() {
     </MainLayout>
   );
 }
- 
-
-

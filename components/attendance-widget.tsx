@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Clock } from 'lucide-react';
 import { format } from 'date-fns';
-import { toZonedTime } from 'date-fns-tz';
 
 // Simple type for today's attendance payload
 interface TodayAttendance {
@@ -33,8 +32,6 @@ interface ShiftInfo {
   end: string | null;
 }
 
-const MALAYSIA_TZ = 'Asia/Kuala_Lumpur';
-
 function formatTimeKL(dt: string | null | undefined) {
   if (!dt) return '-';
   try {
@@ -47,83 +44,8 @@ function formatTimeKL(dt: string | null | undefined) {
   }
 }
 
-export default function AttendanceWidget() {
-  const [today, setToday] = useState<TodayAttendance | null>(null);
-  const [shift, setShift] = useState<ShiftInfo | null>(null);
+export default function AttendanceWidget({ today, shift, onUpdate }: { today: TodayAttendance | null, shift: ShiftInfo | null, onUpdate: () => void }) {
   const [loading, setLoading] = useState(false);
-  const [shiftLoading, setShiftLoading] = useState(false);
-  const [error, setError] = useState<string>('');
-  const [shiftError, setShiftError] = useState<string | null>(null);
-
-  // Helper to fetch today's attendance
-  const fetchToday = async () => {
-    setError('');
-    try {
-      const uidStr = localStorage.getItem('uid');
-      console.log('🔍 UID from localStorage:', uidStr);
-      
-      if (!uidStr) {
-        throw new Error('Not logged in - no UID found in localStorage');
-      }
-      
-      const uid = Number(uidStr);
-      console.log('🔍 Parsed UID:', uid);
-      
-      if (isNaN(uid) || uid <= 0) {
-        throw new Error(`Invalid UID: ${uidStr} (parsed as ${uid})`);
-      }
-      
-      const res = await fetch('/api/odoo/auth/attendance/today', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid }),
-      });
-      
-      console.log('🔍 Response status:', res.status);
-      
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error('❌ API Error:', errorText);
-        throw new Error(`(${res.status}) ${errorText}`);
-      }
-      
-      const data: TodayAttendance = await res.json();
-      console.log('✅ Today attendance data:', data);
-      setToday(data);
-    } catch (err: any) {
-      console.error('❌ Failed to fetch today attendance:', err);
-      setError(err.message);
-      toast.error(err.message);
-    }
-  };
-
-  // Fetch shift info
-  const fetchShift = async () => {
-    setShiftError(null);
-    setShiftLoading(true);
-    try {
-      const uidStr = localStorage.getItem('uid');
-      if (!uidStr) throw new Error('Not logged in');
-      const res = await fetch('/api/odoo/auth/attendance/shift', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid: Number(uidStr) }),
-      });
-      if (!res.ok) throw new Error(`(${res.status}) ${await res.text()}`);
-      const data: ShiftInfo = await res.json();
-      setShift(data);
-    } catch (err: any) {
-      console.error('❌ Failed to fetch shift info:', err);
-      setShiftError(err.message);
-    } finally {
-      setShiftLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchToday();
-    fetchShift();
-  }, []);
 
   // Clock In handler
   const handleClockIn = async () => {
@@ -139,7 +61,7 @@ export default function AttendanceWidget() {
       if (!res.ok) throw new Error(`(${res.status}) ${await res.text()}`);
       await res.json();  // { attendanceId }
       toast.success('Clock-in recorded');
-      await fetchToday();
+      onUpdate(); // Refetch data in parent
     } catch (err: any) {
       console.error('❌ Clock-in error:', err);
       toast.error(err.message);
@@ -162,7 +84,7 @@ export default function AttendanceWidget() {
       if (!res.ok) throw new Error(`(${res.status}) ${await res.text()}`);
       await res.json();  // { success: true }
       toast.success('Clock-out recorded');
-      await fetchToday();
+      onUpdate(); // Refetch data in parent
     } catch (err: any) {
       console.error('❌ Clock-out error:', err);
       toast.error(err.message);
@@ -192,30 +114,10 @@ export default function AttendanceWidget() {
     ? [...today.records].reverse().find(r => r.attn_type === 'o')?.datetime || null
     : today?.lastClockOut || null;
 
-  const checkInStatus = 'N/A';
-  const mealCheckOutStatus = 'N/A';
-  const mealCheckInStatus = 'N/A';
-  const checkOutStatus = 'N/A';
-
-  const getStatusColor = () => {
-    if (today?.lastClockIn && !today?.lastClockOut) {
-      return 'text-green-600';
-    } else if (today?.lastClockOut) {
-      return 'text-red-600';
-    } else {
-      return 'text-gray-600';
-    }
-  };
-
-  const getStatusText = () => {
-    if (today?.lastClockIn && !today?.lastClockOut) {
-      return 'Clocked In';
-    } else if (today?.lastClockOut) {
-      return 'Clocked Out';
-    } else {
-      return 'No Clock In/Out';
-    }
-  };
+  const checkInStatus = 'Check In';
+  const mealCheckOutStatus = 'Meal Out';
+  const mealCheckInStatus = 'Meal In';
+  const checkOutStatus = 'Check Out';
 
   return (
     <div className="bg-white rounded-lg shadow p-6 flex flex-col w-full text-left max-w-xl min-w-[320px]" style={{ minWidth: '320px', maxWidth: '480px' }}>
@@ -223,7 +125,7 @@ export default function AttendanceWidget() {
       <div className="mb-2">
         <h3 className="text-xl font-bold text-[#1d1a4e]">{todayStr}</h3>
         <div className="text-sm text-blue-800 font-medium mt-1">
-          {shiftLoading ? 'Loading shift...' : shiftError ? <span className="text-red-500">{shiftError}</span> : shift && shift.schedule_name ? (
+          {shift ? (
             <>
               Shift: <span className="font-semibold">{shift.schedule_name}</span>
               {shift.start && shift.end && (
@@ -254,7 +156,7 @@ export default function AttendanceWidget() {
       <div className="flex gap-4 mt-2">
         <Button 
           onClick={handleClockIn} 
-          disabled={!canClockIn || !!error || loading}
+          disabled={!canClockIn || loading}
           size="lg"
           className="flex items-center gap-2"
         >
@@ -262,7 +164,7 @@ export default function AttendanceWidget() {
         </Button>
         <Button 
           onClick={handleClockOut} 
-          disabled={!canClockOut || !!error || loading}
+          disabled={!canClockOut || loading}
           size="lg"
           variant="destructive"
           className="flex items-center gap-2"
@@ -306,7 +208,6 @@ export default function AttendanceWidget() {
           </table>
         </div>
       )}
-      {error && <div className="text-red-500 mt-2">{error}</div>}
     </div>
   );
 }

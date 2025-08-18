@@ -444,7 +444,11 @@ export default function AttendancePage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Left: AttendanceWidget */}
                   <div className="flex flex-col justify-center">
-                    <AttendanceWidget />
+                    <AttendanceWidget 
+                      today={todayData} 
+                      shift={todayData?.shiftInfo || null} 
+                      onUpdate={fetchTodayAttendance} 
+                    />
                   </div>
                   {/* Right: Statuses */}
                   <div className="flex flex-col justify-center">

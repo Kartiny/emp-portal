@@ -1374,16 +1374,39 @@ export class OdooClient {
         'search_read',
         [[['name', '=', shiftInfo.schedule_name]]],
         {
-          fields: ['grace_period_late_in', 'grace_period_early_out', 'meal_check_out', 'meal_check_in'],
+          fields: ['grace_period_late_in', 'grace_period_early_out', 'line_ids'],
           limit: 1,
         }
       );
       if (schedule && schedule.length > 0) {
+        const scheduleRecord = schedule[0];
+        
+        // Get meal break times from S03 line code
+        let mealCheckOut = null;
+        let mealCheckIn = null;
+        
+        if (scheduleRecord.line_ids && Array.isArray(scheduleRecord.line_ids)) {
+          const s03Line = await this.execute(
+            'hr.work.schedule.code.line',
+            'search_read',
+            [[
+              ['id', 'in', scheduleRecord.line_ids], 
+              ['code', '=', 'S03']
+            ]],
+            { fields: ['start_clock_actual', 'end_clock_actual', 'code'], limit: 1 }
+          );
+          
+          if (s03Line && s03Line.length > 0) {
+            mealCheckOut = floatToTimeString(s03Line[0].start_clock_actual);
+            mealCheckIn = floatToTimeString(s03Line[0].end_clock_actual);
+          }
+        }
+        
         return {
-          grace_period_late_in: schedule[0].grace_period_late_in,
-          grace_period_early_out: schedule[0].grace_period_early_out,
-          meal_check_out: schedule[0].meal_check_out,
-          meal_check_in: schedule[0].meal_check_in,
+          grace_period_late_in: scheduleRecord.grace_period_late_in,
+          grace_period_early_out: scheduleRecord.grace_period_early_out,
+          meal_check_out: mealCheckOut,
+          meal_check_in: mealCheckIn,
         };
       }
     }
