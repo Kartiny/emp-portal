@@ -27,7 +27,7 @@ export const RoleProvider = ({ children }: { children: React.ReactNode }) => {
       if (Array.isArray(storedRoles)) {
         storedRoles = storedRoles.filter((r: any) => validRoles.includes(r));
         if (storedRoles.length === 0) storedRoles = ['employee'];
-        // Only add 'employee' if the only role is 'administrator' or 'manager'
+        // Only add 'employee' if the only role is 'administrator', 'manager', or 'hr'
         if (storedRoles.length === 1 && (storedRoles[0] === 'administrator' || storedRoles[0] === 'manager') && !storedRoles.includes('employee')) {
           storedRoles = ['employee', storedRoles[0]];
         }

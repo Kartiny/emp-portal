@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ArrowUpDown } from 'lucide-react';
 
@@ -17,7 +16,7 @@ const leaveRequestsData = [
     requestType: 'Annual Leave',
     dateRange: '2024-08-15 to 2024-08-20',
     status: 'Pending',
-    documents: [{ name: 'Doctor\'s Note.pdf', url: '#' }],
+    documents: [{ name: 'Doctor's Note.pdf', url: '#' }],
   },
   {
     id: 2,
@@ -43,9 +42,8 @@ type SortKey = 'employee' | 'department' | 'requestType' | 'dateRange' | 'status
 
 export default function LeaveRequestsTable({ searchTerm, statusFilter }: { searchTerm: string; statusFilter: string }) {
   const [requests, setRequests] = useState(leaveRequestsData);
-  const [selectedRequest, setSelectedRequest] = useState<any>(null);
-  const [rejectionComment, setRejectionComment] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'ascending' | 'descending' } | null>(null);
+  const router = useRouter();
 
   const filteredRequests = useMemo(() => {
     return requests
@@ -80,14 +78,8 @@ export default function LeaveRequestsTable({ searchTerm, statusFilter }: { searc
     setSortConfig({ key, direction });
   };
 
-  const handleApprove = (id: number) => {
-    setRequests(requests.map(req => req.id === id ? { ...req, status: 'Approved' } : req));
-  };
-
-  const handleReject = (id: number) => {
-    setRequests(requests.map(req => req.id === id ? { ...req, status: 'Rejected' } : req));
-    setSelectedRequest(null);
-    setRejectionComment('');
+  const handleRowClick = (requestId: number) => {
+    router.push(`/administrator/approvals/leave/${requestId}`);
   };
 
   const getStatusBadge = (status: string) => {
@@ -134,12 +126,11 @@ export default function LeaveRequestsTable({ searchTerm, statusFilter }: { searc
                   Status <ArrowUpDown className="ml-2 h-4 w-4" />
                 </Button>
               </TableHead>
-              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {sortedRequests.map((request) => (
-              <TableRow key={request.id} onClick={() => setSelectedRequest(request)} className="cursor-pointer">
+              <TableRow key={request.id} onClick={() => handleRowClick(request.id)} className="cursor-pointer">
                 <TableCell>
                   <div className="flex items-center">
                     <img src={request.employee.avatar} alt={request.employee.name} className="h-8 w-8 rounded-full mr-3" />
@@ -150,80 +141,11 @@ export default function LeaveRequestsTable({ searchTerm, statusFilter }: { searc
                 <TableCell>{request.requestType}</TableCell>
                 <TableCell>{request.dateRange}</TableCell>
                 <TableCell>{getStatusBadge(request.status)}</TableCell>
-                <TableCell>
-                  <div className="flex space-x-2">
-                    <Button
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleApprove(request.id);
-                      }}
-                      disabled={request.status !== 'Pending'}
-                    >
-                      Approve
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedRequest(request);
-                      }}
-                      disabled={request.status !== 'Pending'}
-                    >
-                      Reject
-                    </Button>
-                  </div>
-                </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </div>
-
-      <Dialog open={!!selectedRequest} onOpenChange={() => setSelectedRequest(null)}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Leave Request Details</DialogTitle>
-          </DialogHeader>
-          {selectedRequest && (
-            <div className="grid gap-4 py-4">
-              <p><strong>Employee:</strong> {selectedRequest.employee.name}</p>
-              <p><strong>Department:</strong> {selectedRequest.department}</p>
-              <p><strong>Request Type:</strong> {selectedRequest.requestType}</p>
-              <p><strong>Date Range:</strong> {selectedRequest.dateRange}</p>
-              <p><strong>Status:</strong> {getStatusBadge(selectedRequest.status)}</p>
-              {selectedRequest.documents.length > 0 && (
-                <div>
-                  <strong>Documents:</strong>
-                  <ul>
-                    {selectedRequest.documents.map((doc: any, i: number) => (
-                      <li key={i}>
-                        <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                          {doc.name}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              <Textarea
-                placeholder="Add comments for rejection..."
-                value={rejectionComment}
-                onChange={(e) => setRejectionComment(e.target.value)}
-              />
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSelectedRequest(null)}>
-              Cancel
-            </Button>
-            <Button onClick={() => handleReject(selectedRequest?.id)} disabled={!rejectionComment}>
-              Confirm Reject
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
-} 
+}

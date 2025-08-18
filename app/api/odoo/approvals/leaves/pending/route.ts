@@ -14,20 +14,13 @@ export async function GET(req: Request) {
     
     const client = getOdooClient();
     
-    // Get the approver's employee record to find their department/team
-    const approverProfile = await client.getFullUserProfile(uid);
-    console.log('👤 Approver profile:', approverProfile);
-
-    // Find leave requests that need approval
-    // This includes requests where the current user is the manager/approver
+    // For now, let's fetch all pending leave requests without filtering by approver
+    // This will show all requests that need approval
     const leaveRequests = await (client as any).execute(
       'hr.leave',
       'search_read',
       [[
-        ['state', '=', 'confirm'], // Requests waiting for approval
-        '|',
-        ['leave_manager_id', '=', approverProfile.id], // Direct reports
-        ['department_id.manager_id', '=', approverProfile.id] // Department manager
+        ['state', '=', 'confirm'] // Requests waiting for approval
       ]],
       {
         fields: [
@@ -39,17 +32,16 @@ export async function GET(req: Request) {
           'number_of_days',
           'number_of_days_display',
           'state',
-          'name',
           'user_id',
           'employee_id',
           'department_id',
-          'leave_manager_id',
           'create_date',
           'request_unit_hours',
           'request_hour_from',
           'request_hour_to'
         ],
-        order: 'create_date desc'
+        order: 'create_date desc',
+        limit: 50 // Limit to 50 requests for performance
       }
     );
 
@@ -68,6 +60,7 @@ export async function GET(req: Request) {
 
           return {
             id: request.id,
+            type: 'leave',
             employee: {
               id: request.employee_id[0],
               name: employee[0]?.name || 'Unknown Employee',

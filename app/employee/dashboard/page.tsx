@@ -431,116 +431,165 @@ export default function DashboardPage() {
   }
 
   return (
-    <>
-      <div className="space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold text-[#1d1a4e]">Dashboard</h1>
-          <p className="text-gray-500 mt-2">Overview of your attendance and leave management</p>
+    <MainLayout missedClockOut={missedClockOut}>
+      <div className="space-y-6">
+        {/* Page Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Employee Dashboard</h1>
+            <p className="text-gray-600 mt-1">Welcome back, {profile?.name || 'Employee'}</p>
+          </div>
+          <div className="text-sm text-gray-500">
+            {format(new Date(), 'EEEE, MMMM do, yyyy')}
+          </div>
         </div>
 
-        {/* Top Row: Card with Clock In/Out (left) and Action Buttons (right) */}
-        <Card className="mt-6 w-full">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-0 items-stretch min-h-[320px]">
-            {/* Left: Clock In/Out Widget, centered, no border, left-aligned text */}
-            <div className="flex items-center justify-center p-8 md:p-12">
-              <div className="w-full max-w-md text-left">
-                <h2 className="text-2xl font-bold text-[#1d1a4e] mb-2">Attendance</h2>
-                <AttendanceWidget />
-              </div>
-            </div>
-            {/* Right: 2x2 grid of action buttons, centered, larger buttons */}
-            <div className="flex items-center justify-center p-8 md:p-12">
-              <div className="grid grid-cols-2 gap-8 w-full max-w-md">
-                <Button variant="secondary" className="flex flex-col items-center py-8 px-4 min-h-[120px] min-w-[120px] text-base font-semibold shadow-sm" onClick={() => setLeaveDialogOpen(true)}>
-                  <CalendarIcon className="w-9 h-9 mb-3" />
-                  <span>Apply Leave</span>
-                </Button>
-                <Button variant="secondary" className="flex flex-col items-center py-8 px-4 min-h-[120px] min-w-[120px] text-base font-semibold shadow-sm" onClick={() => setExpenseDialogOpen(true)}>
-                  <ReceiptText className="w-9 h-9 mb-3" />
-                  <span>Submit Expense</span>
-                </Button>
-                <Button variant="secondary" className="flex flex-col items-center py-8 px-4 min-h-[120px] min-w-[120px] text-base font-semibold shadow-sm" onClick={() => setOtDialogOpen(true)}>
-                  <Clock className="w-9 h-9 mb-3" />
-                  <span>OT Request</span>
-                </Button>
-                <Button variant="secondary" className="flex flex-col items-center py-8 px-4 min-h-[120px] min-w-[120px] text-base font-semibold shadow-sm" onClick={() => setDiscussionDialogOpen(true)}>
-                  <MessageCircle className="w-9 h-9 mb-3" />
-                  <span>Start Discussion</span>
-                </Button>
-              </div>
-            </div>
-          </div>
-        </Card>
+        {/* Main Stats Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <Card className="shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => setAttendanceDialogOpen(true)}>
+            <CardHeader className="flex flex-row items-center gap-2 pb-2">
+              <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
+              <CardTitle className="text-sm sm:text-base">Total Hours</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="text-xl sm:text-2xl font-bold text-blue-600">{totalHours.toFixed(1)}h</div>
+              <p className="text-xs sm:text-sm text-gray-500 mt-1">This month</p>
+            </CardContent>
+          </Card>
 
-        {/* Second Row: Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-          <Card className="cursor-pointer hover:shadow-lg transition" onClick={openAttendanceDialog}>
-            <CardHeader>
-              <CardTitle className="text-lg">Attendance Rate</CardTitle>
-              <p className="text-sm text-muted-foreground">This month</p>
+          <Card className="shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => setPendingDialogOpen(true)}>
+            <CardHeader className="flex flex-row items-center gap-2 pb-2">
+              <CalendarIcon className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" />
+              <CardTitle className="text-sm sm:text-base">Pending Requests</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{Math.round(attendanceRate)}%</div>
+            <CardContent className="pt-0">
+              <div className="text-xl sm:text-2xl font-bold text-yellow-600">{pendingRequests}</div>
+              <p className="text-xs sm:text-sm text-gray-500 mt-1">Awaiting approval</p>
             </CardContent>
           </Card>
-          <Card className="cursor-pointer hover:shadow-lg transition" onClick={() => setOvertimeRequests(overtimeRequests + 1)}>
-            <CardHeader>
-              <CardTitle className="text-lg">Overtime Requests</CardTitle>
-              <p className="text-sm text-muted-foreground">This month</p>
+
+          <Card className="shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => setLeaveBalanceDialogOpen(true)}>
+            <CardHeader className="flex flex-row items-center gap-2 pb-2">
+              <ReceiptText className="w-4 h-4 sm:w-5 sm:h-5 text-green-500" />
+              <CardTitle className="text-sm sm:text-base">Attendance Rate</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{overtimeRequests}</div>
+            <CardContent className="pt-0">
+              <div className="text-xl sm:text-2xl font-bold text-green-600">{attendanceRate.toFixed(1)}%</div>
+              <p className="text-xs sm:text-sm text-gray-500 mt-1">This month</p>
             </CardContent>
           </Card>
-          <Card className="cursor-pointer hover:shadow-lg transition" onClick={openPendingDialog}>
-            <CardHeader>
-              <CardTitle className="text-lg">Pending Requests</CardTitle>
-              <p className="text-sm text-muted-foreground">Leave applications</p>
+
+          <Card className="shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => setOvertimeDialogOpen(true)}>
+            <CardHeader className="flex flex-row items-center gap-2 pb-2">
+              <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5 text-purple-500" />
+              <CardTitle className="text-sm sm:text-base">Overtime Requests</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{pendingRequests}</div>
-            </CardContent>
-          </Card>
-          <Card className="cursor-pointer hover:shadow-lg transition" onClick={() => setClaimDialogOpen(true)}>
-            <CardHeader>
-              <CardTitle className="text-lg">Claim Requests</CardTitle>
-              <p className="text-sm text-muted-foreground">This month</p>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{claimRequests}</div>
-            </CardContent>
-          </Card>
-          <Card className="cursor-pointer hover:shadow-lg transition" onClick={openLeaveBalanceDialog}>
-            <CardHeader>
-              <CardTitle className="text-lg">Leave Balance</CardTitle>
-              <p className="text-sm text-muted-foreground">This month</p>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">
-                {leaveAllocations.reduce((sum, alloc) => sum + ((alloc.number_of_days_display ?? alloc.max_leaves ?? 0) - (alloc.leaves_taken ?? 0)), 0)}
-              </div>
+            <CardContent className="pt-0">
+              <div className="text-xl sm:text-2xl font-bold text-purple-600">{overtimeRequests}</div>
+              <p className="text-xs sm:text-sm text-gray-500 mt-1">Pending approval</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Third Row: Monthly Attendance Chart (full width) */}
-        <div className="mt-6">
-          <div className="bg-white rounded-lg shadow p-6 w-full">
-            <h2 className="text-xl font-bold mb-4">Monthly Attendance</h2>
-            {monthlyAttendanceLoading ? (
-              <div className="h-[300px] flex items-center justify-center text-gray-400">Loading...</div>
-            ) : (
-              <AttendanceReportChart data={monthlyAttendanceData} />
-            )}
-          </div>
+        {/* Action Cards Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          <Card className="shadow-sm hover:shadow-md transition-shadow">
+            <CardHeader>
+              <CardTitle className="text-base sm:text-lg">Quick Actions</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Button 
+                onClick={() => setLeaveDialogOpen(true)} 
+                className="w-full justify-start"
+                variant="outline"
+              >
+                <CalendarIcon className="w-4 h-4 mr-2" />
+                Request Leave
+              </Button>
+              <Button 
+                onClick={() => setExpenseDialogOpen(true)} 
+                className="w-full justify-start"
+                variant="outline"
+              >
+                <ReceiptText className="w-4 h-4 mr-2" />
+                Submit Expense
+              </Button>
+              <Button 
+                onClick={() => setOtDialogOpen(true)} 
+                className="w-full justify-start"
+                variant="outline"
+              >
+                <Clock className="w-4 h-4 mr-2" />
+                Request Overtime
+              </Button>
+              <Button 
+                onClick={() => setDiscussionDialogOpen(true)} 
+                className="w-full justify-start"
+                variant="outline"
+              >
+                <MessageCircle className="w-4 h-4 mr-2" />
+                Start Discussion
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm hover:shadow-md transition-shadow">
+            <CardHeader>
+              <CardTitle className="text-base sm:text-lg">Leave Balance</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <LeaveBalanceCard leaveAllocations={leaveAllocations} />
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm hover:shadow-md transition-shadow">
+            <CardHeader>
+              <CardTitle className="text-base sm:text-lg">Attendance Widget</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <AttendanceWidget />
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Third Row: Shift Codes */}
-        {missedClockOut && (
-          <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4 rounded">
-            <strong>Reminder:</strong> You forgot to clock out yesterday. Please contact HR or your manager to correct your attendance.
-          </div>
-        )}
+        {/* Charts Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-base sm:text-lg">Monthly Attendance</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64 sm:h-80">
+                <AttendanceReportChart data={monthlyAttendanceData} />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-base sm:text-lg">Recent Claims</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {claims.slice(0, 5).map((claim, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div>
+                      <p className="font-medium text-sm">{claim.name}</p>
+                      <p className="text-xs text-gray-500">{claim.date}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium text-sm">${claim.total_amount}</p>
+                      <p className="text-xs text-gray-500">{claim.payment_mode}</p>
+                    </div>
+                  </div>
+                ))}
+                {claims.length === 0 && (
+                  <p className="text-center text-gray-500 text-sm py-4">No recent claims</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <Dialog open={claimDialogOpen} onOpenChange={setClaimDialogOpen}>
@@ -744,7 +793,7 @@ export default function DashboardPage() {
           <div className="py-4 text-center text-gray-500">Coming soon</div>
         </DialogContent>
       </Dialog>
-    </>
+    </MainLayout>
   );
 }
  

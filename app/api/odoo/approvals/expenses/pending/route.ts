@@ -14,20 +14,12 @@ export async function GET(req: Request) {
     
     const client = getOdooClient();
     
-    // Get the approver's employee record to find their department/team
-    const approverProfile = await client.getFullUserProfile(uid);
-    console.log('👤 Approver profile:', approverProfile);
-
-    // Find expense sheets that need approval
-    // This includes requests where the current user is the manager/approver
+    // For now, let's fetch all pending expense sheets without filtering by approver
     const expenseSheets = await (client as any).execute(
       'hr.expense.sheet',
       'search_read',
       [[
-        ['state', '=', 'submit'], // Requests waiting for approval
-        '|',
-        ['employee_id.leave_manager_id', '=', approverProfile.id], // Direct reports
-        ['employee_id.department_id.manager_id', '=', approverProfile.id] // Department manager
+        ['state', '=', 'submit'] // Requests waiting for approval
       ]],
       {
         fields: [
@@ -38,10 +30,10 @@ export async function GET(req: Request) {
           'currency_id',
           'state',
           'create_date',
-          'date',
-          
+          'expense_line_ids'
         ],
-        order: 'create_date desc'
+        order: 'create_date desc',
+        limit: 50 // Limit to 50 requests for performance
       }
     );
 
@@ -79,6 +71,7 @@ export async function GET(req: Request) {
 
           return {
             id: sheet.id,
+            type: 'expense',
             employee: {
               id: sheet.employee_id[0],
               name: employee[0]?.name || 'Unknown Employee',

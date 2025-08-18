@@ -1,16 +1,15 @@
-
-"use client";
+'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Calendar, Clock, DollarSign, User, Filter, Search } from 'lucide-react';
+import { Calendar, Clock, DollarSign, User, Filter, Search, Plus, Settings, List, BarChart3, Grid } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Employee {
@@ -32,6 +31,7 @@ interface LeaveRequest {
   state: string;
   submitted_date: string;
   department: string;
+  type: 'leave';
 }
 
 interface ExpenseRequest {
@@ -53,6 +53,7 @@ interface ExpenseRequest {
     has_attachment: boolean;
   }>;
   department: string;
+  type: 'expense';
 }
 
 interface ApprovalData {
@@ -62,14 +63,16 @@ interface ApprovalData {
 
 export default function ApprovalsPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('pending');
   const [loading, setLoading] = useState(true);
   const [pendingData, setPendingData] = useState<ApprovalData>({ leaves: [], expenses: [] });
   const [approvedData, setApprovedData] = useState<ApprovalData>({ leaves: [], expenses: [] });
   const [refusedData, setRefusedData] = useState<ApprovalData>({ leaves: [], expenses: [] });
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [departmentFilter, setDepartmentFilter] = useState('all');
-  const [typeFilter, setTypeFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(16);
+  const [viewType, setViewType] = useState<'list' | 'chart' | 'grid'>('list');
 
   useEffect(() => {
     loadApprovalData();
@@ -87,44 +90,22 @@ export default function ApprovalsPage() {
       }
 
       // Load pending requests
-      const pendingLeavesResponse = await fetch(`/api/odoo/approvals/leaves/pending?uid=${uid}`);
-      const pendingLeaves = await pendingLeavesResponse.json();
+      const pendingResponse = await fetch(`/api/odoo/approvals/leaves/pending?uid=${uid}`);
+      const pendingLeaves = await pendingResponse.json();
       
       const pendingExpensesResponse = await fetch(`/api/odoo/approvals/expenses/pending?uid=${uid}`);
       const pendingExpenses = await pendingExpensesResponse.json();
 
-      // Load approved requests
-      const approvedLeavesResponse = await fetch(`/api/odoo/approvals/leaves/approved?uid=${uid}`);
-      const approvedLeaves = await approvedLeavesResponse.json();
-      const approvedExpensesResponse = await fetch(`/api/odoo/approvals/expenses/approved?uid=${uid}`);
-      const approvedExpenses = await approvedExpensesResponse.json();
-
-      // Load refused requests
-      const refusedLeavesResponse = await fetch(`/api/odoo/approvals/leaves/refused?uid=${uid}`);
-      const refusedLeaves = await refusedLeavesResponse.json();
-      const refusedExpensesResponse = await fetch(`/api/odoo/approvals/expenses/refused?uid=${uid}`);
-      const refusedExpenses = await refusedExpensesResponse.json();
-
       if (pendingLeaves.success) {
         setPendingData({
-          leaves: pendingLeaves.data.leaves || [],
-          expenses: pendingExpenses.success ? pendingExpenses.data.expenses || [] : []
+          leaves: (pendingLeaves.data.leaves || []).map(l => ({...l, type: 'leave'})),
+          expenses: (pendingExpenses.success ? pendingExpenses.data.expenses || [] : []).map(e => ({...e, type: 'expense'}))
         });
       }
 
-      if (approvedLeaves.success) {
-        setApprovedData({
-          leaves: approvedLeaves.data.leaves || [],
-          expenses: approvedExpenses.success ? approvedExpenses.data.expenses || [] : []
-        });
-      }
-
-      if (refusedLeaves.success) {
-        setRefusedData({
-          leaves: refusedLeaves.data.leaves || [],
-          expenses: refusedExpenses.success ? refusedExpenses.data.expenses || [] : []
-        });
-      }
+      // TODO: Load approved and refused data from separate endpoints
+      setApprovedData({ leaves: [], expenses: [] });
+      setRefusedData({ leaves: [], expenses: [] });
 
     } catch (error) {
       console.error('Error loading approval data:', error);
@@ -134,67 +115,11 @@ export default function ApprovalsPage() {
     }
   };
 
-  const handleApprove = async (type: 'leave' | 'expense', id: number, comment?: string) => {
-    try {
-      const uid = localStorage.getItem('uid');
-      if (!uid) {
-        toast.error('Not logged in');
-        return;
-      }
-
-      const endpoint = type === 'leave' 
-        ? `/api/odoo/approvals/leaves/${id}/approve`
-        : `/api/odoo/approvals/expenses/${id}/approve`;
-
-      const response = await fetch(endpoint, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid: Number(uid), comment })
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        toast.success(`${type === 'leave' ? 'Leave' : 'Expense'} request approved successfully`);
-        loadApprovalData(); // Refresh data
-      } else {
-        toast.error(result.error || 'Failed to approve request');
-      }
-    } catch (error) {
-      console.error('Error approving request:', error);
-      toast.error('Failed to approve request');
-    }
-  };
-
-  const handleRefuse = async (type: 'leave' | 'expense', id: number, comment: string) => {
-    try {
-      const uid = localStorage.getItem('uid');
-      if (!uid) {
-        toast.error('Not logged in');
-        return;
-      }
-
-      const endpoint = type === 'leave' 
-        ? `/api/odoo/approvals/leaves/${id}/refuse`
-        : `/api/odoo/approvals/expenses/${id}/refuse`;
-
-      const response = await fetch(endpoint, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid: Number(uid), comment })
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        toast.success(`${type === 'leave' ? 'Leave' : 'Expense'} request refused successfully`);
-        loadApprovalData(); // Refresh data
-      } else {
-        toast.error(result.error || 'Failed to refuse request');
-      }
-    } catch (error) {
-      console.error('Error refusing request:', error);
-      toast.error('Failed to refuse request');
+  const handleRowClick = (request: LeaveRequest | ExpenseRequest) => {
+    if (request.type === 'leave') {
+      router.push(`/administrator/approvals/leave/${request.id}`);
+    } else {
+      router.push(`/administrator/approvals/expense/${request.id}`);
     }
   };
 
@@ -202,7 +127,7 @@ export default function ApprovalsPage() {
     switch (state) {
       case 'confirm':
       case 'submit':
-        return <Badge variant="secondary">Pending</Badge>;
+        return <Badge variant="secondary">Waiting Pre-Approval</Badge>;
       case 'validate':
       case 'approve':
         return <Badge className="bg-green-500 text-white">Approved</Badge>;
@@ -217,8 +142,11 @@ export default function ApprovalsPage() {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
-      month: 'short',
-      day: 'numeric'
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
     });
   };
 
@@ -229,7 +157,21 @@ export default function ApprovalsPage() {
     }).format(amount);
   };
 
-  const filteredData = (data: ApprovalData) => {
+  const getCurrentData = () => {
+    switch (statusFilter) {
+      case 'pending':
+        return pendingData;
+      case 'approved':
+        return approvedData;
+      case 'refused':
+        return refusedData;
+      default:
+        return pendingData;
+    }
+  };
+
+  const filteredData = () => {
+    const data = getCurrentData();
     let filtered = { ...data };
 
     // Filter by search term
@@ -252,286 +194,208 @@ export default function ApprovalsPage() {
       filtered.expenses = filtered.expenses.filter(expense => expense.department === departmentFilter);
     }
 
-    // Filter by type
-    if (typeFilter === 'leaves') {
-      filtered.expenses = [];
-    } else if (typeFilter === 'expenses') {
-      filtered.leaves = [];
-    }
-
     return filtered;
   };
 
-  const currentData = () => {
-    switch (activeTab) {
-      case 'pending':
-        return filteredData(pendingData);
-      case 'approved':
-        return filteredData(approvedData);
-      case 'refused':
-        return filteredData(refusedData);
-      default:
-        return { leaves: [], expenses: [] };
-    }
-  };
-
-  const renderLeaveCard = (leave: LeaveRequest) => (
-    <Card key={`leave-${leave.id}`} className="mb-4">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <Avatar>
-              <AvatarImage src={leave.employee.avatar} />
-              <AvatarFallback>{leave.employee.name.charAt(0)}</AvatarFallback>
-            </Avatar>
-            <div>
-              <h3 className="font-semibold">{leave.employee.name}</h3>
-              <p className="text-sm text-gray-500">{leave.employee.department}</p>
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            {getStatusBadge(leave.state)}
-            <Badge variant="outline">{leave.leave_type}</Badge>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
-          <div className="flex items-center space-x-2 text-sm">
-            <Calendar className="h-4 w-4" />
-            <span>{formatDate(leave.date_from)} - {formatDate(leave.date_to)}</span>
-            <span className="text-gray-500">({leave.number_of_days} days)</span>
-          </div>
-          <p className="text-sm text-gray-600">{leave.description}</p>
-          <div className="flex items-center space-x-2 text-xs text-gray-500">
-            <Clock className="h-3 w-3" />
-            <span>Submitted {formatDate(leave.submitted_date)}</span>
-          </div>
-        </div>
-        
-        {activeTab === 'pending' && (
-          <div className="flex space-x-2 mt-4">
-            <Button 
-              size="sm" 
-              onClick={() => handleApprove('leave', leave.id)}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              Approve
-            </Button>
-            <Button 
-              size="sm" 
-              variant="destructive"
-              onClick={() => {
-                const comment = prompt('Please provide a reason for refusal:');
-                if (comment) {
-                  handleRefuse('leave', leave.id, comment);
-                }
-              }}
-            >
-              Refuse
-            </Button>
-            <Button size="sm" variant="outline">
-              View Details
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-
-  const renderExpenseCard = (expense: ExpenseRequest) => (
-    <Card key={`expense-${expense.id}`} className="mb-4">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <Avatar>
-              <AvatarImage src={expense.employee.avatar} />
-              <AvatarFallback>{expense.employee.name.charAt(0)}</AvatarFallback>
-            </Avatar>
-            <div>
-              <h3 className="font-semibold">{expense.employee.name}</h3>
-              <p className="text-sm text-gray-500">{expense.employee.department}</p>
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            {getStatusBadge(expense.state)}
-            <Badge variant="outline">Expense</Badge>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
-          <h4 className="font-medium">{expense.name}</h4>
-          <div className="flex items-center space-x-2 text-sm">
-            <DollarSign className="h-4 w-4" />
-            <span className="font-semibold">{formatCurrency(expense.total_amount, expense.currency)}</span>
-          </div>
-          <div className="text-sm text-gray-600">
-            {expense.expense_lines.length} expense line{expense.expense_lines.length !== 1 ? 's' : ''}
-          </div>
-          <div className="flex items-center space-x-2 text-xs text-gray-500">
-            <Clock className="h-3 w-3" />
-            <span>Submitted {formatDate(expense.submitted_date)}</span>
-          </div>
-        </div>
-        
-        {activeTab === 'pending' && (
-          <div className="flex space-x-2 mt-4">
-            <Button 
-              size="sm" 
-              onClick={() => handleApprove('expense', expense.id)}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              Approve
-            </Button>
-            <Button 
-              size="sm" 
-              variant="destructive"
-              onClick={() => {
-                const comment = prompt('Please provide a reason for refusal:');
-                if (comment) {
-                  handleRefuse('expense', expense.id, comment);
-                }
-              }}
-            >
-              Refuse
-            </Button>
-            <Button size="sm" variant="outline">
-              View Details
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
+  const currentData = filteredData();
+  const allRequests = [...currentData.leaves, ...currentData.expenses];
+  const totalItems = allRequests.length;
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedRequests = allRequests.slice(startIndex, endIndex);
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
-  const currentDataValue = currentData();
-  const totalRequests = currentDataValue.leaves.length + currentDataValue.expenses.length;
-
   return (
-    <div className="container mx-auto p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Approval Dashboard</h1>
-        <p className="text-gray-600">Review and manage pending leave and expense requests</p>
+    <div className="flex h-full">
+      {/* Filter Sidebar */}
+      <div className="w-64 bg-gray-50 border-r p-4 space-y-6">
+        <div>
+          <h3 className="font-semibold text-sm text-gray-700 mb-3">STATUS</h3>
+          <div className="space-y-2">
+            <button
+              onClick={() => setStatusFilter('all')}
+              className={`w-full text-left px-3 py-2 rounded text-sm ${
+                statusFilter === 'all' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setStatusFilter('pending')}
+              className={`w-full text-left px-3 py-2 rounded text-sm ${
+                statusFilter === 'pending' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              Waiting Pre-Approval
+            </button>
+            <button
+              onClick={() => setStatusFilter('refused')}
+              className={`w-full text-left px-3 py-2 rounded text-sm ${
+                statusFilter === 'refused' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              Refused
+            </button>
+            <button
+              onClick={() => setStatusFilter('approved')}
+              className={`w-full text-left px-3 py-2 rounded text-sm ${
+                statusFilter === 'approved' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              Approved
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="font-semibold text-sm text-gray-700 mb-3">DEPARTMENT</h3>
+          <div className="space-y-2">
+            <button
+              onClick={() => setDepartmentFilter('all')}
+              className={`w-full text-left px-3 py-2 rounded text-sm ${
+                departmentFilter === 'all' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              All
+            </button>
+            <div className="pl-3">
+              <button
+                onClick={() => setDepartmentFilter('Management')}
+                className={`w-full text-left px-3 py-2 rounded text-sm ${
+                  departmentFilter === 'Management' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                ▸ Management
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Filters */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Filter className="h-5 w-5" />
-            <span>Filters</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col">
+        {/* Toolbar */}
+        <div className="bg-white border-b p-4 flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Button className="bg-blue-600 hover:bg-blue-700">
+              <Plus className="w-4 h-4 mr-2" />
+              New
+            </Button>
+            <div className="flex items-center space-x-2">
+              <h1 className="text-lg font-semibold">Time Off Analysis</h1>
+              <Settings className="w-4 h-4 text-gray-500" />
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-4">
             <div className="relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input
-                placeholder="Search by name or description..."
+                placeholder="Search..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 w-64"
               />
             </div>
-            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Department" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Departments</SelectItem>
-                <SelectItem value="Engineering">Engineering</SelectItem>
-                <SelectItem value="Marketing">Marketing</SelectItem>
-                <SelectItem value="Sales">Sales</SelectItem>
-                <SelectItem value="HR">HR</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Request Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="leaves">Leave Requests</SelectItem>
-                <SelectItem value="expenses">Expense Requests</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button onClick={loadApprovalData} variant="outline">
-              Refresh
-            </Button>
+            
+            <div className="flex items-center space-x-2 text-sm text-gray-600">
+              <span>{startIndex + 1}-{Math.min(endIndex, totalItems)} / {totalItems}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+              >
+                ‹
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setCurrentPage(Math.min(Math.ceil(totalItems / itemsPerPage), currentPage + 1))}
+                disabled={endIndex >= totalItems}
+              >
+                ›
+              </Button>
+            </div>
+            
+            <div className="flex items-center space-x-1">
+              <Button
+                variant={viewType === 'list' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewType('list')}
+              >
+                <List className="w-4 h-4" />
+              </Button>
+              <Button
+                variant={viewType === 'chart' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewType('chart')}
+              >
+                <BarChart3 className="w-4 h-4" />
+              </Button>
+              <Button
+                variant={viewType === 'grid' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewType('grid')}
+              >
+                <Grid className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="pending">
-            To Approve ({pendingData.leaves.length + pendingData.expenses.length})
-          </TabsTrigger>
-          <TabsTrigger value="approved">
-            Approved ({approvedData.leaves.length + approvedData.expenses.length})
-          </TabsTrigger>
-          <TabsTrigger value="refused">
-            Refused ({refusedData.leaves.length + refusedData.expenses.length})
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="pending" className="mt-6">
-          {totalRequests === 0 ? (
-            <Card>
-              <CardContent className="flex items-center justify-center h-32">
-                <p className="text-gray-500">No pending requests to approve</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {currentDataValue.leaves.map(renderLeaveCard)}
-              {currentDataValue.expenses.map(renderExpenseCard)}
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="approved" className="mt-6">
-          {totalRequests === 0 ? (
-            <Card>
-              <CardContent className="flex items-center justify-center h-32">
-                <p className="text-gray-500">No approved requests</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {currentDataValue.leaves.map(renderLeaveCard)}
-              {currentDataValue.expenses.map(renderExpenseCard)}
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="refused" className="mt-6">
-          {totalRequests === 0 ? (
-            <Card>
-              <CardContent className="flex items-center justify-center h-32">
-                <p className="text-gray-500">No refused requests</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {currentDataValue.leaves.map(renderLeaveCard)}
-              {currentDataValue.expenses.map(renderExpenseCard)}
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
+        {/* Table */}
+        <div className="flex-1 overflow-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Employee</TableHead>
+                <TableHead>Number of Days</TableHead>
+                <TableHead>Start Date</TableHead>
+                <TableHead>End Date</TableHead>
+                <TableHead>State</TableHead>
+                <TableHead>Description</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {paginatedRequests.map((request: any) => (
+                <TableRow key={`${request.type}-${request.id}`} className="hover:bg-gray-50 cursor-pointer" onClick={() => handleRowClick(request)}>
+                  <TableCell>
+                    <div className="flex items-center space-x-3">
+                      <Avatar className="w-8 h-8">
+                        <AvatarImage src={request.employee.avatar} />
+                        <AvatarFallback>{request.employee.name.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <span className="font-medium">{request.employee.name}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {request.type === 'leave' ? 
+                      `${request.number_of_days.toFixed(2)} days` : 
+                      formatCurrency(request.total_amount, request.currency)
+                    }
+                  </TableCell>
+                  <TableCell>{formatDate(request.date_from)}</TableCell>
+                  <TableCell>{formatDate(request.date_to)}</TableCell>
+                  <TableCell>{getStatusBadge(request.state)}</TableCell>
+                  <TableCell>
+                    <div className="max-w-xs truncate">
+                      {request.type === 'leave' ? request.description : request.name}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
     </div>
   );
 }

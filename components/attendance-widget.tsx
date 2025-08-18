@@ -197,6 +197,26 @@ export default function AttendanceWidget() {
   const mealCheckInStatus = 'N/A';
   const checkOutStatus = 'N/A';
 
+  const getStatusColor = () => {
+    if (today?.lastClockIn && !today?.lastClockOut) {
+      return 'text-green-600';
+    } else if (today?.lastClockOut) {
+      return 'text-red-600';
+    } else {
+      return 'text-gray-600';
+    }
+  };
+
+  const getStatusText = () => {
+    if (today?.lastClockIn && !today?.lastClockOut) {
+      return 'Clocked In';
+    } else if (today?.lastClockOut) {
+      return 'Clocked Out';
+    } else {
+      return 'No Clock In/Out';
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg shadow p-6 flex flex-col w-full text-left max-w-xl min-w-[320px]" style={{ minWidth: '320px', maxWidth: '480px' }}>
       
@@ -232,16 +252,16 @@ export default function AttendanceWidget() {
         )}
       </div>
       <div className="flex gap-4 mt-2">
-        <Button
-          onClick={handleClockIn}
+        <Button 
+          onClick={handleClockIn} 
           disabled={!canClockIn || !!error || loading}
           size="lg"
           className="flex items-center gap-2"
         >
           <Clock className="w-5 h-5" /> Clock In
         </Button>
-        <Button
-          onClick={handleClockOut}
+        <Button 
+          onClick={handleClockOut} 
           disabled={!canClockOut || !!error || loading}
           size="lg"
           variant="destructive"

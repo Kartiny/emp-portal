@@ -1,4 +1,4 @@
-"use client"
+'use client';
 
 import type React from "react"
 import { useRole } from '../context/RoleContext'
@@ -11,7 +11,9 @@ import {
   ListTodo,
   MessageCircle,
   Receipt,
-  User
+  User,
+  FileText,
+  CheckCircle
 } from "lucide-react"
 
 interface MainLayoutProps {
@@ -45,9 +47,8 @@ export function MainLayout({ children, missedClockOut }: MainLayoutProps) {
       { name: "Attendance Management", href: "/administrator/attendance-management", icon: Clock },
       { name: "Leave Management", href: "/administrator/leave-management", icon: Calendar },
       { name: "Expense Management", href: "/administrator/expense-management", icon: Receipt },
-      { name: "Reports", href: "/administrator/reports", icon: ListTodo },
-      { name: "Approvals", href: "/administrator/approvals", icon: ListTodo },
-      { name: "Contracts", href: "/administrator/contracts", icon: ListTodo },
+      { name: "Reports", href: "/administrator/reports", icon: FileText },
+      { name: "Approvals", href: "/administrator/approvals", icon: CheckCircle },
       { name: "Profile", href: "/administrator/profile", icon: User },
     ],
     manager: [
@@ -55,7 +56,6 @@ export function MainLayout({ children, missedClockOut }: MainLayoutProps) {
       { name: "Team Attendance", href: "/manager/team-attendance", icon: Clock },
       { name: "Approve Leaves", href: "/manager/approve-leaves", icon: Calendar },
       { name: "Approve Expenses", href: "/manager/approve-expenses", icon: Receipt },
-      { name: "Team Reports", href: "/manager/reports", icon: ListTodo },
       { name: "Profile", href: "/manager/profile", icon: User },
     ],
   }

@@ -13,13 +13,17 @@ async function getUserRoles(uid: number, employeeType?: string) {
   
   try {
     // Get user's groups from res.users
+    console.log(`🔍 Fetching user groups for UID: ${uid}`);
     const userGroups = await (client as any).execute(
       'res.users',
       'read',
       [[uid], ['groups_id']]
     );
 
+    console.log(`🔍 User groups response:`, userGroups);
+
     if (!userGroups || !userGroups[0]) {
+      console.log(`❌ No user groups found for UID: ${uid}`);
       return { 
         roles: [], 
         primaryRole: 'employee', 
@@ -29,7 +33,12 @@ async function getUserRoles(uid: number, employeeType?: string) {
     }
 
     const groupIds = userGroups[0].groups_id || [];
+    console.log(`🔍 Group IDs found:`, groupIds);
     
+    if (groupIds.length === 0) {
+      console.log(`⚠️ User has no groups assigned`);
+    }
+
     // Get detailed group information including category_id and access rights
     const groups = await (client as any).execute(
       'res.groups',
@@ -173,24 +182,25 @@ async function getUserRoles(uid: number, employeeType?: string) {
     console.log(`🎭 employeeType === 'administrator': ${employeeType === 'administrator'}`);
     console.log(`🎭 employeeType === 'admin': ${employeeType === 'admin'}`);
     
-    // Special case: if employee_type is 'hr', always assign administrator role
-    if (employeeType === 'hr') {
-      primaryRole = 'administrator';
-      console.log(`🎯 Special case: employee_type is 'hr', forcing ADMINISTRATOR role`);
-    } else if (employeeType === 'administrator' || employeeType === 'admin') {
+    // Special case: if employee_type is 'administrator' or 'admin', always assign administrator role
+    if (employeeType === 'administrator' || employeeType === 'admin') {
       primaryRole = 'administrator';
       console.log(`🎯 Special case: employee_type is '${employeeType}', forcing ADMINISTRATOR role`);
+    } else if (employeeType === 'hr') {
+      // HR users should also be administrators since they have the same permissions
+      primaryRole = 'administrator';
+      console.log(`🎯 Special case: employee_type is 'hr', mapping to ADMINISTRATOR role`);
     } else {
-      console.log(`❌ Special case NOT triggered - employeeType "${employeeType}" !== "hr"/"administrator"/"admin"`);
-      // Check group-based roles only if not 'hr'
+      console.log(`❌ Special case NOT triggered - employeeType "${employeeType}" !== "administrator"/"admin"/"hr"`);
+      // Check group-based roles only if not 'administrator' or 'hr'
       if (roles.some((r: any) => r.role === 'administrator')) {
         primaryRole = 'administrator';
-        console.log(`✅ Primary role set to: ADMINISTRATOR (from groups)`);
+        console.log(`✅ Primary role set to: ADMINISTRATOR (group-based)`);
       } else if (roles.some((r: any) => r.role === 'manager')) {
         primaryRole = 'manager';
-        console.log(`✅ Primary role set to: MANAGER (from groups)`);
+        console.log(`✅ Primary role set to: MANAGER (group-based)`);
       } else {
-        console.log(`✅ Primary role set to: ${baseRole.toUpperCase()} (from employee type)`);
+        console.log(`✅ Primary role remains: ${primaryRole} (default)`);
       }
     }
     
@@ -208,11 +218,19 @@ async function getUserRoles(uid: number, employeeType?: string) {
     };
   } catch (error) {
     console.error('Error fetching user roles:', error);
+    
+    // Special handling for HR users - they should always get administrator role
+    let fallbackPrimaryRole = 'employee';
+    if (employeeType === 'hr' || employeeType === 'administrator' || employeeType === 'admin') {
+      fallbackPrimaryRole = 'administrator';
+      console.log(`🔄 Fallback: Setting HR user to ADMINISTRATOR role despite error`);
+    }
+    
     return { 
       roles: [], 
-      primaryRole: 'employee', 
+      primaryRole: fallbackPrimaryRole, 
       permissions: [],
-      availableFeatures: ['dashboard', 'profile'],
+      availableFeatures: fallbackPrimaryRole === 'administrator' ? ['dashboard', 'profile', 'employee_management', 'leave_management', 'expense_management', 'attendance_management', 'reports', 'approvals'] : ['dashboard', 'profile'],
       employeeType: employeeType
     };
   }

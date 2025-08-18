@@ -5,7 +5,6 @@ import { MainLayout } from '@/components/main-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart2, UserCheck, UserX, Clock, FileText, ClipboardList } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
-import { ChartContainer } from '@/components/ui/chart';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 export default function ManagerDashboardPage() {
@@ -115,6 +114,6 @@ export default function ManagerDashboardPage() {
             </Card>
           </>
         )}
-      </div>
+    </div>
   );
 } 

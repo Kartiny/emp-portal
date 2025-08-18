@@ -1372,7 +1372,7 @@ export class OdooClient {
       const schedule = await this.execute(
         'hr.work.schedule.code',
         'search_read',
-        [['name', '=', shiftInfo.schedule_name]],
+        [[['name', '=', shiftInfo.schedule_name]]],
         {
           fields: ['grace_period_late_in', 'grace_period_early_out', 'meal_check_out', 'meal_check_in'],
           limit: 1,

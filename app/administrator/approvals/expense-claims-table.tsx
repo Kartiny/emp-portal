@@ -1,14 +1,11 @@
-
-"use client";
+'use client';
 
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ArrowUpDown } from 'lucide-react';
-import ApprovalButtons from './components/approval-buttons';
 
 const expenseClaimsData = [
   {
@@ -42,11 +39,10 @@ const expenseClaimsData = [
 
 type SortKey = 'employee' | 'department' | 'requestType' | 'amount' | 'status';
 
-export default function ExpenseClaimsTable({ searchTerm, statusFilter }) {
+export default function ExpenseClaimsTable({ searchTerm, statusFilter }: { searchTerm: string; statusFilter: string }) {
   const [claims, setClaims] = useState(expenseClaimsData);
-  const [selectedClaim, setSelectedClaim] = useState(null);
-  const [rejectionComment, setRejectionComment] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'ascending' | 'descending' } | null>(null);
+  const router = useRouter();
 
   const filteredClaims = useMemo(() => {
     return claims
@@ -81,17 +77,11 @@ export default function ExpenseClaimsTable({ searchTerm, statusFilter }) {
     setSortConfig({ key, direction });
   };
 
-  const handleApprove = (id) => {
-    setClaims(claims.map(claim => claim.id === id ? { ...claim, status: 'Approved' } : claim));
+  const handleRowClick = (claimId: number) => {
+    router.push(`/administrator/approvals/expense/${claimId}`);
   };
 
-  const handleReject = (id) => {
-    setClaims(claims.map(claim => claim.id === id ? { ...claim, status: 'Rejected' } : claim));
-    setSelectedClaim(null);
-    setRejectionComment('');
-  };
-
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case 'Pending': return <Badge variant="secondary">Pending</Badge>;
       case 'Approved': return <Badge className="bg-green-500 text-white">Approved</Badge>;
@@ -131,12 +121,11 @@ export default function ExpenseClaimsTable({ searchTerm, statusFilter }) {
                   Status <ArrowUpDown className="ml-2 h-4 w-4" />
                 </Button>
               </TableHead>
-              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {sortedClaims.map((claim) => (
-              <TableRow key={claim.id} onClick={() => setSelectedClaim(claim)} className="cursor-pointer">
+              <TableRow key={claim.id} onClick={() => handleRowClick(claim.id)} className="cursor-pointer">
                 <TableCell>
                   <div className="flex items-center">
                     <img src={claim.employee.avatar} alt={claim.employee.name} className="h-8 w-8 rounded-full mr-3" />
@@ -147,54 +136,11 @@ export default function ExpenseClaimsTable({ searchTerm, statusFilter }) {
                 <TableCell>{claim.requestType}</TableCell>
                 <TableCell>{claim.amount}</TableCell>
                 <TableCell>{getStatusBadge(claim.status)}</TableCell>
-                <TableCell>
-                  <ApprovalButtons
-                    onApprove={() => handleApprove(claim.id)}
-                    onReject={() => setSelectedClaim(claim)}
-                    status={claim.status}
-                  />
-                </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </div>
-
-      <Dialog open={!!selectedClaim} onOpenChange={() => setSelectedClaim(null)}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Expense Claim Details</DialogTitle>
-          </DialogHeader>
-          {selectedClaim && (
-            <div className="grid gap-4 py-4">
-              <p><strong>Employee:</strong> {selectedClaim.employee.name}</p>
-              <p><strong>Department:</strong> {selectedClaim.department}</p>
-              <p><strong>Expense Type:</strong> {selectedClaim.requestType}</p>
-              <p><strong>Amount:</strong> {selectedClaim.amount}</p>
-              <p><strong>Status:</strong> {getStatusBadge(selectedClaim.status)}</p>
-              {selectedClaim.receipts.length > 0 && (
-                <div>
-                  <strong>Receipts:</strong>
-                  <ul>
-                    {selectedClaim.receipts.map((receipt, i) => (
-                      <li key={i}><a href={receipt.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{receipt.name}</a></li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              <Textarea 
-                placeholder="Add comments for rejection..." 
-                value={rejectionComment}
-                onChange={(e) => setRejectionComment(e.target.value)}
-              />
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSelectedClaim(null)}>Cancel</Button>
-            <Button onClick={() => handleReject(selectedClaim.id)} disabled={!rejectionComment}>Confirm Reject</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

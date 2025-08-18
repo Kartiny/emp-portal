@@ -1,6 +1,6 @@
 export const ODOO_CONFIG = {
-  BASE_URL: 'https://staging17.senangniaga.my', 
-  DB_NAME: 'v17c_attendance_demo',
+  BASE_URL: 'https://eglobalscm-ysdev.senangbot.com', 
+  DB_NAME: 'v17c_demo_payroll1',
   ADMIN_USER: 'e-global',
-  ADMIN_PWD: 'egl2025attn'
+  ADMIN_PWD: '12345'
 } as const; 

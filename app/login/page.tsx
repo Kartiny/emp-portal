@@ -110,26 +110,11 @@ export default function LoginPage() {
           console.log('🔍 No roles found, added employee fallback');
         }
 
-        // Add employeeType to roles if it's 'hr'
-        if (data.employeeType === 'hr' && !roles.includes('hr')) {
-          roles.push('hr');
-          console.log('🔍 Added employeeType hr to roles');
-        }
-
         // Add employeeType to roles if it's 'manager'
         if (data.employeeType === 'manager' && !roles.includes('manager')) {
           roles.push('manager');
           console.log('🔍 Added employeeType manager to roles');
         }
-        
-        // Map 'hr' role to 'administrator' for frontend compatibility
-        roles = roles.map((role: string) => {
-          if (role === 'hr') {
-            console.log('🔍 Mapping hr role to administrator');
-            return 'administrator';
-          }
-          return role;
-        });
         
         // Ensure employee role is included for managers and administrators
         if (roles.length === 1 && (roles[0] === 'manager' || roles[0] === 'administrator') && !roles.includes('employee')) {
@@ -139,6 +124,9 @@ export default function LoginPage() {
         
         console.log('🎭 Final roles for frontend:', roles);
         setRoles(roles);
+        
+        // Store the final roles array for RoleContext hydration
+        localStorage.setItem('roles', JSON.stringify(roles));
         
         // Always redirect to verify page after login
         router.push('/verify');
