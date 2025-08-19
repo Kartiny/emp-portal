@@ -1374,7 +1374,51 @@ export class OdooClient {
         'search_read',
         [[['name', '=', shiftInfo.schedule_name]]],
         {
-          fields: ['grace_period_late_in', 'grace_period_early_out', 'line_ids'],
+          fields: [
+            // Grace Period Settings (A6, A7)
+            'grace_period_late_in',
+            'grace_period_early_out',
+            'grace_period_friday_prayer',
+            
+            // Meal Hours Settings (A5)
+            'meals_hour_type',
+            'meal_hour',
+            'meal_hour_value',
+            'meals_offset_check',
+            'meals_offset_from',
+            'meals_offset_to',
+            'meals_offset_check_to',
+            
+            // Tea Break Settings
+            'tea_hour_type',
+            'tea_hour',
+            'tea_hour_value',
+            
+            // Working Hours Impact Settings (A1-A4)
+            'early_in_time',
+            'late_out_time',
+            'early_out_time',
+            'late_in_time',
+            'min_late_out',
+            
+            // Offset Settings (A8)
+            'only_minus',
+            'only_minus_absorb_grace',
+            'offset_late_in',
+            'offset_late_in_ot',
+            'max_late_in',
+            'max_late_in_absorb',
+            'offset_early_out_ot',
+            'max_early_out',
+            'max_early_out_absorb',
+            
+            // Other Settings
+            'overtime_auto_approval',
+            'shift_allowance_1',
+            'shift_allowance_2',
+            'shift_frequency_formula',
+            'line_ids'
+          ],
           limit: 1,
         }
       );
@@ -1403,10 +1447,50 @@ export class OdooClient {
         }
         
         return {
+          // Grace Period Settings
           grace_period_late_in: scheduleRecord.grace_period_late_in,
           grace_period_early_out: scheduleRecord.grace_period_early_out,
+          grace_period_friday_prayer: scheduleRecord.grace_period_friday_prayer,
+          
+          // Meal Settings
           meal_check_out: mealCheckOut,
           meal_check_in: mealCheckIn,
+          meals_hour_type: scheduleRecord.meals_hour_type,
+          meal_hour: scheduleRecord.meal_hour,
+          meal_hour_value: scheduleRecord.meal_hour_value,
+          meals_offset_check: scheduleRecord.meals_offset_check,
+          meals_offset_from: scheduleRecord.meals_offset_from,
+          meals_offset_to: scheduleRecord.meals_offset_to,
+          meals_offset_check_to: scheduleRecord.meals_offset_check_to,
+          
+          // Tea Break Settings
+          tea_hour_type: scheduleRecord.tea_hour_type,
+          tea_hour: scheduleRecord.tea_hour,
+          tea_hour_value: scheduleRecord.tea_hour_value,
+          
+          // Working Hours Impact Settings
+          early_in_time: scheduleRecord.early_in_time,
+          late_out_time: scheduleRecord.late_out_time,
+          early_out_time: scheduleRecord.early_out_time,
+          late_in_time: scheduleRecord.late_in_time,
+          min_late_out: scheduleRecord.min_late_out,
+          
+          // Offset Settings
+          only_minus: scheduleRecord.only_minus,
+          only_minus_absorb_grace: scheduleRecord.only_minus_absorb_grace,
+          offset_late_in: scheduleRecord.offset_late_in,
+          offset_late_in_ot: scheduleRecord.offset_late_in_ot,
+          max_late_in: scheduleRecord.max_late_in,
+          max_late_in_absorb: scheduleRecord.max_late_in_absorb,
+          offset_early_out_ot: scheduleRecord.offset_early_out_ot,
+          max_early_out: scheduleRecord.max_early_out,
+          max_early_out_absorb: scheduleRecord.max_early_out_absorb,
+          
+          // Other Settings
+          overtime_auto_approval: scheduleRecord.overtime_auto_approval,
+          shift_allowance_1: scheduleRecord.shift_allowance_1,
+          shift_allowance_2: scheduleRecord.shift_allowance_2,
+          shift_frequency_formula: scheduleRecord.shift_frequency_formula
         };
       }
     }

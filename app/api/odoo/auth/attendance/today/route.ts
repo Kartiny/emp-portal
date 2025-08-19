@@ -53,10 +53,10 @@ export async function POST(req: Request) {
         : 0;
     }
 
-    // Calculate status fields
-    const calculateStatus = (actualTime: string | null, scheduledTime: string | null, gracePeriod: number, type: 'in' | 'out') => {
+    // Calculate status fields with proper business rules
+    const calculateStatusWithRules = (actualTime: string | null, scheduledTime: string | null, config: any, type: 'checkIn' | 'mealOut' | 'mealIn' | 'checkOut') => {
       if (!actualTime || !scheduledTime) {
-        return { status: 'N/A', mins: 0 };
+        return { status: 'N/A', mins: 0, workingHoursImpact: 0 };
       }
 
       try {
@@ -67,30 +67,116 @@ export async function POST(req: Request) {
 
         const diffMinutes = differenceInMinutes(actualDate, scheduledDate);
 
-        if (type === 'in') {
-          // For check-in: positive means late
-          if (diffMinutes > gracePeriod) {
-            const hours = Math.floor(diffMinutes / 60);
-            const mins = diffMinutes % 60;
-            const timeStr = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
-            return { status: `Late in by ${timeStr}`, mins: diffMinutes };
-          } else {
-            return { status: 'On time', mins: 0 };
-          }
-        } else {
-          // For check-out: negative means early out
-          if (diffMinutes < -gracePeriod) {
-            const absMinutes = Math.abs(diffMinutes);
-            const hours = Math.floor(absMinutes / 60);
-            const mins = absMinutes % 60;
-            const timeStr = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
-            return { status: `Early check out by ${timeStr}`, mins: absMinutes };
-          } else {
-            return { status: 'On time', mins: 0 };
-          }
+        switch (type) {
+          case 'checkIn':
+            // A1: Early In - Add to working hours
+            if (diffMinutes < 0) {
+              const absMinutes = Math.abs(diffMinutes);
+              const hours = Math.floor(absMinutes / 60);
+              const mins = absMinutes % 60;
+              const timeStr = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+              return { 
+                status: `Early in by ${timeStr}`, 
+                mins: absMinutes, 
+                workingHoursImpact: absMinutes / 60 // Add to working hours
+              };
+            }
+            // A4: Late In - Check grace period and deduct if over
+            else if (diffMinutes > 0) {
+              const gracePeriod = config.grace_period_late_in || 0;
+              const hours = Math.floor(diffMinutes / 60);
+              const mins = diffMinutes % 60;
+              const timeStr = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+              
+              // Check if within grace period
+              if (diffMinutes <= gracePeriod) {
+                return { 
+                  status: `Late in by ${timeStr} (within grace period)`, 
+                  mins: diffMinutes, 
+                  workingHoursImpact: 0 // No deduction within grace period
+                };
+              } else {
+                // Check if only_minus_absorb_grace is enabled
+                const deductMinutes = config.only_minus_absorb_grace ? diffMinutes : (diffMinutes - gracePeriod);
+                return { 
+                  status: `Late in by ${timeStr}`, 
+                  mins: diffMinutes, 
+                  workingHoursImpact: -(deductMinutes / 60) // Deduct from working hours
+                };
+              }
+            }
+            break;
+
+          case 'checkOut':
+            // A2: Late Out - Add to working hours
+            if (diffMinutes > 0) {
+              const hours = Math.floor(diffMinutes / 60);
+              const mins = diffMinutes % 60;
+              const timeStr = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+              return { 
+                status: `Late out by ${timeStr}`, 
+                mins: diffMinutes, 
+                workingHoursImpact: diffMinutes / 60 // Add to working hours
+              };
+            }
+            // A3: Early Out - Check grace period and deduct if over
+            else if (diffMinutes < 0) {
+              const absMinutes = Math.abs(diffMinutes);
+              const gracePeriod = config.grace_period_early_out || 0;
+              const hours = Math.floor(absMinutes / 60);
+              const mins = absMinutes % 60;
+              const timeStr = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+              
+              // Check if within grace period
+              if (absMinutes <= gracePeriod) {
+                return { 
+                  status: `Early out by ${timeStr} (within grace period)`, 
+                  mins: absMinutes, 
+                  workingHoursImpact: 0 // No deduction within grace period
+                };
+              } else {
+                // Check if only_minus_absorb_grace is enabled
+                const deductMinutes = config.only_minus_absorb_grace ? absMinutes : (absMinutes - gracePeriod);
+                return { 
+                  status: `Early out by ${timeStr}`, 
+                  mins: absMinutes, 
+                  workingHoursImpact: -(deductMinutes / 60) // Deduct from working hours
+                };
+              }
+            }
+            break;
+
+          case 'mealOut':
+          case 'mealIn':
+            // A5: Meal Hours - Check if within meal time range
+            if (diffMinutes === 0) {
+              return { status: 'On time', mins: 0, workingHoursImpact: 0 };
+            } else {
+              const absMinutes = Math.abs(diffMinutes);
+              const hours = Math.floor(absMinutes / 60);
+              const mins = absMinutes % 60;
+              const timeStr = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+              
+              if (diffMinutes > 0) {
+                return { 
+                  status: `Late by ${timeStr}`, 
+                  mins: diffMinutes, 
+                  workingHoursImpact: 0 // Meal time doesn't affect working hours directly
+                };
+              } else {
+                return { 
+                  status: `Early by ${timeStr}`, 
+                  mins: absMinutes, 
+                  workingHoursImpact: 0 // Meal time doesn't affect working hours directly
+                };
+              }
+            }
+            break;
         }
+
+        return { status: 'On time', mins: 0, workingHoursImpact: 0 };
       } catch (error) {
-        return { status: 'N/A', mins: 0 };
+        return { status: 'N/A', mins: 0, workingHoursImpact: 0 };
       }
     };
 
@@ -101,45 +187,83 @@ export async function POST(req: Request) {
     const firstCheckIn = checkInRecords[0]?.datetime || null;
     const secondCheckIn = checkInRecords[1]?.datetime || null;
     const firstCheckOut = checkOutRecords[0]?.datetime || null;
-    const lastCheckOut = checkOutRecords[checkOutRecords.length - 1]?.datetime || null;
+    const secondCheckOut = checkOutRecords[1]?.datetime || null; // Changed from lastCheckOut to secondCheckOut
 
-    // Calculate statuses
-    const checkInStatus = calculateStatus(
+    // Calculate statuses with business rules
+    const checkInStatus = calculateStatusWithRules(
       firstCheckIn, 
       shiftInfo?.start, 
-      gracePeriod?.grace_period_late_in || 0, 
-      'in'
+      gracePeriod, 
+      'checkIn'
     );
 
-    const mealCheckOutStatus = calculateStatus(
+    // Meal check-out status - shown after first check-out (lunch)
+    const mealCheckOutStatus = calculateStatusWithRules(
       firstCheckOut, 
       gracePeriod?.meal_check_out, 
-      0, // No grace period for meal
-      'out'
+      gracePeriod, 
+      'mealOut'
     );
 
-    const mealCheckInStatus = calculateStatus(
+    // Meal check-in status - shown after second check-in (return from lunch)
+    const mealCheckInStatus = calculateStatusWithRules(
       secondCheckIn, 
       gracePeriod?.meal_check_in, 
-      0, // No grace period for meal
-      'in'
+      gracePeriod, 
+      'mealIn'
     );
 
-    const checkOutStatus = calculateStatus(
-      lastCheckOut, 
-      shiftInfo?.end, 
-      gracePeriod?.grace_period_early_out || 0, 
-      'out'
-    );
+    // Final check-out status - only shown after second check-out (end of day)
+    let checkOutStatus;
+    if (secondCheckOut) {
+      // Employee has completed the day (second check-out exists)
+      checkOutStatus = calculateStatusWithRules(
+        secondCheckOut,
+        shiftInfo?.end, 
+        gracePeriod, 
+        'checkOut'
+      );
+    } else {
+      // Employee is still at work (no second check-out yet)
+      checkOutStatus = {
+        status: 'Still at work',
+        mins: 0,
+        workingHoursImpact: 0
+      };
+    }
 
-    // Debug logging for meal times
-    console.log('🔍 Meal Time Debug:', {
+    // Calculate total working hours impact
+    const totalWorkingHoursImpact = 
+      checkInStatus.workingHoursImpact + 
+      checkOutStatus.workingHoursImpact;
+
+    // Debug logging for meal times and working hours impact
+    console.log('🔍 Business Rules Debug:', {
+      firstCheckIn,
+      shiftStart: shiftInfo?.start,
       firstCheckOut,
       mealCheckOutScheduled: gracePeriod?.meal_check_out,
       secondCheckIn,
       mealCheckInScheduled: gracePeriod?.meal_check_in,
+      secondCheckOut, // Changed from lastCheckOut
+      shiftEnd: shiftInfo?.end,
+      checkInStatus: checkInStatus.status,
+      checkOutStatus: checkOutStatus.status,
       mealCheckOutStatus: mealCheckOutStatus.status,
-      mealCheckInStatus: mealCheckInStatus.status
+      mealCheckInStatus: mealCheckInStatus.status,
+      totalWorkingHoursImpact,
+      gracePeriodSettings: {
+        lateIn: gracePeriod?.grace_period_late_in,
+        earlyOut: gracePeriod?.grace_period_early_out,
+        onlyMinusAbsorbGrace: gracePeriod?.only_minus_absorb_grace
+      },
+      attendanceFlow: {
+        hasFirstCheckIn: !!firstCheckIn,
+        hasFirstCheckOut: !!firstCheckOut,
+        hasSecondCheckIn: !!secondCheckIn,
+        hasSecondCheckOut: !!secondCheckOut,
+        currentStage: secondCheckOut ? 'Completed' : secondCheckIn ? 'After Lunch' : firstCheckOut ? 'At Lunch' : firstCheckIn ? 'Working' : 'Not Started'
+      }
     });
 
     const result = {
@@ -156,15 +280,21 @@ export async function POST(req: Request) {
         latitude: r.latitude,
         longitude: r.longitude
       })),
-      // Add calculated status fields
+      // Add calculated status fields with business rules
       checkInStatus: checkInStatus.status,
       checkInMins: checkInStatus.mins,
+      checkInWorkingHoursImpact: checkInStatus.workingHoursImpact,
       mealCheckOutStatus: mealCheckOutStatus.status,
       mealCheckOutMins: mealCheckOutStatus.mins,
+      mealCheckOutWorkingHoursImpact: mealCheckOutStatus.workingHoursImpact,
       mealCheckInStatus: mealCheckInStatus.status,
       mealCheckInMins: mealCheckInStatus.mins,
+      mealCheckInWorkingHoursImpact: mealCheckInStatus.workingHoursImpact,
       checkOutStatus: checkOutStatus.status,
       checkOutMins: checkOutStatus.mins,
+      checkOutWorkingHoursImpact: checkOutStatus.workingHoursImpact,
+      // Add total working hours impact
+      totalWorkingHoursImpact,
       // Add shift info for reference
       shiftInfo
     };
