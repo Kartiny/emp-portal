@@ -127,7 +127,7 @@ export default function AttendanceWidget({ today, shift, onUpdate }: { today: To
         <div className="text-sm text-blue-800 font-medium mt-1">
           {shift ? (
             <>
-              Shif: <span className="font-semibold">{shift.schedule_name}</span>
+              Shiftt: <span className="font-semibold">{shift.schedule_name}</span>
               {shift.start && shift.end && (
                 <span className="ml-2">({shift.start} - {shift.end})</span>
               )}
