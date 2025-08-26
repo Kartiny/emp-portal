@@ -120,14 +120,14 @@ export default function AttendanceWidget({ today, shift, onUpdate }: { today: To
   const checkOutStatus = 'Check Out';
 
   return (
-    <div className="bg-white rounded-lg shadow p-6 flex flex-col w-full text-left max-w-xl min-w-[320px]" style={{ minWidth: '320px', maxWidth: '480px' }}>
+    <div className="bg-white rounded-lg shadow p-4 lg:p-6 flex flex-col w-full text-left">
       
       <div className="mb-2">
-        <h3 className="text-xl font-bold text-[#1d1a4e]">{todayStr}</h3>
-        <div className="text-sm text-blue-800 font-medium mt-1">
+        <h3 className="text-lg lg:text-xl font-bold text-[#1d1a4e]">{todayStr}</h3>
+        <div className="text-xs lg:text-sm text-blue-800 font-medium mt-1">
           {shift ? (
             <>
-              Shiftt: <span className="font-semibold">{shift.schedule_name}</span>
+              Shift: <span className="font-semibold">{shift.schedule_name}</span>
               {shift.start && shift.end && (
                 <span className="ml-2">({shift.start} - {shift.end})</span>
               )}
@@ -135,15 +135,16 @@ export default function AttendanceWidget({ today, shift, onUpdate }: { today: To
           ) : <span>No shift info</span>}
         </div>
       </div>
+      
       <div className="mb-2">
-        <div className="text-sm font-semibold">Last Clock In</div>
-        <div className="mb-1">{lastClockIn ? formatTimeKL(lastClockIn) : '-'}</div>
-        <div className="text-sm font-semibold">Last Clock Out</div>
-        <div className="mb-1">{lastClockOut ? formatTimeKL(lastClockOut) : '-'}</div>
+        <div className="text-xs lg:text-sm font-semibold">Last Clock In</div>
+        <div className="mb-1 text-sm lg:text-base">{lastClockIn ? formatTimeKL(lastClockIn) : '-'}</div>
+        <div className="text-xs lg:text-sm font-semibold">Last Clock Out</div>
+        <div className="mb-1 text-sm lg:text-base">{lastClockOut ? formatTimeKL(lastClockOut) : '-'}</div>
         {today && today.workedHours && today.workedHours > 0 && (
           <div>
-            <p className="text-sm font-semibold">Worked Hours Today</p>
-            <p className="text-600">
+            <p className="text-xs lg:text-sm font-semibold">Worked Hours Today</p>
+            <p className="text-sm lg:text-base">
               {(() => {
                 const h = Math.floor(today.workedHours!);
                 const m = Math.round((today.workedHours! % 1) * 60);
@@ -153,59 +154,63 @@ export default function AttendanceWidget({ today, shift, onUpdate }: { today: To
           </div>
         )}
       </div>
-      <div className="flex gap-4 mt-2">
+      
+      <div className="flex flex-col sm:flex-row gap-2 lg:gap-4 mt-2">
         <Button 
           onClick={handleClockIn} 
           disabled={!canClockIn || loading}
-          size="lg"
-          className="flex items-center gap-2"
+          size="default"
+          className="flex items-center gap-2 text-sm lg:text-base"
         >
-          <Clock className="w-5 h-5" /> Clock In
+          <Clock className="w-4 h-4 lg:w-5 lg:h-5" /> Clock In
         </Button>
         <Button 
           onClick={handleClockOut} 
           disabled={!canClockOut || loading}
-          size="lg"
+          size="default"
           variant="destructive"
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 text-sm lg:text-base"
         >
-          <Clock className="w-5 h-5" /> Clock Out
+          <Clock className="w-4 h-4 lg:w-5 lg:h-5" /> Clock Out
         </Button>
       </div>
+      
       {/* Show all today's clock-in/out records */}
       {today?.records && today.records.length > 0 && (
         <div className="mt-4">
-          <div className="font-semibold mb-2">Today's Clock In/Out Records</div>
-          <table className="w-full text-sm border">
-            <thead>
-              <tr>
-                <th className="border px-2 py-1">Time</th>
-                <th className="border px-2 py-1">Type</th>
-                <th className="border px-2 py-1">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {today.records.map((rec, index) => {
-                let status = 'N/A';
-                if (index === 0) {
-                  status = checkInStatus;
-                } else if (index === 1) {
-                  status = mealCheckOutStatus;
-                } else if (index === 2) {
-                  status = mealCheckInStatus;
-                } else if (index === 3) {
-                  status = checkOutStatus;
-                }
-                return (
-                  <tr key={rec.id}>
-                    <td className="border px-2 py-1">{formatTimeKL(rec.datetime)}</td>
-                    <td className="border px-2 py-1">{rec.attn_type === 'i' ? 'In' : rec.attn_type === 'o' ? 'Out' : rec.attn_type}</td>
-                    <td className="border px-2 py-1">{status}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+          <div className="font-semibold mb-2 text-sm lg:text-base">Today's Clock In/Out Records</div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs lg:text-sm border">
+              <thead>
+                <tr>
+                  <th className="border px-1 lg:px-2 py-1">Time</th>
+                  <th className="border px-1 lg:px-2 py-1">Type</th>
+                  <th className="border px-1 lg:px-2 py-1">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {today.records.map((rec, index) => {
+                  let status = 'N/A';
+                  if (index === 0) {
+                    status = checkInStatus;
+                  } else if (index === 1) {
+                    status = mealCheckOutStatus;
+                  } else if (index === 2) {
+                    status = mealCheckInStatus;
+                  } else if (index === 3) {
+                    status = checkOutStatus;
+                  }
+                  return (
+                    <tr key={rec.id}>
+                      <td className="border px-1 lg:px-2 py-1">{formatTimeKL(rec.datetime)}</td>
+                      <td className="border px-1 lg:px-2 py-1">{rec.attn_type === 'i' ? 'In' : rec.attn_type === 'o' ? 'Out' : rec.attn_type}</td>
+                      <td className="border px-1 lg:px-2 py-1">{status}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

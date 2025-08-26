@@ -98,6 +98,7 @@ export default function LeavePage() {
           setError('Not logged in');
           return;
         }
+
         const uid = Number(rawUid);
 
         // Fetch all leave-related data in parallel
@@ -311,7 +312,7 @@ export default function LeavePage() {
 
       toast.success('Leave request submitted successfully');
       setIsRequestOpen(false);
-
+      
       // Refresh the list of leave requests
       const newRequests = await fetch('/api/odoo/leave/requests', {
         method: 'POST',
@@ -320,7 +321,7 @@ export default function LeavePage() {
       }).then((res) => res.json());
       if (newRequests.error) throw new Error(newRequests.error);
       setLeaveRequests(newRequests);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error submitting leave request:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to submit leave request');
     }
@@ -337,27 +338,31 @@ export default function LeavePage() {
   // ───── Render Loading / Error States ──────────────────────────────────────
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <p>Loading leave data...</p>
-      </div>
+      <MainLayout>
+        <div className="flex items-center justify-center h-64">
+          <p>Loading leave data...</p>
+        </div>
+      </MainLayout>
     );
   }
 
   if (error) {
     return (
+      <MainLayout>
         <Card>
           <CardContent className="text-red-600 p-6">{error}</CardContent>
         </Card>
+      </MainLayout>
     );
   }
 
   // ───── Main JSX ───────────────────────────────────────────────────────────
   return (
-    <>
+    <MainLayout>
       <div className="space-y-6">
         <Tabs defaultValue="calendar" className="w-full">
           <div className="flex items-center justify-between mb-4">
-            <TabsList>
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="calendar">Calendar</TabsTrigger>
               <TabsTrigger value="balance">
                 Leave Balance
@@ -476,6 +481,6 @@ export default function LeavePage() {
           </DialogContent>
         </Dialog>
       </div>
-    </>
+    </MainLayout>
   );
 }

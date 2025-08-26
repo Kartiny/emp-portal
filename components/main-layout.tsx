@@ -4,6 +4,9 @@ import type React from "react"
 import { useRole } from '../context/RoleContext'
 import { Sidebar, SidebarProvider } from './ui/sidebar'
 import { CustomHeader } from "@/components/custom-header"
+import { Button } from "@/components/ui/button"
+import { Menu, X } from "lucide-react"
+import { useState } from "react"
 import {
   Calendar,
   Clock,
@@ -24,6 +27,7 @@ interface MainLayoutProps {
 
 export function MainLayout({ children, missedClockOut }: MainLayoutProps) {
   const { roles, isHydrated } = useRole()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   if (!isHydrated) {
     return (
@@ -92,25 +96,53 @@ export function MainLayout({ children, missedClockOut }: MainLayoutProps) {
       <div className="min-h-screen bg-gray-50">
 
         {/* Top Bar */}
-        <div className="fixed top-0 left-0 right-0 h-20 bg-white border-b z-30">
-          <CustomHeader missedClockOut={missedClockOut} />
+        <div className="fixed top-0 left-0 right-0 h-16 lg:h-20 bg-white border-b z-30">
+          <div className="flex items-center h-full px-4 lg:px-8">
+            {/* Mobile Menu Button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="lg:hidden mr-2"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+            >
+              {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </Button>
+            
+            {/* Custom Header */}
+            <div className="flex-1">
+              <CustomHeader missedClockOut={missedClockOut} />
+            </div>
+          </div>
         </div>
 
+        {/* Mobile Sidebar Overlay */}
+        {sidebarOpen && (
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
         {/* Sidebar */}
-        <aside className="fixed top-20 left-0 bottom-0 w-56 bg-white border-r z-20 overflow-y-auto">
+        <aside className={`
+          fixed top-16 lg:top-20 left-0 bottom-0 z-50 lg:z-20 
+          w-64 bg-white border-r overflow-y-auto transform transition-transform duration-300 ease-in-out
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        `}>
           <Sidebar>
             <nav className="flex flex-col gap-4 p-4">
               {menu.map(group => (
                 <div key={group.title}>
-                  <h2 className="font-bold text-md mb-2">{group.title}</h2>
+                  <h2 className="font-bold text-sm lg:text-md mb-2 text-gray-700">{group.title}</h2>
                   {group.items.map(item => (
                     <a
                       key={item.name}
                       href={item.href}
-                      className="flex items-center gap-2 p-2 rounded hover:bg-gray-100 text-sm"
+                      className="flex items-center gap-2 p-2 rounded hover:bg-gray-100 text-sm transition-colors"
+                      onClick={() => setSidebarOpen(false)}
                     >
-                      <item.icon className="w-5 h-5" />
-                      <span>{item.name}</span>
+                      <item.icon className="w-4 h-4 lg:w-5 lg:h-5" />
+                      <span className="truncate">{item.name}</span>
                     </a>
                   ))}
                 </div>
@@ -120,7 +152,11 @@ export function MainLayout({ children, missedClockOut }: MainLayoutProps) {
         </aside>
 
         {/* Main Content */}
-        <main className="fixed top-20 left-60 right-0 bottom-0 overflow-y-auto px-8 py-8 bg-gray-50">
+        <main className={`
+          fixed top-16 lg:top-20 left-0 lg:left-64 right-0 bottom-0 
+          overflow-y-auto px-4 lg:px-8 py-4 lg:py-8 bg-gray-50
+          transition-all duration-300 ease-in-out
+        `}>
           {children}
         </main>
       </div>

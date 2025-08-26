@@ -106,111 +106,131 @@ export function CustomHeader({ missedClockOut }: CustomHeaderProps) {
   };
 
   return (
-    <div className="w-full bg-white border-b">
-      <div className="max-w-screen-xl mx-auto w-full flex h-20 items-center justify-between px-8">
-      {/* Left: Avatar + Hi, Name */}
-      <div className="flex items-center space-x-3">
-        <Link href="/profile" className="flex items-center">
-          <Avatar className="h-9 w-9 mr-2">
-            {!isLoading && profile?.image ? (
-              <AvatarImage src={profile.image} alt={profile.name || 'User'} />
-            ) : null}
-            <AvatarFallback>
-              {getInitials(profile?.name || '')}
-            </AvatarFallback>
-          </Avatar>
-        </Link>
-        <span className="text-lg font-semibold">Hi, {profile?.name || 'User'}</span>
-      </div>
-        {/* Right: Warning, Tasks, Notifications, Logo, Activities, Role Switcher */}
-      <div className="flex items-center space-x-6">
-        {roles.length > 1 && companies.length > 0 && (
-          <Select onValueChange={handleCompanyChange} value={selectedCompanyId ? String(selectedCompanyId) : ''}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Select Company" />
-            </SelectTrigger>
-            <SelectContent>
-              {companies.map((company) => (
-                <SelectItem key={company.id} value={String(company.id)}>
-                  {company.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-        {missedClockOut ? (
-          <Popover open={showMissedPopover} onOpenChange={setShowMissedPopover}>
-            <PopoverTrigger asChild>
-              <button title="Missed Clock Out" className="relative transition-colors" onClick={() => setShowMissedPopover(true)}>
-                <AlertTriangle className="h-6 w-6 text-red-600 animate-pulse" />
-                <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-red-500 border-2 border-white animate-ping" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-64 text-sm text-red-900 bg-red-50 border-red-400">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">⚠️</span>
-                <span>You missed your clock out for today! Please update your attendance.</span>
-              </div>
-            </PopoverContent>
-          </Popover>
-        ) : (
-          <span title="No missed clock out" className="relative">
-            <AlertTriangle className="h-6 w-6 text-gray-400" />
+    <div className="w-full bg-white">
+      <div className="w-full flex h-full items-center justify-between">
+        {/* Left: Avatar + Hi, Name */}
+        <div className="flex items-center space-x-2 lg:space-x-3">
+          <Link href="/profile" className="flex items-center">
+            <Avatar className="h-8 w-8 lg:h-9 lg:w-9 mr-2">
+              {!isLoading && profile?.image ? (
+                <AvatarImage src={profile.image} alt={profile.name || 'User'} />
+              ) : null}
+              <AvatarFallback>
+                {getInitials(profile?.name || '')}
+              </AvatarFallback>
+            </Avatar>
+          </Link>
+          <span className="text-sm lg:text-lg font-semibold hidden sm:inline">
+            Hi, {profile?.name || 'User'}
           </span>
-        )}
-        <Popover open={showActivities} onOpenChange={(open) => {
-          setShowActivities(open);
-          if (open) fetchActivities();
-        }}>
-          <PopoverTrigger asChild>
-            <button title="Activities" className="hover:text-blue-600 transition-colors relative">
-              <ListTodo className="h-6 w-6" />
-              {activities.length > 0 && (
-                <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-blue-500 border-2 border-white" />
-              )}
-            </button>
-          </PopoverTrigger>
-          <PopoverContent className="w-72">
-            <div className="font-semibold mb-2">Your Activities</div>
-            {activitiesLoading ? (
-              <div>Loading...</div>
-            ) : activities.length === 0 ? (
-              <div className="text-muted-foreground">No activities found.</div>
-            ) : (
-              <ul className="space-y-1">
-                {activities.map((a) => (
-                  <li key={a.id} className="border-b last:border-b-0 py-1">
-                    <span className="font-medium">{a.activity_type_name}</span>
-                    {a.summary && <span className="ml-2 text-xs text-muted-foreground">{a.summary}</span>}
-                    {a.date_deadline && <span className="ml-2 text-xs text-blue-600">{a.date_deadline}</span>}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </PopoverContent>
-        </Popover>
-        <button title="Chat" className="hover:text-blue-600 transition-colors" onClick={() => alert('Open chat!')}>
-          <MessageCircle className="h-6 w-6" />
-        </button>
-        <button
-          title="Logout"
-          className="hover:text-red-600 transition-colors flex items-center gap-1"
-          onClick={() => {
-            localStorage.clear();
-            window.location.href = '/login';
-          }}
-        >
-          <LogOut className="h-6 w-6" />
-          <span className="hidden md:inline">Logout</span>
-        </button>
-        <Image
-          src="/logo.png"
-          alt="KPRJ Logo"
-          width={60}
-          height={60}
-          className="rounded-lg ml-2"
-        />
-          
+          <span className="text-sm lg:text-lg font-semibold sm:hidden">
+            {profile?.name || 'User'}
+          </span>
+        </div>
+
+        {/* Right: Warning, Tasks, Notifications, Logo, Activities, Role Switcher */}
+        <div className="flex items-center space-x-2 lg:space-x-6">
+          {/* Company Selector - Hidden on mobile */}
+          {roles.length > 1 && companies.length > 0 && (
+            <div className="hidden md:block">
+              <Select onValueChange={handleCompanyChange} value={selectedCompanyId ? String(selectedCompanyId) : ''}>
+                <SelectTrigger className="w-[140px] lg:w-[180px]">
+                  <SelectValue placeholder="Select Company" />
+                </SelectTrigger>
+                <SelectContent>
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={String(company.id)}>
+                      {company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Missed Clock Out Warning */}
+          {missedClockOut ? (
+            <Popover open={showMissedPopover} onOpenChange={setShowMissedPopover}>
+              <PopoverTrigger asChild>
+                <button title="Missed Clock Out" className="relative transition-colors" onClick={() => setShowMissedPopover(true)}>
+                  <AlertTriangle className="h-5 w-5 lg:h-6 lg:w-6 text-red-600 animate-pulse" />
+                  <span className="absolute -top-1 -right-1 h-2 w-2 lg:h-3 lg:w-3 rounded-full bg-red-500 border-2 border-white animate-ping" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 text-sm text-red-900 bg-red-50 border-red-400">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">⚠️</span>
+                  <span>You missed your clock out for today! Please update your attendance.</span>
+                </div>
+              </PopoverContent>
+            </Popover>
+          ) : (
+            <span title="No missed clock out" className="relative">
+              <AlertTriangle className="h-5 w-5 lg:h-6 lg:w-6 text-gray-400" />
+            </span>
+          )}
+
+          {/* Activities - Hidden on small mobile */}
+          <div className="hidden sm:block">
+            <Popover open={showActivities} onOpenChange={(open) => {
+              setShowActivities(open);
+              if (open) fetchActivities();
+            }}>
+              <PopoverTrigger asChild>
+                <button title="Activities" className="hover:text-blue-600 transition-colors relative">
+                  <ListTodo className="h-5 w-5 lg:h-6 lg:w-6" />
+                  {activities.length > 0 && (
+                    <span className="absolute -top-1 -right-1 h-2 w-2 lg:h-3 lg:w-3 rounded-full bg-blue-500 border-2 border-white" />
+                  )}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-72">
+                <div className="font-semibold mb-2">Your Activities</div>
+                {activitiesLoading ? (
+                  <div>Loading...</div>
+                ) : activities.length === 0 ? (
+                  <div className="text-muted-foreground">No activities found.</div>
+                ) : (
+                  <ul className="space-y-1">
+                    {activities.map((a) => (
+                      <li key={a.id} className="border-b last:border-b-0 py-1">
+                        <span className="font-medium">{a.activity_type_name}</span>
+                        {a.summary && <span className="ml-2 text-xs text-muted-foreground">{a.summary}</span>}
+                        {a.date_deadline && <span className="ml-2 text-xs text-blue-600">{a.date_deadline}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Chat - Hidden on small mobile */}
+          <button title="Chat" className="hidden sm:block hover:text-blue-600 transition-colors" onClick={() => alert('Open chat!')}>
+            <MessageCircle className="h-5 w-5 lg:h-6 lg:w-6" />
+          </button>
+
+          {/* Logout */}
+          <button
+            title="Logout"
+            className="hover:text-red-600 transition-colors flex items-center gap-1"
+            onClick={() => {
+              localStorage.clear();
+              window.location.href = '/login';
+            }}
+          >
+            <LogOut className="h-5 w-5 lg:h-6 lg:w-6" />
+            <span className="hidden lg:inline">Logout</span>
+          </button>
+
+          {/* Logo */}
+          <Image
+            src="/logo.png"
+            alt="KPRJ Logo"
+            width={40}
+            height={40}
+            className="rounded-lg ml-2 lg:w-[60px] lg:h-[60px]"
+          />
         </div>
       </div>
     </div>

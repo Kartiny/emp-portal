@@ -426,14 +426,15 @@ export default function AttendancePage() {
   }
 
   return (
-  
+    <MainLayout>
       <div className="space-y-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList>
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="today">Today's Attendance</TabsTrigger>
             <TabsTrigger value="summary">Attendance Summary</TabsTrigger>
             <TabsTrigger value="rosters">Shift Rosters</TabsTrigger>
           </TabsList>
+          
           <TabsContent value="today">
             <Card>
               <CardHeader>
@@ -441,7 +442,7 @@ export default function AttendancePage() {
                 <CardDescription>Clock in/out and status overview</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Left: AttendanceWidget */}
                   <div className="flex flex-col justify-center">
                     <AttendanceWidget 
@@ -534,6 +535,7 @@ export default function AttendancePage() {
               </CardContent>
             </Card>
           </TabsContent>
+          
           <TabsContent value="summary">
             <Card>
               <CardHeader>
@@ -545,20 +547,21 @@ export default function AttendancePage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm">Total Hours</p>
-                    <p className="text-2xl font-bold">{attendanceData?.totalHours.toFixed(1)}h</p>
+                    <p className="text-xl lg:text-2xl font-bold">{attendanceData?.totalHours.toFixed(1)}h</p>
                   </div>
                   <div>
                     <p className="text-sm">Attendance Rate</p>
-                    <p className="text-2xl font-bold">{attendanceData?.rate.toFixed(1)}%</p>
+                    <p className="text-xl lg:text-2xl font-bold">{attendanceData?.rate.toFixed(1)}%</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
+            
             {/* Controls */}
-            <div className="flex items-center gap-4 py-2 px-4 bg-[#1d1a4e] rounded-lg">
+            <div className="flex flex-col sm:flex-row items-center gap-4 py-2 px-4 bg-[#1d1a4e] rounded-lg">
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
@@ -568,7 +571,7 @@ export default function AttendancePage() {
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <Button variant="outline" onClick={goToCurrent}>
+                <Button variant="outline" onClick={goToCurrent} className="text-sm lg:text-base">
                   {getRangeLabel()}
                 </Button>
                 <Button
@@ -597,6 +600,7 @@ export default function AttendancePage() {
                 </SelectContent>
               </Select>
             </div>
+            
             {/* Records Table */}
             <Card>
               <CardHeader>
@@ -604,54 +608,57 @@ export default function AttendancePage() {
                 <CardDescription>Your attendance history</CardDescription>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Day</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Shift Code</TableHead>
-                      <TableHead>Approved OT Hours</TableHead>
-                      <TableHead>Check In</TableHead>
-                      <TableHead>Check Out</TableHead>
-                      <TableHead>Meal In</TableHead>
-                      <TableHead>Meal Out</TableHead>
-                      <TableHead>Worked Hours</TableHead>
-                      <TableHead>Total OT</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {attendanceData?.records.map((rec) => (
-                      <TableRow key={rec.id}>
-                        <TableCell>{rec.day}</TableCell>
-                        <TableCell>{formatDate(rec.date || '')}</TableCell>
-                        <TableCell>{rec.shiftCode || '-'}</TableCell>
-                        <TableCell></TableCell>
-                        <TableCell>{floatToTimeString(rec.checkIn)}</TableCell>
-                        <TableCell>{floatToTimeString(rec.checkOut)}</TableCell>
-                        <TableCell>{floatToTimeString(rec.mealIn)}</TableCell>
-                        <TableCell>{floatToTimeString(rec.mealOut)}</TableCell>
-                        <TableCell>{rec.workedHours ? formatHours(rec.workedHours) : '-'}</TableCell>
-                        <TableCell></TableCell>
-                        <TableCell>
-                          {rec.status && typeof rec.status === 'string' && statusLabels[rec.status]
-                            ? statusLabels[rec.status]
-                            : rec.status || '-'}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {(!attendanceData?.records || attendanceData.records.length === 0) && (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center">
-                          No attendance records found
-                        </TableCell>
+                        <TableHead className="text-xs lg:text-sm">Day</TableHead>
+                        <TableHead className="text-xs lg:text-sm">Date</TableHead>
+                        <TableHead className="text-xs lg:text-sm">Shift Code</TableHead>
+                        <TableHead className="text-xs lg:text-sm">Approved OT Hours</TableHead>
+                        <TableHead className="text-xs lg:text-sm">Check In</TableHead>
+                        <TableHead className="text-xs lg:text-sm">Check Out</TableHead>
+                        <TableHead className="text-xs lg:text-sm">Meal In</TableHead>
+                        <TableHead className="text-xs lg:text-sm">Meal Out</TableHead>
+                        <TableHead className="text-xs lg:text-sm">Worked Hours</TableHead>
+                        <TableHead className="text-xs lg:text-sm">Total OT</TableHead>
+                        <TableHead className="text-xs lg:text-sm">Status</TableHead>
                       </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {attendanceData?.records.map((rec) => (
+                        <TableRow key={rec.id}>
+                          <TableCell className="text-xs lg:text-sm">{rec.day}</TableCell>
+                          <TableCell className="text-xs lg:text-sm">{formatDate(rec.date || '')}</TableCell>
+                          <TableCell className="text-xs lg:text-sm">{rec.shiftCode || '-'}</TableCell>
+                          <TableCell className="text-xs lg:text-sm"></TableCell>
+                          <TableCell className="text-xs lg:text-sm">{floatToTimeString(rec.checkIn)}</TableCell>
+                          <TableCell className="text-xs lg:text-sm">{floatToTimeString(rec.checkOut)}</TableCell>
+                          <TableCell className="text-xs lg:text-sm">{floatToTimeString(rec.mealIn)}</TableCell>
+                          <TableCell className="text-xs lg:text-sm">{floatToTimeString(rec.mealOut)}</TableCell>
+                          <TableCell className="text-xs lg:text-sm">{rec.workedHours ? formatHours(rec.workedHours) : '-'}</TableCell>
+                          <TableCell className="text-xs lg:text-sm"></TableCell>
+                          <TableCell className="text-xs lg:text-sm">
+                            {rec.status && typeof rec.status === 'string' && statusLabels[rec.status]
+                              ? statusLabels[rec.status]
+                              : rec.status || '-'}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {(!attendanceData?.records || attendanceData.records.length === 0) && (
+                        <TableRow>
+                          <TableCell colSpan={11} className="text-center text-xs lg:text-sm">
+                            No attendance records found
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
+          
           <TabsContent value="rosters">
             <Card>
               <CardHeader>
@@ -659,7 +666,7 @@ export default function AttendancePage() {
                 <CardDescription>View your assigned shifts and rosters here.</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center gap-2 mb-4">
+                <div className="flex flex-col sm:flex-row items-center gap-2 mb-4">
                   <Select value={String(rosterMonth)} onValueChange={(v) => setRosterMonth(Number(v))}>
                     <SelectTrigger className="w-[160px]">
                       <SelectValue placeholder="Month" />
@@ -695,7 +702,7 @@ export default function AttendancePage() {
                         <TableHeader>
                           <TableRow>
                             {roster.days.map((day: any, i: number) => (
-                              <TableHead key={i} className="text-center">{`Day${day.day}`}</TableHead>
+                              <TableHead key={i} className="text-center text-xs lg:text-sm">{`Day${day.day}`}</TableHead>
                             ))}
                           </TableRow>
                         </TableHeader>
@@ -705,7 +712,7 @@ export default function AttendancePage() {
                               const dateObj = new Date(roster.year, roster.month - 1, day.day);
                               const weekday = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
                               return (
-                                <TableCell key={i} className="text-center">
+                                <TableCell key={i} className="text-center text-xs lg:text-sm">
                                   <div>{weekday}</div>
                                   <div className="font-semibold">{day.code || '-'}</div>
                                 </TableCell>
@@ -726,5 +733,6 @@ export default function AttendancePage() {
           </TabsContent>
         </Tabs>
       </div>
+    </MainLayout>
   );
 }

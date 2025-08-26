@@ -9,6 +9,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { format } from 'date-fns';
 import { DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 export default function ExpensesPage() {
   const [claims, setClaims] = useState<any[]>([]);
@@ -100,161 +108,254 @@ export default function ExpensesPage() {
           return;
         }
       }
-      setForm({ description: '', date: '', payment_mode: '', total_amount: '' });
-      setReceipt(null);
+      // 3. Success
+      alert('Expense claim submitted successfully!');
       setDialogOpen(false);
-      await refreshClaims();
-      setFormLoading(false);
-      console.log('Claim submitted successfully');
+      setForm({
+        description: '',
+        date: '',
+        payment_mode: '',
+        total_amount: '',
+      });
+      setReceipt(null);
+      refreshClaims();
     } catch (err) {
+      console.error('Error submitting claim:', err);
+      alert('Failed to submit claim');
+    } finally {
       setFormLoading(false);
-      setUploading(false);
-      console.error('Error during claim submission:', err);
-      alert('An error occurred: ' + (err instanceof Error ? err.message : String(err)));
     }
   };
 
-  // Helper for payment mode label
-  const paymentModeLabel = (mode: string) => {
-    if (mode === 'own_account') return 'Employee';
-    if (mode === 'company_account') return 'Company';
-    return mode;
+  const handleViewInvoice = (claim: any) => {
+    setSelectedClaim(claim);
+    setInvoiceDialogOpen(true);
   };
 
-  // Helper for state label
-  const stateLabel = (state: string) => {
-    if (state === 'draft') return 'To Approve';
-    if (!state) return '';
-    return state.charAt(0).toUpperCase() + state.slice(1);
-  };
+  if (loading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center h-64">
+          <p>Loading expenses...</p>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
-    <div className="space-y-8">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Expenses</h1>
-          <p className="text-muted-foreground">Submit and view your expense (claim) requests</p>
+    <MainLayout>
+      <div className="space-y-6">
+        {/* Header with New Claim Button */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 className="text-2xl lg:text-3xl font-bold">Expense Claims</h1>
+            <p className="text-muted-foreground">Manage your expense claims and reimbursements</p>
+          </div>
+          <Button onClick={() => setDialogOpen(true)} className="w-full sm:w-auto">
+            New Expense Claim
+          </Button>
         </div>
-        <div className="flex justify-end">
-          <Button onClick={() => setDialogOpen(true)}>Apply for Claim</Button>
-        </div>
+
+        {/* Claims Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>My Expense Claims</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs lg:text-sm">Date</TableHead>
+                    <TableHead className="text-xs lg:text-sm">Description</TableHead>
+                    <TableHead className="text-xs lg:text-sm">Payment Mode</TableHead>
+                    <TableHead className="text-xs lg:text-sm">Amount</TableHead>
+                    <TableHead className="text-xs lg:text-sm">Status</TableHead>
+                    <TableHead className="text-xs lg:text-sm">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {claims.map((claim) => (
+                    <TableRow key={claim.id}>
+                      <TableCell className="text-xs lg:text-sm">
+                        {claim.date ? format(new Date(claim.date), 'dd/MM/yyyy') : '-'}
+                      </TableCell>
+                      <TableCell className="text-xs lg:text-sm max-w-[200px] truncate">
+                        {claim.description || '-'}
+                      </TableCell>
+                      <TableCell className="text-xs lg:text-sm">
+                        {claim.payment_mode || '-'}
+                      </TableCell>
+                      <TableCell className="text-xs lg:text-sm">
+                        RM {claim.total_amount?.toFixed(2) || '0.00'}
+                      </TableCell>
+                      <TableCell className="text-xs lg:text-sm">
+                        <span className={`px-2 py-1 rounded-full text-xs ${
+                          claim.state === 'approved' ? 'bg-green-100 text-green-800' :
+                          claim.state === 'rejected' ? 'bg-red-100 text-red-800' :
+                          claim.state === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {claim.state || 'draft'}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-xs lg:text-sm">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewInvoice(claim)}
+                          className="text-xs"
+                        >
+                          View
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {claims.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-xs lg:text-sm">
+                        No expense claims found
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* New Expense Claim Dialog */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent>
+          <DialogContent className="max-w-md lg:max-w-lg">
             <DialogHeader>
               <DialogTitle>New Expense Claim</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium">Description</label>
-                  <Input value={form.description} onChange={e => handleFormChange('description', e.target.value)} required />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium">Date</label>
-                  <Input type="date" value={form.date} onChange={e => handleFormChange('date', e.target.value)} required />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium">Payment Mode</label>
-                  <Select value={form.payment_mode} onValueChange={v => handleFormChange('payment_mode', v)} required>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select payment mode" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="company_account">Company Account</SelectItem>
-                      <SelectItem value="own_account">Own Account</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium">Total Amount (RM)</label>
-                  <Input type="number" step="0.01" value={form.total_amount} onChange={e => handleFormChange('total_amount', e.target.value)} required />
-                </div>
-              </div>
               <div>
-                <label className="block text-sm font-medium">Attach Receipt</label>
-                <Input type="file" accept="image/*,application/pdf" onChange={handleReceiptChange} />
+                <label className="block text-sm font-medium mb-2">Description *</label>
+                <Input
+                  value={form.description}
+                  onChange={(e) => handleFormChange('description', e.target.value)}
+                  placeholder="Enter expense description"
+                  required
+                />
               </div>
-              <div className="flex justify-end">
-                <Button type="submit" disabled={formLoading || uploading}>{formLoading || uploading ? 'Submitting...' : 'Submit Claim'}</Button>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2">Date *</label>
+                <Input
+                  type="date"
+                  value={form.date}
+                  onChange={(e) => handleFormChange('date', e.target.value)}
+                  required
+                />
               </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2">Payment Mode *</label>
+                <Select value={form.payment_mode} onValueChange={(value) => handleFormChange('payment_mode', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select payment mode" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="credit_card">Credit Card</SelectItem>
+                    <SelectItem value="debit_card">Debit Card</SelectItem>
+                    <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2">Total Amount (RM) *</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={form.total_amount}
+                  onChange={(e) => handleFormChange('total_amount', e.target.value)}
+                  placeholder="0.00"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2">Receipt (Optional)</label>
+                <Input
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={handleReceiptChange}
+                />
+              </div>
+              
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={formLoading || uploading}>
+                  {formLoading ? 'Submitting...' : uploading ? 'Uploading...' : 'Submit Claim'}
+                </Button>
+              </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
-        <Card>
-          <CardHeader>
-            <CardTitle>Expense Claims</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div>Loading...</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm border">
-                  <thead>
-                    <tr className="bg-gray-100">
-                      <th className="px-2 py-1 border">Description</th>
-                      <th className="px-2 py-1 border">Date</th>
-                      <th className="px-2 py-1 border">Payment Mode</th>
-                      <th className="px-2 py-1 border">Total Amount(RM)</th>
-                      <th className="px-2 py-1 border">State</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {claims.map((c, i) => (
-                      <tr key={c.id || i} className="cursor-pointer hover:bg-gray-50" onClick={() => { setSelectedClaim(c); setInvoiceDialogOpen(true); }}>
-                        <td className="px-2 py-1 border">{c.name}</td>
-                        <td className="px-2 py-1 border">{c.date ? format(new Date(c.date), 'dd-MM-yyyy') : '-'}</td>
-                        <td className="px-2 py-1 border">{paymentModeLabel(c.payment_mode)}</td>
-                        <td className="px-2 py-1 border">{c.total_amount}</td>
-                        <td className="px-2 py-1 border">{stateLabel(c.state)}</td>
-                      </tr>
-                    ))}
-                    {claims.length === 0 && (
-                      <tr><td colSpan={5} className="text-center py-2">No claims found</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+
+        {/* View Invoice Dialog */}
         <Dialog open={invoiceDialogOpen} onOpenChange={setInvoiceDialogOpen}>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-md lg:max-w-lg">
             <DialogHeader>
-              <DialogTitle>Expense Claim Invoice</DialogTitle>
+              <DialogTitle>Expense Details</DialogTitle>
             </DialogHeader>
-            {selectedClaim ? (
-              <div className="space-y-2">
-                <div><b>Description:</b> {selectedClaim.name}</div>
-                <div><b>Date:</b> {selectedClaim.date ? format(new Date(selectedClaim.date), 'dd-MM-yyyy') : '-'}</div>
-                <div><b>Payment Mode:</b> {paymentModeLabel(selectedClaim.payment_mode)}</div>
-                <div><b>Total Amount:</b> RM {selectedClaim.total_amount}</div>
-                <div><b>Status:</b> {stateLabel(selectedClaim.state)}</div>
-                {selectedClaim.remarks && (
-                  <div><b>Remarks:</b> {selectedClaim.remarks}</div>
-                )}
-                {selectedClaim.attachment_url && (
+            {selectedClaim && (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Description</label>
+                  <p className="text-sm">{selectedClaim.description || '-'}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Date</label>
+                  <p className="text-sm">
+                    {selectedClaim.date ? format(new Date(selectedClaim.date), 'dd/MM/yyyy') : '-'}
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Payment Mode</label>
+                  <p className="text-sm">{selectedClaim.payment_mode || '-'}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Amount</label>
+                  <p className="text-sm font-semibold">RM {selectedClaim.total_amount?.toFixed(2) || '0.00'}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Status</label>
+                  <p className="text-sm">
+                    <span className={`px-2 py-1 rounded-full text-xs ${
+                      selectedClaim.state === 'approved' ? 'bg-green-100 text-green-800' :
+                      selectedClaim.state === 'rejected' ? 'bg-red-100 text-red-800' :
+                      selectedClaim.state === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {selectedClaim.state || 'draft'}
+                    </span>
+                  </p>
+                </div>
+                {selectedClaim.attachment_ids && selectedClaim.attachment_ids.length > 0 && (
                   <div>
-                    <b>Receipt:</b>{' '}
-                    {selectedClaim.attachment_mimetype === 'application/pdf' ? (
-                      <a href={selectedClaim.attachment_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">View PDF</a>
-                    ) : (
-                      <a href={selectedClaim.attachment_url} target="_blank" rel="noopener noreferrer">
-                        <img src={selectedClaim.attachment_url} alt="Receipt" className="max-h-48 mt-2 border rounded cursor-pointer" />
-                      </a>
-                    )}
+                    <label className="block text-sm font-medium mb-1">Attachments</label>
+                    <div className="space-y-2">
+                      {selectedClaim.attachment_ids.map((attachment: any, index: number) => (
+                        <div key={index} className="text-sm text-blue-600 hover:underline cursor-pointer">
+                          {attachment.name || `Attachment ${index + 1}`}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
-                {!selectedClaim.attachment_url && (
-                  <div className="text-gray-400">No receipt attached.</div>
-                )}
               </div>
-            ) : (
-              <div>Loading...</div>
             )}
           </DialogContent>
         </Dialog>
       </div>
+    </MainLayout>
   );
 } 

@@ -99,22 +99,14 @@ interface EmployeeProfile {
 export default function ProfilePage() {
   const [profile, setProfile] = useState<EmployeeProfile | null>(null);
   const [originalProfile, setOriginalProfile] = useState<EmployeeProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
   const [editedProfile, setEditedProfile] = useState<Partial<EmployeeProfile>>({});
+  const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isRequesting, setIsRequesting] = useState(false);
   const [requestComment, setRequestComment] = useState('');
   const [showRequestDialog, setShowRequestDialog] = useState(false);
   const [requestHistory, setRequestHistory] = useState<any[]>([]);
-
-  // Add state for bank details and status history
-  const [bankDetails, setBankDetails] = useState<any[]>([]);
-  const [statusHistory, setStatusHistory] = useState<any[]>([]);
-
-  // Add state for residency options
-  const [residencyOptions, setResidencyOptions] = useState<{ value: string; label: string }[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -123,84 +115,49 @@ export default function ProfilePage() {
         if (!rawUid) throw new Error('Not logged in');
         const uid = Number(rawUid);
 
-        console.log('🔍 Fetching profile for UID:', uid);
         const res = await fetch('/api/odoo/auth/profile', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
           body: JSON.stringify({ uid }),
         });
 
-        console.log('🔍 Profile API response status:', res.status);
-        
         if (!res.ok) {
-          let errPayload: any;
-          try {
-            errPayload = await res.json();
-          } catch {
-            errPayload = await res.text();
-          }
-          console.error('❌ Profile API error payload:', errPayload);
-          console.error('❌ Profile API response status:', res.status);
-          throw new Error(
-            typeof errPayload === 'string'
-              ? errPayload
-              : errPayload.error || JSON.stringify(errPayload)
-          );
+          const err = await res.json();
+          throw new Error(err.error || 'Failed to fetch profile');
         }
 
-        const { user, bankDetails, statusHistory } = await res.json();
-        if (!user) throw new Error('Malformed profile response');
+        const { user } = await res.json();
         setProfile(user);
-        setOriginalProfile(user); // Store original profile data
-        setBankDetails(bankDetails || []);
-        setStatusHistory(statusHistory || []);
+        setOriginalProfile(user);
+        setLoading(false);
       } catch (err: any) {
-        console.error('❌ Failed to load profile:', err);
-        setError(err.message);
-      } finally {
+        console.error('❌ Failed to fetch profile:', err);
+        toast.error(err.message || 'Failed to fetch profile');
         setLoading(false);
       }
     };
 
-    fetchProfile();
-  }, []);
-
-  // Fetch residency options on mount
-  useEffect(() => {
-    const fetchResidencyOptions = async () => {
-      const res = await fetch('/api/odoo/auth/profile/options?model=hr.employee&field=residence_status');
-      if (res.ok) {
-        const { options } = await res.json();
-        setResidencyOptions(options);
-      }
-    };
-    fetchResidencyOptions();
-  }, []);
-
-  // Fetch request history on mount
-  useEffect(() => {
     const fetchRequestHistory = async () => {
       try {
         const rawUid = localStorage.getItem('uid');
         if (!rawUid) return;
         const uid = Number(rawUid);
 
-        const res = await fetch('/api/odoo/auth/profile/request-history', {
+        const res = await fetch('/api/odoo/profile/my-requests', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
           body: JSON.stringify({ uid }),
         });
 
         if (res.ok) {
-          const { data } = await res.json();
-          setRequestHistory(data);
+          const data = await res.json();
+          setRequestHistory(data.requests || []);
         }
       } catch (err) {
         console.error('Failed to fetch request history:', err);
       }
     };
+    fetchProfile();
     fetchRequestHistory();
   }, []);
 
@@ -312,22 +269,12 @@ export default function ProfilePage() {
     );
   }
 
-  if (error) {
-    return (
-      <MainLayout>
-        <Card>
-          <CardContent className="text-red-600 p-6">{error}</CardContent>
-        </Card>
-      </MainLayout>
-    );
-  }
-
   if (!profile) {
     return (
       <MainLayout>
-        <Card>
-          <CardContent className="p-6">Profile not found</CardContent>
-        </Card>
+        <div className="text-center">
+          <p className="text-red-600">Failed to load profile</p>
+        </div>
       </MainLayout>
     );
   }
@@ -336,44 +283,77 @@ export default function ProfilePage() {
     <MainLayout>
       <div className="space-y-6">
         {/* Header with Edit/Save buttons */}
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">Profile Information</h2>
-            <p className="text-muted-foreground">View and update your personal information</p>
+            <h1 className="text-2xl lg:text-3xl font-bold">Employee Profile</h1>
+            <p className="text-muted-foreground">Manage your personal and work information</p>
           </div>
-          {!isEditing ? (
-            <Button onClick={handleEdit} disabled={!profile}>Edit Profile</Button>
-          ) : (
-            <div className="space-x-2">
-              <Button variant="outline" onClick={handleCancel} disabled={isSaving || isRequesting}>
-                Cancel
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            {!isEditing ? (
+              <Button onClick={handleEdit} className="w-full sm:w-auto">
+                <Edit className="w-4 h-4 mr-2" />
+                Edit Profile
               </Button>
-              <Button onClick={() => setShowRequestDialog(true)} disabled={isSaving || isRequesting}>
-                {isRequesting ? 'Submitting...' : 'Request Changes'}
-              </Button>
-            </div>
-          )}
+            ) : (
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <Button onClick={handleCancel} variant="outline" className="w-full sm:w-auto">
+                  Cancel
+                </Button>
+                <Button onClick={() => setShowRequestDialog(true)} className="w-full sm:w-auto">
+                  Request Changes
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Tabs for profile sections */}
         <Tabs defaultValue="basic" className="w-full">
-          <TabsList className="mb-4">
-            <TabsTrigger value="basic">Basic Information</TabsTrigger>
-            <TabsTrigger value="work">Work Information</TabsTrigger>
-            <TabsTrigger value="private">Private Information</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-6">
+            <TabsTrigger value="basic">Basic Info</TabsTrigger>
+            <TabsTrigger value="work">Work Info</TabsTrigger>
+            <TabsTrigger value="private">Private Info</TabsTrigger>
             <TabsTrigger value="bank">Bank Details</TabsTrigger>
             <TabsTrigger value="status">Status History</TabsTrigger>
             <TabsTrigger value="requests">Change Requests</TabsTrigger>
           </TabsList>
+
           <TabsContent value="basic">
-            {/* Basic Information Section */}
             <Card>
               <CardHeader>
                 <CardTitle>Basic Information</CardTitle>
                 <CardDescription>Your personal details</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Profile Image */}
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                  <div className="relative">
+                    <Avatar className="h-20 w-20 lg:h-24 lg:w-24">
+                      {profile.image_1920 ? (
+                        <AvatarImage src={`data:image/jpeg;base64,${profile.image_1920}`} alt={profile.name} />
+                      ) : null}
+                      <AvatarFallback className="text-lg lg:text-xl">
+                        {profile.name?.split(' ').map(n => n[0]).join('').toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    {isEditing && (
+                      <label className="absolute bottom-0 right-0 bg-white rounded-full p-1 shadow-md cursor-pointer">
+                        <Camera className="w-4 h-4 text-gray-600" />
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          className="hidden"
+                        />
+                      </label>
+                    )}
+                  </div>
+                  <div className="text-center sm:text-left">
+                    <h3 className="text-lg lg:text-xl font-semibold">{profile.name}</h3>
+                    <p className="text-sm text-muted-foreground">Employee ID: {profile.id}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Name */}
                   <div className="space-y-2">
                     <Label htmlFor="name">Name</Label>
@@ -385,9 +365,9 @@ export default function ProfilePage() {
                       className={!isEditing ? 'bg-muted' : ''}
                     />
                   </div>
-                  {/* Work Mobile */}
+                  {/* Mobile Phone */}
                   <div className="space-y-2">
-                    <Label htmlFor="mobile_phone">Work Mobile</Label>
+                    <Label htmlFor="mobile_phone">Mobile Phone</Label>
                     <Input
                       id="mobile_phone"
                       value={profile.mobile_phone || ''}
@@ -424,59 +404,29 @@ export default function ProfilePage() {
                     <Input
                       id="barcode"
                       value={profile.barcode || ''}
-                      onChange={(e) => setEditedProfile((p) => ({ ...p, barcode: e.target.value }))}
-                      readOnly={!isEditing}
-                      className={!isEditing ? 'bg-muted' : ''}
+                      readOnly
+                      className="bg-muted"
                     />
                   </div>
                   {/* Gender */}
                   <div className="space-y-2">
                     <Label htmlFor="gender">Gender</Label>
-                    {isEditing ? (
-                      <Select
-                        value={editedProfile.gender || ''}
-                        onValueChange={(v) =>
-                          setEditedProfile((p) => ({ ...p, gender: v as Gender }))
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select gender" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {GENDER_OPTIONS.map((opt) => (
-                            <SelectItem key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Input
-                        id="gender"
-                        value={GENDER_OPTIONS.find((o) => o.value === profile.gender)?.label || ''}
-                        readOnly
-                        className="bg-muted"
-                      />
-                    )}
+                    <Input
+                      id="gender"
+                      value={GENDER_OPTIONS.find((o) => o.value === profile.gender)?.label || ''}
+                      readOnly
+                      className="bg-muted"
+                    />
                   </div>
                   {/* Date of Birth */}
                   <div className="space-y-2">
                     <Label htmlFor="birthday">Date of Birth</Label>
                     <Input
                       id="birthday"
-                      type={isEditing ? 'date' : 'text'}
-                      value={
-                        isEditing
-                          ? editedProfile.birthday || ''
-                          : profile.birthday
-                          ? format(new Date(profile.birthday), 'dd/MM/yyyy')
-                          : ''
-                      }
-                      onChange={(e) =>
-                        setEditedProfile((p) => ({ ...p, birthday: e.target.value }))
-                      }
-                      readOnly={!isEditing}
-                      className={!isEditing ? 'bg-muted' : ''}
+                      type="text"
+                      value={profile.birthday ? format(new Date(profile.birthday), 'dd/MM/yyyy') : ''}
+                      readOnly
+                      className="bg-muted"
                     />
                   </div>
                   {/* Age */}
@@ -486,9 +436,8 @@ export default function ProfilePage() {
                       id="age"
                       type="number"
                       value={profile.age || ''}
-                      onChange={(e) => setEditedProfile((p) => ({ ...p, age: parseInt(e.target.value) || 0 }))}
-                      readOnly={!isEditing}
-                      className={!isEditing ? 'bg-muted' : ''}
+                      readOnly
+                      className="bg-muted"
                     />
                   </div>
                   {/* Place of Birth */}
@@ -516,6 +465,7 @@ export default function ProfilePage() {
               </CardContent>
             </Card>
           </TabsContent>
+
           <TabsContent value="work">
             {/* Work Information Section */}
             <Card>
@@ -524,16 +474,15 @@ export default function ProfilePage() {
                 <CardDescription>Your employment details</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Job Title */}
                   <div className="space-y-2">
                     <Label htmlFor="job_title">Job Title</Label>
                     <Input
                       id="job_title"
                       value={profile.job_title || ''}
-                      onChange={(e) => setEditedProfile((p) => ({ ...p, job_title: e.target.value }))}
-                      readOnly={!isEditing}
-                      className={!isEditing ? 'bg-muted' : ''}
+                      readOnly
+                      className="bg-muted"
                     />
                   </div>
                   {/* Department */}
@@ -546,9 +495,9 @@ export default function ProfilePage() {
                       className="bg-muted"
                     />
                   </div>
-                  {/* Direct Manager */}
+                  {/* Manager */}
                   <div className="space-y-2">
-                    <Label htmlFor="parent_id">Direct Manager</Label>
+                    <Label htmlFor="parent_id">Manager</Label>
                     <Input
                       id="parent_id"
                       value={profile.parent_id?.[1] || ''}
@@ -586,9 +535,9 @@ export default function ProfilePage() {
                       className="bg-muted"
                     />
                   </div>
-                  {/* Current Contract */}
+                  {/* Contract */}
                   <div className="space-y-2">
-                    <Label htmlFor="contract_id">Current Contract</Label>
+                    <Label htmlFor="contract_id">Contract</Label>
                     <Input
                       id="contract_id"
                       value={profile.contract_id?.[1] || ''}
@@ -600,438 +549,213 @@ export default function ProfilePage() {
               </CardContent>
             </Card>
           </TabsContent>
+
           <TabsContent value="private">
-            {/* Private Information Section with sub-sections */}
+            {/* Private Information Section */}
             <Card>
               <CardHeader>
                 <CardTitle>Private Information</CardTitle>
-                <CardDescription>Personal and family details</CardDescription>
+                <CardDescription>Your personal and family details</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Private Address */}
-                <div>
-                  <h4 className="font-semibold mb-3">Private Address</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="private_street">Private Street</Label>
-                      <Input
-                        id="private_street"
-                        value={`${profile.private_street || ''}${profile.private_street2 ? `, ${profile.private_street2}` : ''}`}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          const parts = value.split(', ');
-                          setEditedProfile((p) => ({ 
-                            ...p, 
-                            private_street: parts[0] || '',
-                            private_street2: parts.slice(1).join(', ') || ''
-                          }));
-                        }}
-                        readOnly={!isEditing}
-                        className={!isEditing ? 'bg-muted' : ''}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="private_zip">Private ZIP</Label>
-                      <Input
-                        id="private_zip"
-                        value={profile.private_zip || ''}
-                        onChange={(e) => setEditedProfile((p) => ({ ...p, private_zip: e.target.value }))}
-                        readOnly={!isEditing}
-                        className={!isEditing ? 'bg-muted' : ''}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="private_state_id">Private State</Label>
-                      <Input
-                        id="private_state_id"
-                        value={profile.private_state_id?.[1] || ''}
-                        readOnly
-                        className="bg-muted"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="country_id">Country</Label>
-                      <Input
-                        id="country_id"
-                        value={profile.country_id?.[1] || ''}
-                        readOnly
-                        className="bg-muted"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="residence_status">Residency</Label>
-                      {isEditing ? (
-                        <Select
-                          value={editedProfile.residence_status || ''}
-                          onValueChange={(v) => setEditedProfile((p) => ({ ...p, residence_status: v }))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select residency" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {residencyOptions.map((opt) => (
-                              <SelectItem key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <Input
-                          id="residence_status"
-                          value={residencyOptions.find(opt => opt.value === profile.residence_status)?.label || ''}
-                          readOnly
-                          className="bg-muted"
-                        />
-                      )}
-                    </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Address fields */}
+                  <div className="space-y-2">
+                    <Label htmlFor="private_street">Street Address</Label>
+                    <Input
+                      id="private_street"
+                      value={profile.private_street || ''}
+                      readOnly
+                      className="bg-muted"
+                    />
                   </div>
-                </div>
-
-                {/* Work Permit */}
-                <div>
-                  <h4 className="font-semibold mb-3">Work Permit</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="visa_no">Visa No</Label>
-                      <Input
-                        id="visa_no"
-                        value={profile.visa_no || ''}
-                        onChange={(e) => setEditedProfile((p) => ({ ...p, visa_no: e.target.value }))}
-                        readOnly={!isEditing}
-                        className={!isEditing ? 'bg-muted' : ''}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="permit_no">Work Permit No</Label>
-                      <Input
-                        id="permit_no"
-                        value={profile.permit_no || ''}
-                        onChange={(e) => setEditedProfile((p) => ({ ...p, permit_no: e.target.value }))}
-                        readOnly={!isEditing}
-                        className={!isEditing ? 'bg-muted' : ''}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="visa_expire">Visa Expiration Date</Label>
-                      <Input
-                        id="visa_expire"
-                        type={isEditing ? 'date' : 'text'}
-                        value={
-                          isEditing
-                            ? editedProfile.visa_expire || ''
-                            : profile.visa_expire
-                            ? format(new Date(profile.visa_expire), 'dd/MM/yyyy')
-                            : ''
-                        }
-                        onChange={(e) =>
-                          setEditedProfile((p) => ({ ...p, visa_expire: e.target.value }))
-                        }
-                        readOnly={!isEditing}
-                        className={!isEditing ? 'bg-muted' : ''}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="work_permit_expiration_date">Work Permit Expiration Date</Label>
-                      <Input
-                        id="work_permit_expiration_date"
-                        type={isEditing ? 'date' : 'text'}
-                        value={
-                          isEditing
-                            ? editedProfile.work_permit_expiration_date || ''
-                            : profile.work_permit_expiration_date
-                            ? format(new Date(profile.work_permit_expiration_date), 'dd/MM/yyyy')
-                            : ''
-                        }
-                        onChange={(e) =>
-                          setEditedProfile((p) => ({ ...p, work_permit_expiration_date: e.target.value }))
-                        }
-                        readOnly={!isEditing}
-                        className={!isEditing ? 'bg-muted' : ''}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="has_work_permit">Work Permit</Label>
-                      <Input
-                        id="has_work_permit"
-                        value={profile.has_work_permit ? 'Yes' : 'No'}
-                        readOnly
-                        className="bg-muted"
-                      />
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="private_street2">Street Address 2</Label>
+                    <Input
+                      id="private_street2"
+                      value={profile.private_street2 || ''}
+                      readOnly
+                      className="bg-muted"
+                    />
                   </div>
-                </div>
-
-                {/* Citizenship */}
-                <div>
-                  <h4 className="font-semibold mb-3">Citizenship</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="emp_country">Nationality</Label>
-                      <Input
-                        id="emp_country"
-                        value={profile.emp_country || ''}
-                        onChange={(e) => setEditedProfile((p) => ({ ...p, emp_country: e.target.value }))}
-                        readOnly={!isEditing}
-                        className={!isEditing ? 'bg-muted' : ''}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="emp_old_ic">Old Identification No</Label>
-                      <Input
-                        id="emp_old_ic"
-                        value={profile.emp_old_ic || ''}
-                        onChange={(e) => setEditedProfile((p) => ({ ...p, emp_old_ic: e.target.value }))}
-                        readOnly={!isEditing}
-                        className={!isEditing ? 'bg-muted' : ''}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="identification_id">Identification No</Label>
-                      <Input
-                        id="identification_id"
-                        value={profile.identification_id || ''}
-                        onChange={(e) => setEditedProfile((p) => ({ ...p, identification_id: e.target.value }))}
-                        readOnly={!isEditing}
-                        className={!isEditing ? 'bg-muted' : ''}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="ssnid">SSN No</Label>
-                      <Input
-                        id="ssnid"
-                        value={profile.ssnid || ''}
-                        onChange={(e) => setEditedProfile((p) => ({ ...p, ssnid: e.target.value }))}
-                        readOnly={!isEditing}
-                        className={!isEditing ? 'bg-muted' : ''}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="passport_id">Passport No</Label>
-                      <Input
-                        id="passport_id"
-                        value={profile.passport_id || ''}
-                        onChange={(e) => setEditedProfile((p) => ({ ...p, passport_id: e.target.value }))}
-                        readOnly={!isEditing}
-                        className={!isEditing ? 'bg-muted' : ''}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="passport_exp_date">Passport Expiry Date</Label>
-                      <Input
-                        id="passport_exp_date"
-                        type={isEditing ? 'date' : 'text'}
-                        value={
-                          isEditing
-                            ? editedProfile.passport_exp_date || ''
-                            : profile.passport_exp_date
-                            ? format(new Date(profile.passport_exp_date), 'dd/MM/yyyy')
-                            : ''
-                        }
-                        onChange={(e) =>
-                          setEditedProfile((p) => ({ ...p, passport_exp_date: e.target.value }))
-                        }
-                        readOnly={!isEditing}
-                        className={!isEditing ? 'bg-muted' : ''}
-                      />
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="private_zip">ZIP Code</Label>
+                    <Input
+                      id="private_zip"
+                      value={profile.private_zip || ''}
+                      readOnly
+                      className="bg-muted"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="private_state_id">State</Label>
+                    <Input
+                      id="private_state_id"
+                      value={profile.private_state_id?.[1] || ''}
+                      readOnly
+                      className="bg-muted"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="country_id">Country</Label>
+                    <Input
+                      id="country_id"
+                      value={profile.country_id?.[1] || ''}
+                      readOnly
+                      className="bg-muted"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="permanent_resident">Permanent Resident</Label>
+                    <Input
+                      id="permanent_resident"
+                      value={profile.permanent_resident || ''}
+                      readOnly
+                      className="bg-muted"
+                    />
+                  </div>
+                  {/* Family Status */}
+                  <div className="space-y-2">
+                    <Label htmlFor="marital">Marital Status</Label>
+                    <Input
+                      id="marital"
+                      value={MARITAL_OPTIONS.find((o) => o.value === profile.marital)?.label || ''}
+                      readOnly
+                      className="bg-muted"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="children">Number of Children</Label>
+                    <Input
+                      id="children"
+                      type="number"
+                      value={profile.children || ''}
+                      readOnly
+                      className="bg-muted"
+                    />
+                  </div>
+                  {/* Emergency Contact */}
+                  <div className="space-y-2">
+                    <Label htmlFor="emergency_contact">Emergency Contact</Label>
+                    <Input
+                      id="emergency_contact"
+                      value={profile.emergency_contact || ''}
+                      readOnly
+                      className="bg-muted"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="emergency_phone">Emergency Phone</Label>
+                    <Input
+                      id="emergency_phone"
+                      value={profile.emergency_phone || ''}
+                      readOnly
+                      className="bg-muted"
+                    />
                   </div>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
+
           <TabsContent value="bank">
-            {/* Bank Details Table */}
+            {/* Bank Details Section */}
             <Card>
               <CardHeader>
                 <CardTitle>Bank Details</CardTitle>
-                <CardDescription>Your bank accounts</CardDescription>
+                <CardDescription>Your banking information</CardDescription>
               </CardHeader>
               <CardContent>
-                <table className="min-w-full text-sm border-collapse">
-                  <thead>
-                    <tr>
-                      <th className="px-4 py-2 text-center w-1/4">Name of Bank</th>
-                      <th className="px-4 py-2 text-center w-1/4">Bank Code</th>
-                      <th className="px-4 py-2 text-center w-1/4">Bank Account No</th>
-                      <th className="px-4 py-2 text-center w-1/4">Beneficiary Name</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {bankDetails.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="text-center text-muted-foreground py-4">No records found</td>
-                      </tr>
-                    ) : (
-                      bankDetails.map((b, i) => (
-                        <tr key={b.id || i}>
-                          <td className="px-4 py-2 text-center">{b.bank_name}</td>
-                          <td className="px-4 py-2 text-center">{b.bank_code}</td>
-                          <td className="px-4 py-2 text-center">{b.bank_ac_no}</td>
-                          <td className="px-4 py-2 text-center">{b.beneficiary_name}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">Bank details section - to be implemented</p>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
+
           <TabsContent value="status">
-            {/* Status History Table */}
+            {/* Status History Section */}
             <Card>
               <CardHeader>
                 <CardTitle>Status History</CardTitle>
-                <CardDescription>Employment status changes</CardDescription>
+                <CardDescription>Your employment status changes</CardDescription>
               </CardHeader>
               <CardContent>
-                <table className="min-w-full text-sm border-collapse">
-                  <thead>
-                    <tr>
-                      <th className="px-4 py-2 text-center w-1/4">Stage</th>
-                      <th className="px-4 py-2 text-center w-1/4">Start Date</th>
-                      <th className="px-4 py-2 text-center w-1/4">End Date</th>
-                      <th className="px-4 py-2 text-center w-1/4">Duration (Days)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {statusHistory.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="text-center text-muted-foreground py-4">No records found</td>
-                      </tr>
-                    ) : (
-                      statusHistory.map((s, i) => (
-                        <tr key={s.id || i}>
-                          <td className="px-4 py-2 text-center">{s.state}</td>
-                          <td className="px-4 py-2 text-center">{s.start_date ? format(new Date(s.start_date), 'dd/MM/yyyy') : ''}</td>
-                          <td className="px-4 py-2 text-center">{s.end_date ? format(new Date(s.end_date), 'dd/MM/yyyy') : ''}</td>
-                          <td className="px-4 py-2 text-center">{s.duration}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">Status history section - to be implemented</p>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
+
           <TabsContent value="requests">
-            {/* Change Requests History */}
+            {/* Change Requests Section */}
             <Card>
               <CardHeader>
-                <CardTitle>Profile Change Requests</CardTitle>
-                <CardDescription>History of your profile change requests</CardDescription>
+                <CardTitle>Change Requests</CardTitle>
+                <CardDescription>Your profile change request history</CardDescription>
               </CardHeader>
               <CardContent>
-                {requestHistory.length === 0 ? (
-                  <div className="text-center text-muted-foreground py-8">
-                    No change requests found
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {requestHistory.map((request) => (
-                      <Card key={request.id} className="border-l-4 border-l-blue-500">
-                        <CardContent className="pt-6">
-                          <div className="flex justify-between items-start mb-4">
-                            <div>
-                              <h4 className="font-semibold">Request #{request.id}</h4>
-                              <p className="text-sm text-muted-foreground">
-                                Submitted on {format(new Date(request.request_date), 'PPP')}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                Manager: {request.manager_name}
-                              </p>
-                            </div>
+                <div className="space-y-4">
+                  {requestHistory.length === 0 ? (
+                    <div className="text-center py-8">
+                      <p className="text-muted-foreground">No change requests found</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {requestHistory.map((request, index) => (
+                        <div key={index} className="border rounded-lg p-4">
+                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
+                            <h4 className="font-semibold text-sm lg:text-base">Request #{request.id}</h4>
                             {getStatusBadge(request.state)}
                           </div>
-                          
-                          {request.comment && (
-                            <div className="mb-3">
-                              <Label className="text-sm font-medium">Your Comment:</Label>
-                              <p className="text-sm text-muted-foreground mt-1">{request.comment}</p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs lg:text-sm">
+                            <div>
+                              <span className="font-medium">Submitted:</span> {format(new Date(request.create_date), 'dd/MM/yyyy HH:mm')}
                             </div>
-                          )}
-                          
-                          <div className="mb-3">
-                            <Label className="text-sm font-medium">Requested Changes:</Label>
-                            <div className="mt-2 space-y-1">
-                              {Object.entries(request.requested_changes).map(([key, value]) => (
-                                <div key={key} className="flex justify-between items-center text-sm">
-                                  <span className="capitalize">{key.replace(/_/g, ' ')}:</span>
-                                  <span className="text-muted-foreground">{String(value)}</span>
-                                </div>
-                              ))}
+                            <div>
+                              <span className="font-medium">Manager:</span> {request.manager_name || 'N/A'}
                             </div>
                           </div>
-                          
-                          {request.state === 'approved' && request.approval_comment && (
-                            <div className="mb-3">
-                              <Label className="text-sm font-medium">Manager's Approval Comment:</Label>
-                              <p className="text-sm text-muted-foreground mt-1">{request.approval_comment}</p>
+                          {request.comment && (
+                            <div className="mt-2">
+                              <span className="font-medium text-xs lg:text-sm">Comment:</span>
+                              <p className="text-xs lg:text-sm text-muted-foreground mt-1">{request.comment}</p>
                             </div>
                           )}
-                          
-                          {request.state === 'rejected' && request.rejection_comment && (
-                            <div className="mb-3">
-                              <Label className="text-sm font-medium">Manager's Rejection Reason:</Label>
-                              <p className="text-sm text-muted-foreground mt-1">{request.rejection_comment}</p>
-                            </div>
-                          )}
-                          
-                          {request.state === 'approved' && (
-                            <p className="text-sm text-green-600 font-medium">
-                              ✓ Approved on {format(new Date(request.approved_date), 'PPP')}
-                            </p>
-                          )}
-                          
-                          {request.state === 'rejected' && (
-                            <p className="text-sm text-red-600 font-medium">
-                              ✗ Rejected on {format(new Date(request.rejected_date), 'PPP')}
-                            </p>
-                          )}
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
 
-        {/* Profile Change Request Dialog */}
+        {/* Request Changes Dialog */}
         <Dialog open={showRequestDialog} onOpenChange={setShowRequestDialog}>
-          <DialogContent>
+          <DialogContent className="max-w-md lg:max-w-lg">
             <DialogHeader>
               <DialogTitle>Request Profile Changes</DialogTitle>
               <DialogDescription>
-                Your changes will be sent to your direct manager for approval. Please add a comment explaining the reason for these changes.
+                Submit a request to your manager to approve the changes you've made to your profile.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="request-comment">Comment (Optional)</Label>
+                <Label htmlFor="comment">Comment (Optional)</Label>
                 <Textarea
-                  id="request-comment"
-                  placeholder="Explain the reason for these changes..."
+                  id="comment"
                   value={requestComment}
                   onChange={(e) => setRequestComment(e.target.value)}
+                  placeholder="Add any additional comments for your manager..."
                   rows={3}
                 />
               </div>
-              <div className="text-sm text-muted-foreground">
-                <p className="font-medium mb-2">Changes to be requested:</p>
-                <ul className="space-y-1">
-                  {Object.entries(editedProfile).map(([key, value]) => (
-                    <li key={key} className="flex justify-between">
-                      <span className="capitalize">{key.replace(/_/g, ' ')}:</span>
-                      <span className="font-mono text-xs">{String(value)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowRequestDialog(false)} disabled={isRequesting}>
+              <Button variant="outline" onClick={() => setShowRequestDialog(false)}>
                 Cancel
               </Button>
               <Button onClick={handleRequestChanges} disabled={isRequesting}>
