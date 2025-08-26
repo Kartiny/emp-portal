@@ -1497,6 +1497,227 @@ export class OdooClient {
     return null;
   }
 
+  // ── PROFILE CHANGE REQUEST MODULE ────────────────────────────────────────────────
+  //
+
+  /** Create a new profile change request */
+  async createProfileChangeRequest(data: {
+    employee_id: number;
+    requester_id: number;
+    approver_id: number;
+    request_type: string;
+    current_data: any;
+    requested_changes: any;
+    status?: string;
+  }): Promise<number> {
+    try {
+      const requestData = {
+        employee_id: data.employee_id,
+        requester_id: data.requester_id,
+        approver_id: data.approver_id,
+        request_type: data.request_type,
+        current_data: JSON.stringify(data.current_data),
+        requested_changes: JSON.stringify(data.requested_changes),
+        status: data.status || 'pending',
+        request_date: new Date().toISOString(),
+      };
+
+      const result = await this.execute(
+        'hr.profile.change.request',
+        'create',
+        [requestData]
+      );
+
+      console.log('✅ Profile change request created:', result);
+      return result;
+    } catch (error: any) {
+      console.error('❌ Error creating profile change request:', error);
+      throw error;
+    }
+  }
+
+  /** Get profile change requests for approval (manager/admin) */
+  async getPendingProfileRequests(approverId: number): Promise<any[]> {
+    try {
+      const requests = await this.execute(
+        'hr.profile.change.request',
+        'search_read',
+        [[['approver_id', '=', approverId], ['status', '=', 'pending']]],
+        {
+          fields: [
+            'id',
+            'employee_id',
+            'requester_id',
+            'approver_id',
+            'request_type',
+            'current_data',
+            'requested_changes',
+            'status',
+            'request_date',
+            'approval_date',
+            'approval_notes'
+          ],
+          order: 'request_date desc'
+        }
+      );
+
+      // Parse JSON data
+      return requests.map(req => ({
+        ...req,
+        current_data: JSON.parse(req.current_data || '{}'),
+        requested_changes: JSON.parse(req.requested_changes || '{}')
+      }));
+    } catch (error: any) {
+      console.error('❌ Error fetching pending profile requests:', error);
+      throw error;
+    }
+  }
+
+  /** Get profile change requests for an employee */
+  async getEmployeeProfileRequests(employeeId: number): Promise<any[]> {
+    try {
+      const requests = await this.execute(
+        'hr.profile.change.request',
+        'search_read',
+        [[['employee_id', '=', employeeId]]],
+        {
+          fields: [
+            'id',
+            'employee_id',
+            'requester_id',
+            'approver_id',
+            'request_type',
+            'current_data',
+            'requested_changes',
+            'status',
+            'request_date',
+            'approval_date',
+            'approval_notes'
+          ],
+          order: 'request_date desc'
+        }
+      );
+
+      // Parse JSON data
+      return requests.map(req => ({
+        ...req,
+        current_data: JSON.parse(req.current_data || '{}'),
+        requested_changes: JSON.parse(req.requested_changes || '{}')
+      }));
+    } catch (error: any) {
+      console.error('❌ Error fetching employee profile requests:', error);
+      throw error;
+    }
+  }
+
+  /** Approve a profile change request */
+  async approveProfileRequest(requestId: number, approverId: number, notes?: string): Promise<boolean> {
+    try {
+      // Update request status
+      await this.execute(
+        'hr.profile.change.request',
+        'write',
+        [[requestId], {
+          status: 'approved',
+          approval_date: new Date().toISOString(),
+          approval_notes: notes || ''
+        }]
+      );
+
+      // Get the request details
+      const request = await this.execute(
+        'hr.profile.change.request',
+        'read',
+        [[requestId]],
+        { fields: ['employee_id', 'requested_changes'] }
+      );
+
+      if (request && request[0]) {
+        const changes = JSON.parse(request[0].requested_changes);
+        
+        // Apply changes to employee profile
+        await this.execute(
+          'hr.employee',
+          'write',
+          [[request[0].employee_id], changes]
+        );
+
+        console.log('✅ Profile change request approved and applied:', requestId);
+        return true;
+      }
+
+      return false;
+    } catch (error: any) {
+      console.error('❌ Error approving profile change request:', error);
+      throw error;
+    }
+  }
+
+  /** Reject a profile change request */
+  async rejectProfileRequest(requestId: number, approverId: number, notes?: string): Promise<boolean> {
+    try {
+      await this.execute(
+        'hr.profile.change.request',
+        'write',
+        [[requestId], {
+          status: 'rejected',
+          approval_date: new Date().toISOString(),
+          approval_notes: notes || ''
+        }]
+      );
+
+      console.log('✅ Profile change request rejected:', requestId);
+      return true;
+    } catch (error: any) {
+      console.error('❌ Error rejecting profile change request:', error);
+      throw error;
+    }
+  }
+
+  /** Get direct manager for an employee */
+  async getDirectManager(employeeId: number): Promise<any> {
+    try {
+      const employee = await this.execute(
+        'hr.employee',
+        'read',
+        [[employeeId]],
+        { fields: ['parent_id'] }
+      );
+
+      if (employee && employee[0] && employee[0].parent_id) {
+        const manager = await this.execute(
+          'hr.employee',
+          'read',
+          [[employee[0].parent_id[0]]],
+          { fields: ['id', 'name', 'user_id'] }
+        );
+
+        return manager[0];
+      }
+
+      return null;
+    } catch (error: any) {
+      console.error('❌ Error getting direct manager:', error);
+      throw error;
+    }
+  }
+
+  /** Check if user has pending profile change request */
+  async hasPendingProfileRequest(employeeId: number): Promise<boolean> {
+    try {
+      const requests = await this.execute(
+        'hr.profile.change.request',
+        'search_count',
+        [[['employee_id', '=', employeeId], ['status', '=', 'pending']]]
+      );
+
+      return requests > 0;
+    } catch (error: any) {
+      console.error('❌ Error checking pending profile request:', error);
+      return false;
+    }
+  }
+
   
 }
 
@@ -1573,6 +1794,43 @@ export async function getDiscussChannels(uid: number) {
 export async function getAllShiftCodes() {
   const client = getOdooClient();
   return client.getAllShiftCodes();
+}
+
+// Profile Change Request exports
+export async function createProfileChangeRequest(data: {
+  employee_id: number;
+  requester_id: number;
+  approver_id: number;
+  request_type: string;
+  current_data: any;
+  requested_changes: any;
+  status?: string;
+}) {
+  return getOdooClient().createProfileChangeRequest(data);
+}
+
+export async function getPendingProfileRequests(approverId: number) {
+  return getOdooClient().getPendingProfileRequests(approverId);
+}
+
+export async function getEmployeeProfileRequests(employeeId: number) {
+  return getOdooClient().getEmployeeProfileRequests(employeeId);
+}
+
+export async function approveProfileRequest(requestId: number, approverId: number, notes?: string) {
+  return getOdooClient().approveProfileRequest(requestId, approverId, notes);
+}
+
+export async function rejectProfileRequest(requestId: number, approverId: number, notes?: string) {
+  return getOdooClient().rejectProfileRequest(requestId, approverId, notes);
+}
+
+export async function getDirectManager(employeeId: number) {
+  return getOdooClient().getDirectManager(employeeId);
+}
+
+export async function hasPendingProfileRequest(employeeId: number) {
+  return getOdooClient().hasPendingProfileRequest(employeeId);
 }
 
 export async function uploadAttachmentToOdoo(opts: {
