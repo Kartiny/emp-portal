@@ -16,7 +16,7 @@ const leaveRequestsData = [
     requestType: 'Annual Leave',
     dateRange: '2024-08-15 to 2024-08-20',
     status: 'Pending',
-    documents: [{ name: 'Doctor's Note.pdf', url: '#' }],
+    documents: [{ name: 'Doctor\'s Note.pdf', url: '#' }],
   },
   {
     id: 2,

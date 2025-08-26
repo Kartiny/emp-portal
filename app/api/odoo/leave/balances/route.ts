@@ -1,13 +1,11 @@
-
 import { NextResponse } from 'next/server';
-import { Odoo } from '@/lib/odooXml';
+import { OdooClient } from '@/lib/odooXml';
 
 export async function GET() {
-  const odoo = new Odoo();
-  await odoo.connect();
+  const odoo = new OdooClient();
 
   try {
-    const balances = await odoo.execute_kw('hr.leave.allocation', 'search_read', [
+    const balances = await odoo.execute('hr.leave.allocation', 'search_read', [
       [],
       {
         fields: ['employee_id', 'number_of_days', 'holiday_status_id'],
@@ -15,7 +13,7 @@ export async function GET() {
     ]);
 
     return NextResponse.json(balances);
-  } catch (error) {
+  } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

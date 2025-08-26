@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getOdooClient } from '@/lib/odooXml';
+import { getOdooClient, getFullUserProfile } from '@/lib/odooXml';
 
 export async function POST(req: Request) {
   try {
-  const { uid } = await req.json();
+    const { uid } = await req.json();
     
     if (!uid) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
@@ -12,7 +12,9 @@ export async function POST(req: Request) {
     console.log('🔍 Fetching profile for UID:', uid);
     
     const client = getOdooClient();
-    const user = await client.getUserProfile(uid);
+    
+    // Get the full user profile using the same method as other APIs
+    const user = await getFullUserProfile(uid);
     
     if (!user) {
       return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
@@ -69,6 +71,13 @@ export async function POST(req: Request) {
       details: err.toString(),
       stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
     };
+    
+    // Log additional debugging information
+    console.error('❌ Profile API error details:', {
+      message: err.message,
+      name: err.name,
+      stack: err.stack
+    });
     
     return NextResponse.json(errorDetails, { status: 500 });
   }

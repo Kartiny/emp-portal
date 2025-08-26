@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import React, { useEffect, useState } from 'react';
 import { BarChart2, UserCheck, UserX, Clock, FileText, ClipboardList } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { ProfileChangeRequests } from '@/components/profile-change-requests';
 
 export default function AdministratorDashboardPage() {
   const [loading, setLoading] = useState(true);
@@ -25,7 +26,8 @@ export default function AdministratorDashboardPage() {
   }, []);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen py-8">
+    <MainLayout>
+      <div className="flex flex-col items-center justify-center min-h-screen py-8">
         {loading ? (
           <div className="text-lg text-muted-foreground">Loading...</div>
         ) : error ? (
@@ -104,8 +106,19 @@ export default function AdministratorDashboardPage() {
                 </div>
               </CardContent>
             </Card>
+            
+            {/* Profile Change Requests Section */}
+            <Card className="w-full max-w-6xl shadow-md mt-8">
+              <CardHeader>
+                <CardTitle className="text-lg">Profile Change Requests</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ProfileChangeRequests />
+              </CardContent>
+            </Card>
           </>
         )}
-    </div>
+      </div>
+    </MainLayout>
   );
 } 

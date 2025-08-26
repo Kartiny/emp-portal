@@ -18,6 +18,9 @@ import { Camera } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 
 const GENDER_OPTIONS = [
   { value: 'male', label: 'Male' },
@@ -100,6 +103,10 @@ export default function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editedProfile, setEditedProfile] = useState<Partial<EmployeeProfile>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [isRequesting, setIsRequesting] = useState(false);
+  const [requestComment, setRequestComment] = useState('');
+  const [showRequestDialog, setShowRequestDialog] = useState(false);
+  const [requestHistory, setRequestHistory] = useState<any[]>([]);
 
   // Add state for bank details and status history
   const [bankDetails, setBankDetails] = useState<any[]>([]);
@@ -115,6 +122,7 @@ export default function ProfilePage() {
         if (!rawUid) throw new Error('Not logged in');
         const uid = Number(rawUid);
 
+        console.log('🔍 Fetching profile for UID:', uid);
         const res = await fetch('/api/odoo/auth/profile', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -122,6 +130,8 @@ export default function ProfilePage() {
           body: JSON.stringify({ uid }),
         });
 
+        console.log('🔍 Profile API response status:', res.status);
+        
         if (!res.ok) {
           let errPayload: any;
           try {
@@ -130,6 +140,7 @@ export default function ProfilePage() {
             errPayload = await res.text();
           }
           console.error('❌ Profile API error payload:', errPayload);
+          console.error('❌ Profile API response status:', res.status);
           throw new Error(
             typeof errPayload === 'string'
               ? errPayload
@@ -163,6 +174,32 @@ export default function ProfilePage() {
       }
     };
     fetchResidencyOptions();
+  }, []);
+
+  // Fetch request history on mount
+  useEffect(() => {
+    const fetchRequestHistory = async () => {
+      try {
+        const rawUid = localStorage.getItem('uid');
+        if (!rawUid) return;
+        const uid = Number(rawUid);
+
+        const res = await fetch('/api/odoo/auth/profile/request-history', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ uid }),
+        });
+
+        if (res.ok) {
+          const { data } = await res.json();
+          setRequestHistory(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch request history:', err);
+      }
+    };
+    fetchRequestHistory();
   }, []);
 
   const handleEdit = () => {
@@ -219,6 +256,56 @@ export default function ProfilePage() {
     }
   };
 
+  const handleRequestChanges = async () => {
+    try {
+      setIsRequesting(true);
+      const rawUid = localStorage.getItem('uid');
+      if (!rawUid) throw new Error('Not logged in');
+      const uid = Number(rawUid);
+
+      const res = await fetch('/api/odoo/auth/profile/request-changes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ 
+          uid, 
+          changes: editedProfile,
+          comment: requestComment 
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to submit change request');
+      }
+
+      const { data } = await res.json();
+      setIsEditing(false);
+      setEditedProfile({});
+      setRequestComment('');
+      setShowRequestDialog(false);
+      toast.success(`Change request submitted to ${data.manager_name}`);
+    } catch (err: any) {
+      console.error('❌ Failed to submit change request:', err);
+      toast.error(err.message || 'Failed to submit change request');
+    } finally {
+      setIsRequesting(false);
+    }
+  };
+
+
+  const getStatusBadge = (state: string) => {
+    switch (state) {
+      case 'pending':
+        return <Badge variant="secondary">Pending</Badge>;
+      case 'approved':
+        return <Badge variant="default">Approved</Badge>;
+      case 'rejected':
+        return <Badge variant="destructive">Rejected</Badge>;
+      default:
+        return <Badge variant="outline">{state}</Badge>;
+    }
+  };
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -285,11 +372,11 @@ export default function ProfilePage() {
             <Button onClick={handleEdit} disabled={!profile}>Edit Profile</Button>
           ) : (
             <div className="space-x-2">
-              <Button variant="outline" onClick={handleCancel} disabled={isSaving}>
+              <Button variant="outline" onClick={handleCancel} disabled={isSaving || isRequesting}>
                 Cancel
               </Button>
-              <Button onClick={handleSave} disabled={isSaving}>
-                {isSaving ? 'Saving...' : 'Save Changes'}
+              <Button onClick={() => setShowRequestDialog(true)} disabled={isSaving || isRequesting}>
+                {isRequesting ? 'Submitting...' : 'Request Changes'}
               </Button>
             </div>
           )}
@@ -338,6 +425,7 @@ export default function ProfilePage() {
                 <TabsTrigger value="private">Private Information</TabsTrigger>
                 <TabsTrigger value="bank">Bank Details</TabsTrigger>
                 <TabsTrigger value="status">Status History</TabsTrigger>
+                <TabsTrigger value="requests">Change Requests</TabsTrigger>
               </TabsList>
               <TabsContent value="basic">
                 {/* Basic Information Section */}
@@ -999,9 +1087,134 @@ export default function ProfilePage() {
                   </CardContent>
                 </Card>
               </TabsContent>
+              <TabsContent value="requests">
+                {/* Change Requests History */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Profile Change Requests</CardTitle>
+                    <CardDescription>History of your profile change requests</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {requestHistory.length === 0 ? (
+                      <div className="text-center text-muted-foreground py-8">
+                        No change requests found
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {requestHistory.map((request) => (
+                          <Card key={request.id} className="border-l-4 border-l-blue-500">
+                            <CardContent className="pt-6">
+                              <div className="flex justify-between items-start mb-4">
+                                <div>
+                                  <h4 className="font-semibold">Request #{request.id}</h4>
+                                  <p className="text-sm text-muted-foreground">
+                                    Submitted on {format(new Date(request.request_date), 'PPP')}
+                                  </p>
+                                  <p className="text-sm text-muted-foreground">
+                                    Manager: {request.manager_name}
+                                  </p>
+                                </div>
+                                {getStatusBadge(request.state)}
+                              </div>
+                              
+                              {request.comment && (
+                                <div className="mb-3">
+                                  <Label className="text-sm font-medium">Your Comment:</Label>
+                                  <p className="text-sm text-muted-foreground mt-1">{request.comment}</p>
+                                </div>
+                              )}
+                              
+                              <div className="mb-3">
+                                <Label className="text-sm font-medium">Requested Changes:</Label>
+                                <div className="mt-2 space-y-1">
+                                  {Object.entries(request.requested_changes).map(([key, value]) => (
+                                    <div key={key} className="flex justify-between items-center text-sm">
+                                      <span className="capitalize">{key.replace(/_/g, ' ')}:</span>
+                                      <span className="text-muted-foreground">{String(value)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                              
+                              {request.state === 'approved' && request.approval_comment && (
+                                <div className="mb-3">
+                                  <Label className="text-sm font-medium">Manager's Approval Comment:</Label>
+                                  <p className="text-sm text-muted-foreground mt-1">{request.approval_comment}</p>
+                                </div>
+                              )}
+                              
+                              {request.state === 'rejected' && request.rejection_comment && (
+                                <div className="mb-3">
+                                  <Label className="text-sm font-medium">Manager's Rejection Reason:</Label>
+                                  <p className="text-sm text-muted-foreground mt-1">{request.rejection_comment}</p>
+                                </div>
+                              )}
+                              
+                              {request.state === 'approved' && (
+                                <p className="text-sm text-green-600 font-medium">
+                                  ✓ Approved on {format(new Date(request.approved_date), 'PPP')}
+                                </p>
+                              )}
+                              
+                              {request.state === 'rejected' && (
+                                <p className="text-sm text-red-600 font-medium">
+                                  ✗ Rejected on {format(new Date(request.rejected_date), 'PPP')}
+                                </p>
+                              )}
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
             </Tabs>
           </>
         )}
+
+        {/* Profile Change Request Dialog */}
+        <Dialog open={showRequestDialog} onOpenChange={setShowRequestDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Request Profile Changes</DialogTitle>
+              <DialogDescription>
+                Your changes will be sent to your direct manager for approval. Please add a comment explaining the reason for these changes.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="request-comment">Comment (Optional)</Label>
+                <Textarea
+                  id="request-comment"
+                  placeholder="Explain the reason for these changes..."
+                  value={requestComment}
+                  onChange={(e) => setRequestComment(e.target.value)}
+                  rows={3}
+                />
+              </div>
+              <div className="text-sm text-muted-foreground">
+                <p className="font-medium mb-2">Changes to be requested:</p>
+                <ul className="space-y-1">
+                  {Object.entries(editedProfile).map(([key, value]) => (
+                    <li key={key} className="flex justify-between">
+                      <span className="capitalize">{key.replace(/_/g, ' ')}:</span>
+                      <span className="font-mono text-xs">{String(value)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowRequestDialog(false)} disabled={isRequesting}>
+                Cancel
+              </Button>
+              <Button onClick={handleRequestChanges} disabled={isRequesting}>
+                {isRequesting ? 'Submitting...' : 'Submit Request'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
   );
 }

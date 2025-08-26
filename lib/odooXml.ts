@@ -118,7 +118,7 @@ export class OdooClient {
     return this.adminUid;
   }
 
-  private async execute(
+    public async execute(
     model: string,
     method: string,
     args: any[] = [],

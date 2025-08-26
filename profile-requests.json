@@ -1,0 +1,54 @@
+[
+  {
+    "employee_id": 78,
+    "employee_name": "TEST",
+    "manager_id": 74,
+    "manager_name": "Smith John",
+    "requested_changes": {
+      "gender": false,
+      "birthday": "2000-07-05",
+      "marital": "single",
+      "country_id": false,
+      "work_email": "testerkk27@gmail.com",
+      "work_phone": "+1 555-555-5556",
+      "mobile_phone": false,
+      "private_street": false,
+      "emergency_contact": false,
+      "emergency_phone": false,
+      "job_title": "Engineer"
+    },
+    "comment": "",
+    "state": "approved",
+    "id": "1756179217235_78",
+    "request_date": "2025-08-26T03:33:37.235Z",
+    "approved_date": "2025-08-26T03:35:08.624Z",
+    "approved_by": 74,
+    "approval_comment": ""
+  },
+  {
+    "employee_id": 78,
+    "employee_name": "TEST",
+    "manager_id": 1,
+    "manager_name": "Mitchell Admin",
+    "requested_changes": {
+      "gender": false,
+      "birthday": "2000-07-05",
+      "marital": "single",
+      "country_id": false,
+      "work_email": "testerkk27@gmail.com",
+      "work_phone": "+1 555-555-5556",
+      "mobile_phone": false,
+      "private_street": "5",
+      "emergency_contact": false,
+      "emergency_phone": false,
+      "private_street2": ""
+    },
+    "comment": "",
+    "state": "rejected",
+    "id": "1756179411221_78",
+    "request_date": "2025-08-26T03:36:51.221Z",
+    "rejected_date": "2025-08-26T03:44:50.633Z",
+    "rejected_by": 2,
+    "rejection_comment": "not properly stated"
+  }
+]

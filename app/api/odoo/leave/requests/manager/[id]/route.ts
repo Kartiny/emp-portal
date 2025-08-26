@@ -1,20 +1,19 @@
 
-import { NextRequest, NextResponse } from 'next/server';
-import { Odoo } from '@/lib/odooXml';
+import { NextResponse } from 'next/server';
+import { OdooClient } from '@/lib/odooXml';
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
-
-  if (!id) {
-    return NextResponse.json({ error: 'Missing manager ID' }, { status: 400 });
+export async function GET(request: Request, { params }: { params: { id: string } }) {
+  const managerId = parseInt(params.id, 10);
+  if (isNaN(managerId)) {
+    return NextResponse.json({ error: 'Invalid manager ID' }, { status: 400 });
   }
 
-  const odoo = new Odoo();
-  await odoo.connect();
+  const odoo = new OdooClient();
+  
 
   try {
     // First, get the employee ID for the manager
-const managerEmployee = await odoo.execute_kw('hr.employee', 'search_read', [
+const managerEmployee = await odoo.execute('hr.employee', 'search_read', [
       [['user_id', '=', parseInt(id, 10)]],
       { fields: ['id'], limit: 1 },
     ]);
@@ -26,7 +25,7 @@ const managerEmployee = await odoo.execute_kw('hr.employee', 'search_read', [
     const managerEmployeeId = managerEmployee[0].id;
 
 // Then, get the employees managed by the manager
-const employees = await odoo.execute_kw('hr.employee', 'search_read', [
+const employees = await odoo.execute('hr.employee', 'search_read', [
   [['parent_id', '=', managerEmployeeId]],
       { fields: ['id'] },
     ]);
@@ -34,7 +33,7 @@ const employees = await odoo.execute_kw('hr.employee', 'search_read', [
     const employeeIds = employees.map((employee: any) => employee.id);
 
     // Finally, get the leave requests for those employees
-    const leaveRequests = await odoo.execute_kw('hr.leave', 'search_read', [
+    const leaveRequests = await odoo.execute('hr.leave', 'search_read', [
       [['employee_id', 'in', employeeIds]],
       {
         fields: ['employee_id', 'holiday_status_id', 'date_from', 'date_to', 'state'],

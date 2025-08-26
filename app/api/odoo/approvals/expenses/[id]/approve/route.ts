@@ -1,8 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getOdooClient } from '@/lib/odooXml';
 
 export async function PUT(
-  req: Request,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
@@ -21,10 +21,8 @@ export async function PUT(
     
     const client = getOdooClient();
     
-    // Verify the user has permission to approve this request
     const approverProfile = await client.getFullUserProfile(uid);
     
-    // Get the expense sheet to verify ownership
     const expenseSheet = await (client as any).execute(
       'hr.expense.sheet',
       'read',
@@ -37,14 +35,11 @@ export async function PUT(
 
     const sheet = expenseSheet[0];
     
-    // Check if user can approve this request (simplified check)
-    // In a real implementation, you'd check manager relationships
     if (sheet.state !== 'submit') {
       return NextResponse.json({ error: 'Expense sheet is not in pending state' }, { status: 400 });
     }
 
-    // Approve the expense sheet
-    const result = await (client as any).execute(
+    await (client as any).execute(
       'hr.expense.sheet',
       'action_approve_expense_sheets',
       [[Number(id)]]
@@ -52,7 +47,6 @@ export async function PUT(
 
     console.log('✅ Expense sheet approved successfully');
 
-    // Add approval comment if provided
     if (comment) {
       try {
         await (client as any).execute(
@@ -87,4 +81,4 @@ export async function PUT(
       { status: 500 }
     );
   }
-} 
+}
