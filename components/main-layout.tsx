@@ -13,7 +13,8 @@ import {
   Receipt,
   User,
   FileText,
-  CheckCircle
+  CheckCircle,
+  Edit
 } from "lucide-react"
 
 interface MainLayoutProps {

@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Camera } from 'lucide-react';
+import { Camera, Edit } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -98,15 +98,22 @@ interface EmployeeProfile {
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<EmployeeProfile | null>(null);
+  const [originalProfile, setOriginalProfile] = useState<EmployeeProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+<<<<<<< HEAD
   const [editedProfile, setEditedProfile] = useState<Partial<EmployeeProfile>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [isRequesting, setIsRequesting] = useState(false);
   const [requestComment, setRequestComment] = useState('');
   const [showRequestDialog, setShowRequestDialog] = useState(false);
   const [requestHistory, setRequestHistory] = useState<any[]>([]);
+=======
+  const [saving, setSaving] = useState(false);
+  const [hasPendingRequest, setHasPendingRequest] = useState(false);
+  const [pendingRequest, setPendingRequest] = useState<any>(null);
+>>>>>>> 722de3af4554494c128ac6f3f6376999eab3c870
 
   // Add state for bank details and status history
   const [bankDetails, setBankDetails] = useState<any[]>([]);
@@ -151,6 +158,7 @@ export default function ProfilePage() {
         const { user, bankDetails, statusHistory } = await res.json();
         if (!user) throw new Error('Malformed profile response');
         setProfile(user);
+        setOriginalProfile(user); // Store original profile data
         setBankDetails(bankDetails || []);
         setStatusHistory(statusHistory || []);
       } catch (err: any) {
@@ -162,7 +170,35 @@ export default function ProfilePage() {
     };
 
     fetchProfile();
+    checkPendingRequest();
   }, []);
+
+  // Check for pending profile change requests
+  const checkPendingRequest = async () => {
+    try {
+      const uid = localStorage.getItem('uid');
+      if (!uid) return;
+
+      const response = await fetch('/api/odoo/profile/my-requests', {
+        headers: {
+          'uid': uid,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setHasPendingRequest(data.hasPendingRequest);
+        
+        if (data.hasPendingRequest) {
+          const pending = data.requests.find((req: any) => req.status === 'pending');
+          setPendingRequest(pending);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking pending request:', error);
+    }
+  };
 
   // Fetch residency options on mount
   useEffect(() => {
@@ -176,6 +212,7 @@ export default function ProfilePage() {
     fetchResidencyOptions();
   }, []);
 
+<<<<<<< HEAD
   // Fetch request history on mount
   useEffect(() => {
     const fetchRequestHistory = async () => {
@@ -203,59 +240,78 @@ export default function ProfilePage() {
   }, []);
 
   const handleEdit = () => {
+=======
+  const handleInputChange = (field: string, value: any) => {
+>>>>>>> 722de3af4554494c128ac6f3f6376999eab3c870
     if (!profile) return;
-    setIsEditing(true);
-    setEditedProfile({
-      gender: profile.gender,
-      birthday: profile.birthday,
-      marital: profile.marital,
-      country_id: profile.country_id,
-      work_email: profile.work_email,
-      work_phone: profile.work_phone,
-      mobile_phone: profile.mobile_phone,
-      private_street: profile.private_street,
-      emergency_contact: profile.emergency_contact,
-      emergency_phone: profile.emergency_phone,
-    });
+    setProfile(prev => prev ? { ...prev, [field]: value } : null);
   };
 
-  const handleCancel = () => {
-    setIsEditing(false);
-    setEditedProfile({});
-  };
-
-  const handleSave = async () => {
+  const handleSendRequest = async () => {
+    if (!profile || !originalProfile) return;
+    
     try {
-      setIsSaving(true);
-      const rawUid = localStorage.getItem('uid');
-      if (!rawUid) throw new Error('Not logged in');
-      const uid = Number(rawUid);
-
-      const res = await fetch('/api/odoo/auth/profile/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ uid, updates: editedProfile }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to update profile');
+      setSaving(true);
+      const uid = localStorage.getItem('uid');
+      if (!uid) {
+        toast.error('User not authenticated');
+        return;
       }
 
-      const { data } = await res.json();
-      setProfile((prev) => (prev ? { ...prev, ...data } : prev));
-      setIsEditing(false);
-      setEditedProfile({});
-      toast.success('Profile updated successfully');
+      // Find what fields have changed by comparing with original profile
+      const changes: any = {};
+      Object.keys(profile).forEach(key => {
+        const currentValue = profile[key as keyof EmployeeProfile];
+        const originalValue = originalProfile[key as keyof EmployeeProfile];
+        
+        // Handle different data types properly
+        if (currentValue !== originalValue) {
+          // For arrays (like department_id, parent_id), compare the first element (ID)
+          if (Array.isArray(currentValue) && Array.isArray(originalValue)) {
+            if (currentValue[0] !== originalValue[0]) {
+              changes[key] = currentValue;
+            }
+          } else {
+            changes[key] = currentValue;
+          }
+        }
+      });
+
+      console.log('🔍 Changes detected:', changes);
+
+      if (Object.keys(changes).length === 0) {
+        toast.error('No changes detected');
+        return;
+      }
+
+      // Submit change request
+      const response = await fetch('/api/odoo/profile/request-change', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'uid': uid
+        },
+        body: JSON.stringify({ changes })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast.success(`Profile change request submitted successfully. Awaiting approval from ${data.approver}`);
+        setIsEditing(false);
+        checkPendingRequest();
+      } else {
+        toast.error(data.error || 'Failed to submit request');
+      }
     } catch (err: any) {
-      console.error('❌ Failed to update profile:', err);
-      toast.error(err.message || 'Failed to update profile');
+      console.error('❌ Failed to submit profile change request:', err);
+      toast.error(err.message || 'Failed to submit profile change request');
     } finally {
-      setIsSaving(false);
+      setSaving(false);
     }
   };
 
+<<<<<<< HEAD
   const handleRequestChanges = async () => {
     try {
       setIsRequesting(true);
@@ -307,6 +363,8 @@ export default function ProfilePage() {
     }
   };
 
+=======
+>>>>>>> 722de3af4554494c128ac6f3f6376999eab3c870
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -314,7 +372,6 @@ export default function ProfilePage() {
       const reader = new FileReader();
       reader.onloadend = async () => {
         const base64 = (reader.result as string).split(',')[1];
-        setIsSaving(true);
         const rawUid = localStorage.getItem('uid');
         if (!rawUid) throw new Error('Not logged in');
         const uid = Number(rawUid);
@@ -339,29 +396,43 @@ export default function ProfilePage() {
     } catch (err: any) {
       console.error('❌ Failed to update profile image:', err);
       toast.error(err.message || 'Failed to update profile image');
-    } finally {
-      setIsSaving(false);
     }
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <p>Loading profile data...</p>
-      </div>
+      <MainLayout>
+        <div className="flex items-center justify-center h-64">
+          <p>Loading profile...</p>
+        </div>
+      </MainLayout>
     );
   }
 
   if (error) {
     return (
-      <Card>
-        <CardContent className="text-red-600 p-6">{error}</CardContent>
-      </Card>
+      <MainLayout>
+        <Card>
+          <CardContent className="text-red-600 p-6">{error}</CardContent>
+        </Card>
+      </MainLayout>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <MainLayout>
+        <Card>
+          <CardContent className="p-6">Profile not found</CardContent>
+        </Card>
+      </MainLayout>
     );
   }
 
   return (
+    <MainLayout>
       <div className="space-y-6">
+<<<<<<< HEAD
         {/* Header with Edit/Save buttons */}
         <div className="flex justify-between items-center">
           <div>
@@ -378,45 +449,187 @@ export default function ProfilePage() {
               <Button onClick={() => setShowRequestDialog(true)} disabled={isSaving || isRequesting}>
                 {isRequesting ? 'Submitting...' : 'Request Changes'}
               </Button>
+=======
+        {/* Pending Request Alert */}
+        {hasPendingRequest && pendingRequest && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+              <div>
+                <h3 className="font-medium text-yellow-800">Profile Change Request Pending</h3>
+                <p className="text-sm text-yellow-700">
+                  Your profile change request is pending approval from {pendingRequest.approver_name}.
+                  Requested on {pendingRequest.request_date_formatted}
+                </p>
+              </div>
+>>>>>>> 722de3af4554494c128ac6f3f6376999eab3c870
             </div>
-          )}
+          </div>
+        )}
+
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Employee Profile</h1>
+            <p className="text-gray-600">Manage your profile information</p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsEditing(!isEditing)}
+              className="flex items-center gap-2"
+              disabled={hasPendingRequest}
+            >
+              <Edit className="h-4 w-4" />
+              {isEditing ? 'Cancel' : 'Edit Profile'}
+            </Button>
+            {isEditing && !hasPendingRequest && (
+              <Button
+                onClick={handleSendRequest}
+                disabled={saving}
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
+              >
+                {saving ? 'Sending...' : 'Send Request'}
+              </Button>
+            )}
+          </div>
         </div>
 
-        {/* Only render profile details if profile is loaded */}
-        {profile && (
-          <>
-            {/* Profile Pic & Name */}
-            <div className="flex flex-col items-center space-y-2 mb-4">
-              <div className="relative">
-                <Avatar className="h-24 w-24">
-                  <AvatarImage
-                    src={profile?.image_1920 ? `data:image/jpeg;base64,${profile.image_1920}` : undefined}
-                    alt={profile?.name || ''}
-                  />
-                  <AvatarFallback>{profile?.name?.charAt(0) || ''}</AvatarFallback>
-                </Avatar>
-                <div className="absolute bottom-0 right-0">
-                  <label htmlFor="avatar-upload">
-                    <Button size="icon" variant="secondary" asChild disabled={isSaving}>
-                      <div>
-                        <Camera className="h-4 w-4" />
+        <Tabs defaultValue="basic" className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="basic">Basic Information</TabsTrigger>
+            <TabsTrigger value="work">Work Information</TabsTrigger>
+            <TabsTrigger value="private">Private Information</TabsTrigger>
+            <TabsTrigger value="documents">Documents</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="basic" className="space-y-6">
+            {/* Profile Card */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <Card className="lg:col-span-1">
+                <CardHeader className="text-center">
+                  <div className="relative inline-block">
+                    <Avatar className="w-24 h-24 mx-auto">
+                      <AvatarImage src={profile.image_1920 || undefined} />
+                      <AvatarFallback className="text-lg">
+                        {profile.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    {isEditing && (
+                      <label htmlFor="image-upload">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="absolute bottom-0 right-0 rounded-full w-8 h-8 p-0 cursor-pointer"
+                        >
+                          <Camera className="h-4 w-4" />
+                        </Button>
                         <input
-                          id="avatar-upload"
+                          id="image-upload"
                           type="file"
                           accept="image/*"
-                          className="hidden"
                           onChange={handleImageUpload}
+                          className="hidden"
                         />
-                      </div>
-                    </Button>
-                  </label>
-                </div>
-              </div>
-              <div className="text-center">
-                <h3 className="text-xl font-semibold">{profile.name}</h3>
-              </div>
+                      </label>
+                    )}
+                  </div>
+                  <CardTitle className="mt-4">{profile.name}</CardTitle>
+                  <CardDescription>{profile.job_title}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Employee ID</Label>
+                    <p className="text-sm text-gray-600">{profile.barcode}</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Department</Label>
+                    <p className="text-sm text-gray-600">{profile.department_id?.[1] || 'Not assigned'}</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Manager</Label>
+                    <p className="text-sm text-gray-600">{profile.parent_id?.[1] || 'Not assigned'}</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Basic Information Form */}
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <CardTitle>Basic Information</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Full Name</Label>
+                      <Input
+                        id="name"
+                        value={profile.name}
+                        onChange={(e) => handleInputChange('name', e.target.value)}
+                        disabled={!isEditing || hasPendingRequest}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="mobile_phone">Mobile Phone</Label>
+                      <Input
+                        id="mobile_phone"
+                        value={profile.mobile_phone || ''}
+                        onChange={(e) => handleInputChange('mobile_phone', e.target.value)}
+                        disabled={!isEditing || hasPendingRequest}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="work_phone">Work Phone</Label>
+                      <Input
+                        id="work_phone"
+                        value={profile.work_phone || ''}
+                        onChange={(e) => handleInputChange('work_phone', e.target.value)}
+                        disabled={!isEditing || hasPendingRequest}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="work_email">Work Email</Label>
+                      <Input
+                        id="work_email"
+                        value={profile.work_email || ''}
+                        onChange={(e) => handleInputChange('work_email', e.target.value)}
+                        disabled={!isEditing || hasPendingRequest}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="gender">Gender</Label>
+                      <Select
+                        value={profile.gender || ''}
+                        onValueChange={(value) => handleInputChange('gender', value)}
+                        disabled={!isEditing || hasPendingRequest}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select gender" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {GENDER_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="birthday">Birthday</Label>
+                      <Input
+                        id="birthday"
+                        type="date"
+                        value={profile.birthday ? format(new Date(profile.birthday), 'yyyy-MM-dd') : ''}
+                        onChange={(e) => handleInputChange('birthday', e.target.value)}
+                        disabled={!isEditing || hasPendingRequest}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
+<<<<<<< HEAD
             {/* Tabs for profile sections */}
             <Tabs defaultValue="basic" className="w-full">
               <TabsList className="mb-4">
@@ -749,118 +962,155 @@ export default function ProfilePage() {
                         </div>
                       </div>
                     </div>
+=======
+            {/* Contact Information */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Contact Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="emergency_contact">Emergency Contact</Label>
+                    <Input
+                      id="emergency_contact"
+                      value={profile.emergency_contact || ''}
+                      onChange={(e) => handleInputChange('emergency_contact', e.target.value)}
+                      disabled={!isEditing || hasPendingRequest}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="emergency_phone">Emergency Phone</Label>
+                    <Input
+                      id="emergency_phone"
+                      value={profile.emergency_phone || ''}
+                      onChange={(e) => handleInputChange('emergency_phone', e.target.value)}
+                      disabled={!isEditing || hasPendingRequest}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+>>>>>>> 722de3af4554494c128ac6f3f6376999eab3c870
 
-                    {/* Family Status */}
-                    <div>
-                      <h4 className="font-semibold mb-3">Family Status</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="marital">Marital Status</Label>
-                        {isEditing ? (
-                          <Select
-                            value={editedProfile.marital || ''}
-                            onValueChange={(v) =>
-                              setEditedProfile((p) => ({ ...p, marital: v as MaritalStatus }))
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select marital status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {MARITAL_OPTIONS.map((opt) => (
-                                <SelectItem key={opt.value} value={opt.value}>
-                                  {opt.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <Input
-                            id="marital"
-                            value={MARITAL_OPTIONS.find((o) => o.value === profile.marital)?.label || ''}
-                            readOnly
-                            className="bg-muted"
-                          />
-                        )}
-                      </div>
-                      <div className="space-y-2">
-                          <Label htmlFor="children">Number of Dependent Children</Label>
-                        <Input
-                            id="children"
-                            type="number"
-                            value={profile.children || ''}
-                            onChange={(e) => setEditedProfile((p) => ({ ...p, children: parseInt(e.target.value) || 0 }))}
-                            readOnly={!isEditing}
-                            className={!isEditing ? 'bg-muted' : ''}
-                          />
-                        </div>
-                      </div>
-                    </div>
+            {/* Address Information */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Address Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="private_street">Street Address</Label>
+                    <Input
+                      id="private_street"
+                      value={profile.private_street || ''}
+                      onChange={(e) => handleInputChange('private_street', e.target.value)}
+                      disabled={!isEditing || hasPendingRequest}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="private_street2">Street Address 2</Label>
+                    <Input
+                      id="private_street2"
+                      value={profile.private_street2 || ''}
+                      onChange={(e) => handleInputChange('private_street2', e.target.value)}
+                      disabled={!isEditing || hasPendingRequest}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="private_zip">Postal Code</Label>
+                    <Input
+                      id="private_zip"
+                      value={profile.private_zip || ''}
+                      onChange={(e) => handleInputChange('private_zip', e.target.value)}
+                      disabled={!isEditing || hasPendingRequest}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-                    {/* Emergency */}
-                    <div>
-                      <h4 className="font-semibold mb-3">Emergency</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                          <Label htmlFor="emergency_contact">Contact Name</Label>
-                          <Input
-                            id="emergency_contact"
-                            value={profile.emergency_contact || ''}
-                            onChange={(e) => setEditedProfile((p) => ({ ...p, emergency_contact: e.target.value }))}
-                            readOnly={!isEditing}
-                            className={!isEditing ? 'bg-muted' : ''}
-                          />
-                    </div>
-                    <div className="space-y-2">
-                          <Label htmlFor="emergency_phone">Contact Phone</Label>
-                          <Input
-                            id="emergency_phone"
-                            value={profile.emergency_phone || ''}
-                            onChange={(e) => setEditedProfile((p) => ({ ...p, emergency_phone: e.target.value }))}
-                            readOnly={!isEditing}
-                            className={!isEditing ? 'bg-muted' : ''}
-                          />
-                        </div>
-                      </div>
-                    </div>
+          <TabsContent value="work" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Work Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="job_title">Job Title</Label>
+                    <Input
+                      id="job_title"
+                      value={profile.job_title || ''}
+                      onChange={(e) => handleInputChange('job_title', e.target.value)}
+                      disabled={!isEditing || hasPendingRequest}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="department">Department</Label>
+                    <Input
+                      id="department"
+                      value={profile.department_id?.[1] || ''}
+                      disabled={true}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="manager">Manager</Label>
+                    <Input
+                      id="manager"
+                      value={profile.parent_id?.[1] || ''}
+                      disabled={true}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-                    {/* Education */}
-                    <div>
-                      <h4 className="font-semibold mb-3">Education</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="certificate">Certificate Level</Label>
-                          <Input
-                            id="certificate"
-                            value={profile.certificate || ''}
-                            onChange={(e) => setEditedProfile((p) => ({ ...p, certificate: e.target.value }))}
-                            readOnly={!isEditing}
-                            className={!isEditing ? 'bg-muted' : ''}
-                          />
-                    </div>
-                    <div className="space-y-2">
-                          <Label htmlFor="study_field">Field of Study</Label>
-                          <Input
-                            id="study_field"
-                            value={profile.study_field || ''}
-                            onChange={(e) => setEditedProfile((p) => ({ ...p, study_field: e.target.value }))}
-                            readOnly={!isEditing}
-                            className={!isEditing ? 'bg-muted' : ''}
-                          />
-                    </div>
-                    <div className="space-y-2">
-                          <Label htmlFor="study_school">School</Label>
-                          <Input
-                            id="study_school"
-                            value={profile.study_school || ''}
-                            onChange={(e) => setEditedProfile((p) => ({ ...p, study_school: e.target.value }))}
-                            readOnly={!isEditing}
-                            className={!isEditing ? 'bg-muted' : ''}
-                          />
-                        </div>
-                      </div>
-                    </div>
+          <TabsContent value="private" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Private Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="marital">Marital Status</Label>
+                    <Select
+                      value={profile.marital || ''}
+                      onValueChange={(value) => handleInputChange('marital', value)}
+                      disabled={!isEditing || hasPendingRequest}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select marital status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {MARITAL_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="children">Number of Children</Label>
+                    <Input
+                      id="children"
+                      type="number"
+                      value={profile.children || 0}
+                      onChange={(e) => handleInputChange('children', parseInt(e.target.value))}
+                      disabled={!isEditing || hasPendingRequest}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
+<<<<<<< HEAD
                     {/* Work Permit */}
                     <div>
                       <h4 className="font-semibold mb-3">Work Permit</h4>
@@ -1215,6 +1465,20 @@ export default function ProfilePage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+=======
+          <TabsContent value="documents" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Documents</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600">Document management features will be added here.</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+>>>>>>> 722de3af4554494c128ac6f3f6376999eab3c870
       </div>
+    </MainLayout>
   );
 }
