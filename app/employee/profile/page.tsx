@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Camera, Edit } from 'lucide-react';
+import { Camera, Edit, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -107,6 +107,9 @@ export default function ProfilePage() {
   const [showRequestDialog, setShowRequestDialog] = useState(false);
   const [requestHistory, setRequestHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [managerInfo, setManagerInfo] = useState<{name: string} | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<any>(null);
+  const [showRequestDetailsDialog, setShowRequestDetailsDialog] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -145,7 +148,10 @@ export default function ProfilePage() {
 
         const res = await fetch('/api/odoo/profile/my-requests', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'uid': uid.toString()
+          },
           body: JSON.stringify({ uid }),
         });
 
@@ -182,12 +188,13 @@ export default function ProfilePage() {
       if (!rawUid) throw new Error('Not logged in');
       const uid = Number(rawUid);
 
-      const res = await fetch('/api/odoo/auth/profile/request-changes', {
+      const res = await fetch('/api/odoo/profile/request-change', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: { 
+          'Content-Type': 'application/json',
+          'uid': uid.toString()
+        },
         body: JSON.stringify({ 
-          uid, 
           changes: editedProfile,
           comment: requestComment 
         }),
@@ -198,17 +205,57 @@ export default function ProfilePage() {
         throw new Error(err.error || 'Failed to submit change request');
       }
 
-      const { data } = await res.json();
+      const data = await res.json();
       setIsEditing(false);
       setEditedProfile({});
       setRequestComment('');
       setShowRequestDialog(false);
-      toast.success(`Change request submitted to ${data.manager_name}`);
+      setManagerInfo(null);
+      toast.success(`Change request submitted successfully. Awaiting approval from ${data.approver}`);
     } catch (err: any) {
       console.error('❌ Failed to submit change request:', err);
       toast.error(err.message || 'Failed to submit change request');
     } finally {
       setIsRequesting(false);
+    }
+  };
+
+  const getManagerInfo = async () => {
+    try {
+      const rawUid = localStorage.getItem('uid');
+      if (!rawUid) return;
+      const uid = Number(rawUid);
+
+      // Get manager info from the profile
+      if (profile?.parent_id) {
+        setManagerInfo({ name: profile.parent_id[1] });
+      }
+    } catch (err) {
+      console.error('Failed to get manager info:', err);
+    }
+  };
+
+  const handleOpenRequestDialog = () => {
+    getManagerInfo();
+    setShowRequestDialog(true);
+  };
+
+  const handleRequestClick = (request: any) => {
+    setSelectedRequest(request);
+    setShowRequestDetailsDialog(true);
+  };
+
+  const getApproverInfo = async (request: any) => {
+    try {
+      // This would typically fetch approver details from the backend
+      // For now, we'll use the data we have
+      return {
+        manager: request.employee?.parent_id?.[1] || 'N/A',
+        hr: 'HR Manager' // This would be fetched from backend
+      };
+    } catch (err) {
+      console.error('Failed to get approver info:', err);
+      return { manager: 'N/A', hr: 'N/A' };
     }
   };
 
@@ -299,7 +346,8 @@ export default function ProfilePage() {
                 <Button onClick={handleCancel} variant="outline" className="w-full sm:w-auto">
                   Cancel
                 </Button>
-                <Button onClick={() => setShowRequestDialog(true)} className="w-full sm:w-auto">
+                <Button onClick={handleOpenRequestDialog} className="w-full sm:w-auto">
+                  <Send className="w-4 h-4 mr-2" />
                   Request Changes
                 </Button>
               </div>
@@ -359,7 +407,7 @@ export default function ProfilePage() {
                     <Label htmlFor="name">Name</Label>
                     <Input
                       id="name"
-                      value={profile.name || ''}
+                      value={isEditing ? (editedProfile.name !== undefined ? editedProfile.name : profile.name || '') : profile.name || ''}
                       onChange={(e) => setEditedProfile((p) => ({ ...p, name: e.target.value }))}
                       readOnly={!isEditing}
                       className={!isEditing ? 'bg-muted' : ''}
@@ -370,7 +418,7 @@ export default function ProfilePage() {
                     <Label htmlFor="mobile_phone">Mobile Phone</Label>
                     <Input
                       id="mobile_phone"
-                      value={profile.mobile_phone || ''}
+                      value={isEditing ? (editedProfile.mobile_phone !== undefined ? editedProfile.mobile_phone : profile.mobile_phone || '') : profile.mobile_phone || ''}
                       onChange={(e) => setEditedProfile((p) => ({ ...p, mobile_phone: e.target.value }))}
                       readOnly={!isEditing}
                       className={!isEditing ? 'bg-muted' : ''}
@@ -381,7 +429,7 @@ export default function ProfilePage() {
                     <Label htmlFor="work_phone">Work Phone</Label>
                     <Input
                       id="work_phone"
-                      value={profile.work_phone || ''}
+                      value={isEditing ? (editedProfile.work_phone !== undefined ? editedProfile.work_phone : profile.work_phone || '') : profile.work_phone || ''}
                       onChange={(e) => setEditedProfile((p) => ({ ...p, work_phone: e.target.value }))}
                       readOnly={!isEditing}
                       className={!isEditing ? 'bg-muted' : ''}
@@ -392,7 +440,7 @@ export default function ProfilePage() {
                     <Label htmlFor="work_email">Work Email</Label>
                     <Input
                       id="work_email"
-                      value={profile.work_email || ''}
+                      value={isEditing ? (editedProfile.work_email !== undefined ? editedProfile.work_email : profile.work_email || '') : profile.work_email || ''}
                       onChange={(e) => setEditedProfile((p) => ({ ...p, work_email: e.target.value }))}
                       readOnly={!isEditing}
                       className={!isEditing ? 'bg-muted' : ''}
@@ -445,7 +493,7 @@ export default function ProfilePage() {
                     <Label htmlFor="place_of_birth">Place of Birth</Label>
                     <Input
                       id="place_of_birth"
-                      value={profile.place_of_birth || ''}
+                      value={isEditing ? (editedProfile.place_of_birth !== undefined ? editedProfile.place_of_birth : profile.place_of_birth || '') : profile.place_of_birth || ''}
                       onChange={(e) => setEditedProfile((p) => ({ ...p, place_of_birth: e.target.value }))}
                       readOnly={!isEditing}
                       className={!isEditing ? 'bg-muted' : ''}
@@ -704,9 +752,16 @@ export default function ProfilePage() {
                   ) : (
                     <div className="space-y-4">
                       {requestHistory.map((request, index) => (
-                        <div key={index} className="border rounded-lg p-4">
+                        <div 
+                          key={index} 
+                          className="border rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors duration-200 group" 
+                          onClick={() => handleRequestClick(request)}
+                        >
                           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
-                            <h4 className="font-semibold text-sm lg:text-base">Request #{request.id}</h4>
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-semibold text-sm lg:text-base">Request #{request.id}</h4>
+                              <span className="text-xs text-muted-foreground group-hover:text-blue-600">Click to view details</span>
+                            </div>
                             {getStatusBadge(request.state)}
                           </div>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs lg:text-sm">
@@ -739,10 +794,53 @@ export default function ProfilePage() {
             <DialogHeader>
               <DialogTitle>Request Profile Changes</DialogTitle>
               <DialogDescription>
-                Submit a request to your manager to approve the changes you've made to your profile.
+                Review the changes below before submitting to your manager for approval.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
+              {/* Show Changes */}
+              <div>
+                <Label className="text-sm font-medium">Changes to be submitted:</Label>
+                <div className="mt-2 space-y-2 max-h-40 overflow-y-auto">
+                  {Object.keys(editedProfile).length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No changes detected</p>
+                  ) : (
+                    Object.entries(editedProfile).map(([field, newValue]) => {
+                      const oldValue = profile[field as keyof EmployeeProfile];
+                      const fieldLabel = field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                      
+                      return (
+                        <div key={field} className="border rounded p-3 bg-muted/50">
+                          <div className="text-sm font-medium text-blue-600">{fieldLabel}</div>
+                          <div className="grid grid-cols-2 gap-2 mt-1 text-xs">
+                            <div>
+                              <span className="font-medium text-red-600">Old:</span>
+                              <div className="text-muted-foreground truncate">
+                                {oldValue ? String(oldValue) : 'Empty'}
+                              </div>
+                            </div>
+                            <div>
+                              <span className="font-medium text-green-600">New:</span>
+                              <div className="text-muted-foreground truncate">
+                                {newValue ? String(newValue) : 'Empty'}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+              
+              {/* Manager Info */}
+              {managerInfo && (
+                <div className="border rounded p-3 bg-blue-50">
+                  <div className="text-sm font-medium text-blue-800">Approval Manager</div>
+                  <div className="text-sm text-blue-600 mt-1">{managerInfo.name}</div>
+                </div>
+              )}
+              
               <div>
                 <Label htmlFor="comment">Comment (Optional)</Label>
                 <Textarea
@@ -758,8 +856,110 @@ export default function ProfilePage() {
               <Button variant="outline" onClick={() => setShowRequestDialog(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleRequestChanges} disabled={isRequesting}>
+              <Button 
+                onClick={handleRequestChanges} 
+                disabled={isRequesting || Object.keys(editedProfile).length === 0}
+              >
                 {isRequesting ? 'Submitting...' : 'Submit Request'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Request Details Dialog */}
+        <Dialog open={showRequestDetailsDialog} onOpenChange={setShowRequestDetailsDialog}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Request Details #{selectedRequest?.id}</DialogTitle>
+              <DialogDescription>
+                Detailed information about the change request.
+              </DialogDescription>
+            </DialogHeader>
+            {selectedRequest ? (
+              <div className="space-y-4">
+                {/* Request Info */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="font-medium">Status:</span> 
+                    <div className="mt-1">{getStatusBadge(selectedRequest.state)}</div>
+                  </div>
+                  <div>
+                    <span className="font-medium">Submitted:</span> 
+                    <div className="text-muted-foreground">{format(new Date(selectedRequest.create_date), 'dd/MM/yyyy HH:mm')}</div>
+                  </div>
+                  <div>
+                    <span className="font-medium">Employee:</span> 
+                    <div className="text-muted-foreground">{selectedRequest.employee?.name || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <span className="font-medium">Requester:</span> 
+                    <div className="text-muted-foreground">{selectedRequest.requester?.name || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <span className="font-medium">Manager Approver:</span> 
+                    <div className="text-muted-foreground">{selectedRequest.employee?.parent_id?.[1] || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <span className="font-medium">HR Approver:</span> 
+                    <div className="text-muted-foreground">HR Manager</div>
+                  </div>
+                </div>
+
+                {/* Comment */}
+                {selectedRequest.comment && (
+                  <div>
+                    <Label className="text-sm font-medium">Comment:</Label>
+                    <p className="text-sm text-muted-foreground mt-1 p-3 bg-muted rounded">{selectedRequest.comment}</p>
+                  </div>
+                )}
+
+                {/* Changes */}
+                {selectedRequest.changes && selectedRequest.changes.length > 0 && (
+                  <div>
+                    <Label className="text-sm font-medium">Changes Requested:</Label>
+                    <div className="mt-2 space-y-2 max-h-60 overflow-y-auto">
+                      {selectedRequest.changes.map((change: any, index: number) => {
+                        const fieldLabel = change.field_name?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) || 'Unknown Field';
+                        return (
+                          <div key={index} className="border rounded p-3 bg-muted/50">
+                            <div className="text-sm font-medium text-blue-600">{fieldLabel}</div>
+                            <div className="grid grid-cols-2 gap-2 mt-1 text-xs">
+                              <div>
+                                <span className="font-medium text-red-600">Old Value:</span>
+                                <div className="text-muted-foreground truncate">
+                                  {change.old_value || 'Empty'}
+                                </div>
+                              </div>
+                              <div>
+                                <span className="font-medium text-green-600">New Value:</span>
+                                <div className="text-muted-foreground truncate">
+                                  {change.new_value || 'Empty'}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Rejection Reason */}
+                {selectedRequest.rejection_reason && (
+                  <div>
+                    <Label className="text-sm font-medium text-red-600">Rejection Reason:</Label>
+                    <p className="text-sm text-red-600 mt-1 p-3 bg-red-50 rounded">{selectedRequest.rejection_reason}</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Loading request details...</p>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowRequestDetailsDialog(false)}>
+                Close
               </Button>
             </DialogFooter>
           </DialogContent>

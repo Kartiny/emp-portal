@@ -1,70 +1,81 @@
 import { NextResponse } from 'next/server';
-import { getFullUserProfile } from '@/lib/odooXml';
-import fs from 'fs';
-import path from 'path';
+import { getOdooClient } from '@/lib/odooXml';
 
-// Simple file-based storage for profile change requests
-const REQUESTS_FILE = path.join(process.cwd(), 'data', 'profile-requests.json');
-
-// Load existing requests
-const loadRequests = () => {
+export async function POST(req: Request) {
   try {
-    const dataDir = path.dirname(REQUESTS_FILE);
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-    
-    if (fs.existsSync(REQUESTS_FILE)) {
-      const data = fs.readFileSync(REQUESTS_FILE, 'utf8');
-      return JSON.parse(data);
-    }
-  } catch (error) {
-    console.error('Error loading requests:', error);
-  }
-  return [];
-};
-
-export async function GET(req: Request) {
-  try {
-    const uid = parseInt(req.headers.get('uid') || '0');
+    const { uid } = await req.json();
 
     if (!uid) {
       return NextResponse.json({ error: 'User ID not provided' }, { status: 400 });
     }
 
-    // Get user profile
-    const userProfile = await getFullUserProfile(uid);
-    if (!userProfile) {
-      return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
+    const client = getOdooClient();
+
+    // Get employee ID for the current user
+    const employee = await client.execute('hr.employee', 'search_read', [
+      [['user_id', '=', uid]],
+      ['id', 'name']
+    ]);
+
+    if (!employee || employee.length === 0) {
+      return NextResponse.json({ error: 'Employee not found' }, { status: 404 });
     }
 
-    // Get employee's profile change requests
-    const allRequests = loadRequests();
-    const requests = allRequests.filter((req: any) => req.employee_id === userProfile.id);
+    const employeeId = employee[0].id;
 
-    // Check if user has pending request
-    const hasPending = requests.some((req: any) => req.status === 'pending');
+    // Get all requests for this employee
+    const requests = await client.execute('employee.update.request', 'search_read', [
+      [['employee_id', '=', employeeId]],
+      [
+        'id',
+        'name',
+        'employee_id',
+        'requested_by_id',
+        'state',
+        'create_date',
+        'rejection_reason',
+        'line_ids'
+      ]
+    ]);
 
-    // Enhance requests with additional data
-    const enhancedRequests = requests.map((req: any) => ({
-      ...req,
-      request_date_formatted: new Date(req.request_date).toLocaleDateString(),
-      approval_date_formatted: req.approval_date ? new Date(req.approval_date).toLocaleDateString() : null,
-      changes_count: Object.keys(req.requested_changes).length,
-      status_color: req.status === 'approved' ? 'green' : req.status === 'rejected' ? 'red' : 'yellow'
-    }));
+    // For each request, get the request lines (changes)
+    const enrichedRequests = await Promise.all(
+      requests.map(async (request: any) => {
+                            // Get request lines (changes)
+                    const lines = await client.execute('employee.update.request.line', 'search_read', [
+                      [['request_id', '=', request.id]],
+                      ['field_name', 'field_description', 'old_value', 'new_value']
+                    ]);
+
+        // Get requester details
+        const requester = await client.execute('res.users', 'read', [
+          [request.requested_by_id[0]],
+          ['id', 'name', 'email']
+        ]);
+
+        return {
+          id: request.id,
+          name: request.name,
+          employee: employee[0],
+          requester: requester[0] || {},
+          state: request.state,
+          create_date: request.create_date,
+          rejection_reason: request.rejection_reason,
+          changes: lines,
+          request_date: request.create_date
+        };
+      })
+    );
 
     return NextResponse.json({
-      success: true,
-      requests: enhancedRequests,
-      hasPendingRequest: hasPending,
-      total: enhancedRequests.length
+      requests: enrichedRequests,
+      count: enrichedRequests.length
     });
 
   } catch (error: any) {
-    console.error('❌ Error fetching employee profile requests:', error);
+    console.error('❌ Error fetching my requests:', error);
     return NextResponse.json({ 
-      error: error.message || 'Failed to fetch profile requests' 
+      error: error.message || 'Failed to fetch my requests' 
     }, { status: 500 });
   }
 } 

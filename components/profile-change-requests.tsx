@@ -21,6 +21,7 @@ interface ProfileChangeRequest {
   employee_id: number;
   employee_name: string;
   requested_changes: Record<string, any>;
+  current_data: Record<string, any>;
   comment: string;
   request_date: string;
   state: string;
@@ -47,10 +48,12 @@ export function ProfileChangeRequests() {
       if (!rawUid) throw new Error('Not logged in');
       const uid = Number(rawUid);
 
-      const res = await fetch('/api/odoo/auth/profile/pending-requests', {
+      // ✅ Use the correct Odoo-based API endpoint
+      const res = await fetch('/api/odoo/profile/pending-requests', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: { 
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({ uid }),
       });
 
@@ -59,8 +62,28 @@ export function ProfileChangeRequests() {
         throw new Error(err.error || 'Failed to fetch requests');
       }
 
-      const { data } = await res.json();
-      setRequests(data);
+      const data = await res.json();
+      console.log('🔍 Debug - Fetched requests:', data);
+      
+      // Transform the Odoo response format to match the component's expected format
+      const transformedRequests = (data.requests || []).map((request: any) => ({
+        id: request.id,
+        employee_id: request.employee.id,
+        employee_name: request.employee.name,
+        requested_changes: request.changes.reduce((acc: any, change: any) => {
+          acc[change.field_name] = change.new_value;
+          return acc;
+        }, {}),
+        current_data: request.changes.reduce((acc: any, change: any) => {
+          acc[change.field_name] = change.old_value;
+          return acc;
+        }, {}),
+        comment: '', // Odoo doesn't have a comment field in the request
+        request_date: request.create_date,
+        state: request.state
+      }));
+
+      setRequests(transformedRequests);
     } catch (err: any) {
       console.error('❌ Failed to fetch requests:', err);
       setError(err.message);
@@ -78,10 +101,12 @@ export function ProfileChangeRequests() {
       if (!rawUid) throw new Error('Not logged in');
       const uid = Number(rawUid);
 
-      const res = await fetch(`/api/odoo/auth/profile/approve-changes/${selectedRequest.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+      // ✅ Use the correct Odoo-based API endpoint
+      const res = await fetch(`/api/odoo/profile/approve-request/${selectedRequest.id}`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({ uid, comment }),
       });
 
@@ -112,10 +137,12 @@ export function ProfileChangeRequests() {
       if (!rawUid) throw new Error('Not logged in');
       const uid = Number(rawUid);
 
-      const res = await fetch(`/api/odoo/auth/profile/reject-changes/${selectedRequest.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+      // ✅ Use the correct Odoo-based API endpoint
+      const res = await fetch(`/api/odoo/profile/reject-request/${selectedRequest.id}`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({ uid, comment }),
       });
 
@@ -139,12 +166,14 @@ export function ProfileChangeRequests() {
 
   const getStatusBadge = (state: string) => {
     switch (state) {
-      case 'pending':
-        return <Badge variant="secondary">Pending</Badge>;
+      case 'to_approve':
+        return <Badge variant="secondary">To Approve</Badge>;
       case 'approved':
         return <Badge variant="default">Approved</Badge>;
       case 'rejected':
         return <Badge variant="destructive">Rejected</Badge>;
+      case 'pending':
+        return <Badge variant="secondary">Pending</Badge>;
       default:
         return <Badge variant="outline">{state}</Badge>;
     }
@@ -210,13 +239,25 @@ export function ProfileChangeRequests() {
                   
                   <div>
                     <Label className="text-sm font-medium">Requested Changes:</Label>
-                    <div className="mt-2 space-y-2">
-                      {Object.entries(request.requested_changes).map(([key, value]) => (
-                        <div key={key} className="flex justify-between items-center text-sm">
-                          <span className="capitalize font-medium">{key.replace(/_/g, ' ')}:</span>
-                          <span className="text-muted-foreground">{String(value)}</span>
-                        </div>
-                      ))}
+                    <div className="mt-2 border rounded-md">
+                      <table className="w-full text-sm">
+                        <thead className="bg-muted/50">
+                          <tr className="text-left">
+                            <th className="p-2 font-medium">Field</th>
+                            <th className="p-2 font-medium">Old Value</th>
+                            <th className="p-2 font-medium">New Value</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Object.entries(request.requested_changes).map(([key, value]) => (
+                            <tr key={key} className="border-t">
+                              <td className="p-2 capitalize">{key.replace(/_/g, ' ')}</td>
+                              <td className="p-2 text-muted-foreground">{String(request.current_data?.[key] ?? 'N/A')}</td>
+                              <td className="p-2 font-semibold">{String(value)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
 

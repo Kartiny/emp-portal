@@ -1,49 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getFullUserProfile } from '@/lib/odooXml';
-import fs from 'fs';
-import path from 'path';
-
-// Simple file-based storage for profile change requests
-const REQUESTS_FILE = path.join(process.cwd(), 'data', 'profile-requests.json');
-
-// Load existing requests
-const loadRequests = () => {
-  try {
-    const dataDir = path.dirname(REQUESTS_FILE);
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-    
-    if (fs.existsSync(REQUESTS_FILE)) {
-      const data = fs.readFileSync(REQUESTS_FILE, 'utf8');
-      return JSON.parse(data);
-    }
-  } catch (error) {
-    console.error('Error loading requests:', error);
-  }
-  return [];
-};
-
-// Save requests
-const saveRequests = (requests: any[]) => {
-  try {
-    const dataDir = path.dirname(REQUESTS_FILE);
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-    fs.writeFileSync(REQUESTS_FILE, JSON.stringify(requests, null, 2));
-  } catch (error) {
-    console.error('Error saving requests:', error);
-  }
-};
+import { getOdooClient } from '@/lib/odooXml';
 
 export async function POST(
   req: Request,
   { params }: { params: { id: string } }
 ) {
   try {
-    const { notes } = await req.json();
-    const uid = parseInt(req.headers.get('uid') || '0');
+    const { uid, comment } = await req.json();
     const requestId = parseInt(params.id);
 
     if (!uid) {
@@ -54,48 +17,55 @@ export async function POST(
       return NextResponse.json({ error: 'Request ID not provided' }, { status: 400 });
     }
 
-    // Get user profile to check role
-    const userProfile = await getFullUserProfile(uid);
-    if (!userProfile) {
-      return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
-    }
+    const client = getOdooClient();
 
-    // Check if user has approval permissions
-    const canApprove = userProfile.employee_type === 'manager' || 
-                      userProfile.employee_type === 'hr' || 
-                      userProfile.employee_type === 'administrator';
+    // Get the request to verify it exists and is in draft state
+    const request = await client.execute('employee.update.request', 'read', [
+      [requestId],
+      ['id', 'state', 'employee_id', 'line_ids']
+    ]);
 
-    if (!canApprove) {
-      return NextResponse.json({ 
-        error: 'You do not have permission to approve profile change requests' 
-      }, { status: 403 });
-    }
-
-    // Load and update the request
-    const allRequests = loadRequests();
-    const requestIndex = allRequests.findIndex((req: any) => req.id === requestId);
-    
-    if (requestIndex === -1) {
+    if (!request || request.length === 0) {
       return NextResponse.json({ error: 'Request not found' }, { status: 404 });
     }
 
-    const request = allRequests[requestIndex];
-    
-    // Update request status
-    allRequests[requestIndex] = {
-      ...request,
-      status: 'approved',
-      approval_date: new Date().toISOString(),
-      approval_notes: notes || ''
-    };
+    const currentRequest = request[0];
+    if (currentRequest.state !== 'to_approve') {
+      return NextResponse.json({ error: 'Request is not in to_approve state' }, { status: 400 });
+    }
 
-    // Save updated requests
-    saveRequests(allRequests);
+    // Update the request state to approved
+    await client.execute('employee.update.request', 'write', [
+      [requestId],
+      {
+        state: 'approved',
+        rejection_reason: comment || ''
+      }
+    ]);
+
+    // Get the request lines to apply the changes to the employee
+    const lines = await client.execute('employee.update.request.line', 'search_read', [
+      [['request_id', '=', requestId]],
+      ['field_name', 'new_value']
+    ]);
+
+    // Apply the changes to the employee record
+    const employeeUpdates: any = {};
+    lines.forEach((line: any) => {
+      employeeUpdates[line.field_name] = line.new_value;
+    });
+
+    if (Object.keys(employeeUpdates).length > 0) {
+      await client.execute('hr.employee', 'write', [
+        [currentRequest.employee_id[0]],
+        employeeUpdates
+      ]);
+    }
 
     console.log('✅ Profile change request approved:', {
       requestId,
-      approver: userProfile.name,
-      notes
+      employeeId: currentRequest.employee_id[0],
+      changes: Object.keys(employeeUpdates)
     });
 
     return NextResponse.json({
@@ -104,7 +74,7 @@ export async function POST(
     });
 
   } catch (error: any) {
-    console.error('❌ Error approving profile change request:', error);
+    console.error('❌ Error approving request:', error);
     return NextResponse.json({ 
       error: error.message || 'Failed to approve request' 
     }, { status: 500 });

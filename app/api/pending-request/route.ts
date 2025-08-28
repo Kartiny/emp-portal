@@ -3,13 +3,13 @@ import { getPendingRequests } from '@/lib/odooXml';
 
 export async function POST(req: NextRequest) {
   try {
-    const { employeeId } = await req.json();
+    const { uid } = await req.json();
 
-    if (!employeeId) {
-      return NextResponse.json({ message: 'Employee ID is required' }, { status: 400 });
+    if (!uid) {
+      return NextResponse.json({ message: 'User ID is required' }, { status: 400 });
     }
 
-    const pendingRequests = await getPendingRequests(employeeId);
+    const pendingRequests = await getPendingRequests(uid);
 
     return NextResponse.json(pendingRequests);
   } catch (error) {

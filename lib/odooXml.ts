@@ -991,8 +991,9 @@ export class OdooClient {
 
     const leaves = await this.getLeaveRequests(uid, { status: 'confirm' });
     const expenses = await this.getExpenseRequests(uid);
+    const profileChanges = await this.getPendingProfileRequests(empId);
 
-    return [...leaves, ...expenses];
+    return [...leaves, ...expenses, ...profileChanges];
   }
 
   /**
@@ -1542,7 +1543,7 @@ export class OdooClient {
       const requests = await this.execute(
         'hr.profile.change.request',
         'search_read',
-        [[['approver_id', '=', approverId], ['status', '=', 'pending']]],
+        [[['manager_id', '=', approverId], ['status', '=', 'pending']]],
         {
           fields: [
             'id',
@@ -1561,7 +1562,6 @@ export class OdooClient {
         }
       );
 
-      // Parse JSON data
       return requests.map(req => ({
         ...req,
         current_data: JSON.parse(req.current_data || '{}'),
@@ -1598,7 +1598,6 @@ export class OdooClient {
         }
       );
 
-      // Parse JSON data
       return requests.map(req => ({
         ...req,
         current_data: JSON.parse(req.current_data || '{}'),

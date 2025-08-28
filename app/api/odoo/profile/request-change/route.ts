@@ -1,85 +1,75 @@
 import { NextResponse } from 'next/server';
-import { getFullUserProfile } from '@/lib/odooXml';
-import fs from 'fs';
-import path from 'path';
-
-// Simple file-based storage for profile change requests
-const REQUESTS_FILE = path.join(process.cwd(), 'data', 'profile-requests.json');
-
-// Ensure data directory exists
-const ensureDataDir = () => {
-  const dataDir = path.dirname(REQUESTS_FILE);
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-  }
-};
-
-// Load existing requests
-const loadRequests = () => {
-  try {
-    ensureDataDir();
-    if (fs.existsSync(REQUESTS_FILE)) {
-      const data = fs.readFileSync(REQUESTS_FILE, 'utf8');
-      return JSON.parse(data);
-    }
-  } catch (error) {
-    console.error('Error loading requests:', error);
-  }
-  return [];
-};
-
-// Save requests
-const saveRequests = (requests: any[]) => {
-  try {
-    ensureDataDir();
-    fs.writeFileSync(REQUESTS_FILE, JSON.stringify(requests, null, 2));
-  } catch (error) {
-    console.error('Error saving requests:', error);
-  }
-};
+import { getFullUserProfile, getOdooClient } from '@/lib/odooXml';
 
 // Get direct manager (simplified)
 const getDirectManager = async (employeeId: number) => {
   try {
-    // Get the employee's manager from Odoo
-    const { getOdooClient } = await import('@/lib/odooXml');
     const client = getOdooClient();
-    
-    // Get employee data to find their manager
-    const employee = await client.getEmployeeByUserId(employeeId);
 
-    if (employee && employee.parent_id) {
+    // Get employee data directly by employee ID (not user ID)
+    const employee = await client.execute('hr.employee', 'read', [
+      [employeeId],
+      ['id', 'name', 'parent_id', 'user_id']
+    ]);
+
+    console.log('🔍 Debug - Employee data:', employee);
+
+    if (employee && employee[0] && employee[0].parent_id) {
       // The parent_id is an array [id, name], so we use the first element (ID)
-      const managerId = employee.parent_id[0];
-      const managerName = employee.parent_id[1];
-      
+      const managerId = employee[0].parent_id[0];
+      const managerName = employee[0].parent_id[1];
+
+      console.log('🔍 Debug - Employee parent_id:', employee[0].parent_id);
+      console.log('🔍 Debug - Manager ID:', managerId);
+
+      // Get the manager's user ID from the employee record
+      const managerEmployee = await client.execute('hr.employee', 'read', [
+        [managerId],
+        ['id', 'name', 'user_id']
+      ]);
+
+      console.log('🔍 Debug - Manager employee data:', managerEmployee);
+
+      if (managerEmployee && managerEmployee[0] && managerEmployee[0].user_id) {
+        const managerUserId = managerEmployee[0].user_id[0];
+        console.log('🔍 Debug - Manager user ID found:', managerUserId);
+        
+        return {
+          id: managerId,
+          name: managerName,
+          user_id: managerUserId // Get the actual user ID
+        };
+      }
+
+      console.log('🔍 Debug - No user_id found for manager, using employee ID as fallback');
       return {
         id: managerId,
         name: managerName,
-        user_id: [managerId, managerName]
+        user_id: managerId // Fallback to employee ID
       };
     }
 
+    console.log('🔍 Debug - No parent_id found, using default manager');
     // Fallback: return a default manager
     return {
-      id: 2, // Changed from 1 to 2 to match the actual manager
+      id: 2,
       name: 'Manager1',
-      user_id: [2, 'Manager1']
+      user_id: 6 // Use the correct user ID for Manager1
     };
   } catch (error) {
     console.error('Error getting manager:', error);
     // Fallback: return a default manager
     return {
-      id: 2, // Changed from 1 to 2 to match the actual manager
+      id: 2,
       name: 'Manager1',
-      user_id: [2, 'Manager1']
+      user_id: 6 // Use the correct user ID for Manager1
     };
   }
 };
 
 export async function POST(req: Request) {
   try {
-    const { changes } = await req.json();
+    const { changes, comment } = await req.json();
     const uid = parseInt(req.headers.get('uid') || '0');
 
     if (!uid) {
@@ -96,18 +86,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
     }
 
-    // Check if user already has a pending request
-    const existingRequests = loadRequests();
-    const hasPending = existingRequests.some((req: any) => 
-      req.employee_id === currentProfile.id && req.status === 'pending'
-    );
-
-    if (hasPending) {
-      return NextResponse.json({ 
-        error: 'You already have a pending profile change request' 
-      }, { status: 400 });
-    }
-
     // Get direct manager for approval
     const manager = await getDirectManager(currentProfile.id);
     if (!manager) {
@@ -118,31 +96,83 @@ export async function POST(req: Request) {
 
     console.log('🔍 Debug - Manager found:', manager);
     console.log('🔍 Debug - Current user ID:', uid);
-    console.log('🔍 Debug - Manager user ID:', manager.user_id[0]);
+    console.log('🔍 Debug - Manager user ID:', manager.user_id);
+    console.log('🔍 Debug - Manager user_id array:', manager.user_id);
 
-    // Create the change request
-    const requestId = Date.now(); // Simple ID generation
-    const newRequest = {
-      id: requestId,
+    // Create the change request in Odoo
+    const client = getOdooClient();
+    
+    // Prepare the request data for Odoo - start with minimal required fields
+    const requestData = {
+      name: `EMP-${currentProfile.id}-${Date.now()}`, // Generate a reference
       employee_id: currentProfile.id,
-      requester_id: uid,
-      approver_id: manager.user_id[0],
-      request_type: 'profile_update',
-      current_data: currentProfile,
-      requested_changes: changes,
-      status: 'pending',
-      request_date: new Date().toISOString(),
-      employee_name: currentProfile.name,
-      approver_name: manager.name
+      requested_by_id: uid,
+      activity_user_id: manager.user_id, // Assign to manager for approval
+      state: 'to_approve', // Set state to to_approve so manager can see it
     };
 
-    console.log('🔍 Debug - New request created:', newRequest);
+    console.log('🔍 Debug - Request data being sent to Odoo:', requestData);
 
-    // Save the request
-    existingRequests.push(newRequest);
-    saveRequests(existingRequests);
+    // First, let's check if the model exists by trying to search for it
+    try {
+      const modelExists = await client.execute('employee.update.request', 'search', [[]]);
+      console.log('🔍 Debug - Model exists, found records:', modelExists);
+      
+      // Let's also try to get the fields of the model
+      const fields = await client.execute('employee.update.request', 'fields_get', []);
+      console.log('🔍 Debug - Model fields:', Object.keys(fields));
+      
+      // Let's also check the line model fields
+      const lineFields = await client.execute('employee.update.request.line', 'fields_get', []);
+      console.log('🔍 Debug - Line model fields:', Object.keys(lineFields));
+      
+      // Let's check the state field selection values
+      const stateField = fields.state;
+      console.log('🔍 Debug - State field info:', stateField);
+    } catch (modelError: any) {
+      console.error('❌ Model does not exist or is not accessible:', modelError);
+      throw new Error('employee.update.request model not found in Odoo');
+    }
 
-    console.log('✅ Profile change request created:', {
+    // Create the main request
+    let requestId: number;
+    try {
+      requestId = await client.execute('employee.update.request', 'create', [requestData]);
+      
+      if (!requestId) {
+        throw new Error('Failed to create request in Odoo');
+      }
+      
+      console.log('🔍 Debug - Request created with ID:', requestId);
+      console.log('🔍 Debug - Request data:', requestData);
+      
+      // Let's check what state the request was created with
+      const createdRequest = await client.execute('employee.update.request', 'read', [[requestId], ['id', 'name', 'state', 'activity_user_id']]);
+      console.log('🔍 Debug - Created request details:', createdRequest[0]);
+    } catch (createError: any) {
+      console.error('❌ Error creating request in Odoo:', createError);
+      console.error('❌ Request data that failed:', requestData);
+      throw createError;
+    }
+
+                    // Create request lines for each change
+                const lineData = Object.entries(changes).map(([field, newValue]) => ({
+                  request_id: requestId,
+                  field_name: field,
+                  field_description: field, // Add field description
+                  old_value: currentProfile[field] || '',
+                  new_value: newValue,
+                }));
+
+                console.log('🔍 Debug - Creating request lines:', lineData);
+
+                // Create the request lines
+                for (const line of lineData) {
+                  const lineId = await client.execute('employee.update.request.line', 'create', [line]);
+                  console.log('🔍 Debug - Created line with ID:', lineId);
+                }
+
+    console.log('✅ Profile change request created in Odoo:', {
       requestId,
       employee: currentProfile.name,
       approver: manager.name,
