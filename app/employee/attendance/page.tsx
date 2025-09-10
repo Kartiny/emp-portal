@@ -428,12 +428,26 @@ export default function AttendancePage() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="today">Today's Attendance</TabsTrigger>
-            <TabsTrigger value="summary">Attendance Summary</TabsTrigger>
-            <TabsTrigger value="rosters">Shift Rosters</TabsTrigger>
-          </TabsList>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      {/* Mobile: Dropdown select */}
+      <div className="sm:hidden mb-4">
+        <select
+          value={activeTab}
+          onChange={(e) => setActiveTab(e.target.value)}
+          className="w-full border rounded px-3 py-2 text-sm bg-background"
+        >
+          <option value="today">Today's Attendance</option>
+          <option value="summary">Attendance Summary</option>
+          <option value="rosters">Shift Rosters</option>
+        </select>
+      </div>
+
+      {/* Desktop/Tablet: Horizontal tab buttons */}
+      <TabsList className="hidden sm:grid w-full grid-cols-3 gap-2 mb-6">
+        <TabsTrigger value="today">Today's Attendance</TabsTrigger>
+        <TabsTrigger value="summary">Attendance Summary</TabsTrigger>
+        <TabsTrigger value="rosters">Shift Rosters</TabsTrigger>
+      </TabsList>
           
           <TabsContent value="today">
             <Card>

@@ -61,7 +61,6 @@ interface LeaveAllocationUI {
 }
 
 export default function LeavePage() {
-  const { activeRole } = useRole();
   // ───── State ────────────────────────────────────────────────────────────────
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
   const [leaveAllocations, setLeaveAllocations] = useState<LeaveAllocationUI[]>([]);
@@ -85,6 +84,7 @@ export default function LeavePage() {
   const [yearFilter, setYearFilter] = useState<string>(new Date().getFullYear().toString());
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [activeTab, setActiveTab] = useState('calendar');
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -360,24 +360,37 @@ export default function LeavePage() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        <Tabs defaultValue="calendar" className="w-full">
-          <div className="flex items-center justify-between mb-4">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="calendar">Calendar</TabsTrigger>
-              <TabsTrigger value="balance">
-                Leave Balance
-              </TabsTrigger>
-              <TabsTrigger value="history">
-                Leave History
-              </TabsTrigger>
-            </TabsList>
-            <button
-              className="px-4 py-2 bg-blue-900 text-white rounded hover:bg-blue-800 transition-colors ml-4"
-              onClick={() => setIsRequestOpen(true)}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        {/* Top bar with Tabs + Request Button */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+          {/* Mobile: Dropdown select */}
+          <div className="sm:hidden w-full">
+            <select
+              value={activeTab}
+              onChange={(e) => setActiveTab(e.target.value)}
+              className="w-full border rounded px-3 py-2 text-sm bg-background"
             >
-              Request Leave
-            </button>
+              <option value="calendar">Calendar</option>
+              <option value="balance">Leave Balance</option>
+              <option value="history">Leave History</option>
+            </select>
           </div>
+
+          {/* Desktop/Tablet: Centered tabs */}
+          <TabsList className="hidden sm:flex mx-auto gap-2">
+            <TabsTrigger value="calendar">Calendar</TabsTrigger>
+            <TabsTrigger value="balance">Leave Balance</TabsTrigger>
+            <TabsTrigger value="history">Leave History</TabsTrigger>
+          </TabsList>
+
+          {/* Request Leave Button */}
+          <button
+            className="px-4 py-2 bg-blue-900 text-white rounded hover:bg-blue-800 transition-colors sm:ml-4"
+            onClick={() => setIsRequestOpen(true)}
+          >
+            Request Leave
+          </button>
+        </div>
 
           {/* ─── Calendar Tab ──────────────────────────────────────────────── */}
           <TabsContent value="calendar">
