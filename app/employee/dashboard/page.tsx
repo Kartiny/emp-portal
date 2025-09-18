@@ -58,6 +58,7 @@ interface ShiftInfo {
   schedule_name: string | null;
   start: string | null;
   end: string | null;
+  desc: string | null;
 }
 
 export default function DashboardPage() {
