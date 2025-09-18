@@ -30,6 +30,7 @@ interface ShiftInfo {
   schedule_name: string | null;
   start: string | null;
   end: string | null;
+  desc: string | null;
 }
 
 function formatTimeKL(dt: string | null | undefined) {
@@ -46,6 +47,12 @@ function formatTimeKL(dt: string | null | undefined) {
 
 export default function AttendanceWidget({ today, shift, onUpdate }: { today: TodayAttendance | null, shift: ShiftInfo | null, onUpdate: () => void }) {
   const [loading, setLoading] = useState(false);
+
+  // Debug logging for shift information
+  console.log('[DEBUG] AttendanceWidget received shift info:', shift);
+  console.log('[DEBUG] AttendanceWidget received today data:', today);
+
+  // Clock In handler
 
   // Clock In handler
   const handleClockIn = async () => {
@@ -127,7 +134,7 @@ export default function AttendanceWidget({ today, shift, onUpdate }: { today: To
         <div className="text-xs lg:text-sm text-blue-800 font-medium mt-1">
           {shift ? (
             <>
-              Shift: <span className="font-semibold">{shift.schedule_name}</span>
+              Shift: <span className="font-semibold">{shift.desc || shift.schedule_name}</span>
               {shift.start && shift.end && (
                 <span className="ml-2">({shift.start} - {shift.end})</span>
               )}
@@ -141,18 +148,6 @@ export default function AttendanceWidget({ today, shift, onUpdate }: { today: To
         <div className="mb-1 text-sm lg:text-base">{lastClockIn ? formatTimeKL(lastClockIn) : '-'}</div>
         <div className="text-xs lg:text-sm font-semibold">Last Clock Out</div>
         <div className="mb-1 text-sm lg:text-base">{lastClockOut ? formatTimeKL(lastClockOut) : '-'}</div>
-        {today && today.workedHours && today.workedHours > 0 && (
-          <div>
-            <p className="text-xs lg:text-sm font-semibold">Worked Hours Today</p>
-            <p className="text-sm lg:text-base">
-              {(() => {
-                const h = Math.floor(today.workedHours!);
-                const m = Math.round((today.workedHours! % 1) * 60);
-                return `${h}h ${m}m`;
-              })()}
-            </p>
-          </div>
-        )}
       </div>
       
       <div className="flex flex-col sm:flex-row gap-2 lg:gap-4 mt-2">

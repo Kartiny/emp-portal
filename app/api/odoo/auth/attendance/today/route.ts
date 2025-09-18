@@ -224,9 +224,9 @@ export async function POST(req: Request) {
         'checkOut'
       );
     } else {
-      // Employee is still at work (no second check-out yet)
+      // No final check-out recorded yet
       checkOutStatus = {
-        status: 'Still at work',
+        status: 'N/A',
         mins: 0,
         workingHoursImpact: 0
       };
