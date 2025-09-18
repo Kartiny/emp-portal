@@ -356,17 +356,19 @@ export default function ProfilePage() {
         </div>
 
         <Tabs defaultValue="basic" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-6">
-            <TabsTrigger value="basic">Basic Info</TabsTrigger>
-            <TabsTrigger value="work">Work Info</TabsTrigger>
-            <TabsTrigger value="private">Private Info</TabsTrigger>
-            <TabsTrigger value="bank">Bank Details</TabsTrigger>
-            <TabsTrigger value="status">Status History</TabsTrigger>
-            <TabsTrigger value="requests">Change Requests</TabsTrigger>
-          </TabsList>
+  <div className="mb-3">
+    <TabsList className="grid w-full grid-cols-2 lg:grid-cols-6">
+      <TabsTrigger value="basic">Basic Info</TabsTrigger>
+      <TabsTrigger value="work">Work Info</TabsTrigger>
+      <TabsTrigger value="private">Private Info</TabsTrigger>
+      <TabsTrigger value="bank">Bank Details</TabsTrigger>
+      <TabsTrigger value="status">Status History</TabsTrigger>
+      <TabsTrigger value="requests">Change Requests</TabsTrigger>
+    </TabsList>
+  </div>
 
-          <TabsContent value="basic">
-            <Card>
+          <TabsContent value="basic" >
+              <Card>
               <CardHeader>
                 <CardTitle>Basic Information</CardTitle>
                 <CardDescription>Your personal details</CardDescription>
@@ -514,8 +516,7 @@ export default function ProfilePage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="work">
-            {/* Work Information Section */}
+          <TabsContent value="work" >            {/* Work Information Section */}
             <Card>
               <CardHeader>
                 <CardTitle>Work Information</CardTitle>
@@ -598,7 +599,7 @@ export default function ProfilePage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="private">
+          <TabsContent value="private" >
             {/* Private Information Section */}
             <Card>
               <CardHeader>
@@ -706,7 +707,7 @@ export default function ProfilePage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="bank">
+          <TabsContent value="bank" >
             {/* Bank Details Section */}
             <Card>
               <CardHeader>
@@ -723,7 +724,7 @@ export default function ProfilePage() {
 
           <TabsContent value="status">
             {/* Status History Section */}
-            <Card>
+            <Card className="mt-6 sm:mt-0">
               <CardHeader>
                 <CardTitle>Status History</CardTitle>
                 <CardDescription>Your employment status changes</CardDescription>

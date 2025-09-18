@@ -109,7 +109,7 @@ export class OdooClient {
     return uid;
   }
 
-  private async authenticateAdmin(): Promise<number> {
+  public async authenticateAdmin(): Promise<number> {
     if (this.adminUid) return this.adminUid;
     this.adminUid = await this.login(
       ODOO_CONFIG.ADMIN_USER!,
@@ -1598,7 +1598,7 @@ export class OdooClient {
         }
       );
 
-      return requests.map(req => ({
+      return requests.map((req: any) => ({
         ...req,
         current_data: JSON.parse(req.current_data || '{}'),
         requested_changes: JSON.parse(req.requested_changes || '{}')
