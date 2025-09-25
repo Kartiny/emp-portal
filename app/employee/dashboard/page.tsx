@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { MainLayout } from "@/components/main-layout";
 import AttendanceWidget from '@/components/attendance-widget';
 import StatusWidget from '@/components/status-widget';
+import { LeaveBalanceWidget } from '@/components/leave-balance-widget';
 import { LeaveBalanceCard } from '@/components/leave-balance-card';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -63,7 +64,7 @@ interface ShiftInfo {
 
 export default function DashboardPage() {
   const [profile, setProfile] = useState<any | null>(null);
-  const [leaveAllocations, setLeaveAllocations] = useState<any[]>([]);
+  
   const [loading, setLoading] = useState(true);
   const [totalHours, setTotalHours] = useState<number>(0);
   const [attendanceRate, setAttendanceRate] = useState<number>(0);
@@ -162,16 +163,7 @@ export default function DashboardPage() {
       })
       .catch(console.error);
 
-    fetch('/api/odoo/leave/allocation', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uid: uidNum }),
-    })
-      .then(res => res.json())
-      .then(data => {
-        setLeaveAllocations(data.allocations || []);
-      })
-      .catch(console.error);
+    
 
     const now = new Date();
     fetch('/api/odoo/auth/attendance', {
@@ -567,14 +559,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm hover:shadow-md transition-shadow">
-            <CardHeader>
-              <CardTitle className="text-base sm:text-lg">Leave Balance</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <LeaveBalanceCard leaveAllocations={leaveAllocations} />
-            </CardContent>
-          </Card>
+          <LeaveBalanceWidget />
         </div>
 
         {/* Charts Section */}
@@ -586,31 +571,6 @@ export default function DashboardPage() {
             <CardContent>
               <div className="h-64 sm:h-80">
                 <AttendanceReportChart data={monthlyAttendanceData} />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-base sm:text-lg">Recent Claims</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {claims.slice(0, 5).map((claim, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div>
-                      <p className="font-medium text-sm">{claim.name}</p>
-                      <p className="text-xs text-gray-500">{claim.date}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium text-sm">${claim.total_amount}</p>
-                      <p className="text-xs text-gray-500">{claim.payment_mode}</p>
-                    </div>
-                  </div>
-                ))}
-                {claims.length === 0 && (
-                  <p className="text-center text-gray-500 text-sm py-4">No recent claims</p>
-                )}
               </div>
             </CardContent>
           </Card>
@@ -759,7 +719,7 @@ export default function DashboardPage() {
           <DialogHeader>
             <DialogTitle>Apply for Leave</DialogTitle>
           </DialogHeader>
-          <LeaveRequestForm onClose={() => setLeaveDialogOpen(false)} />
+          <LeaveRequestForm />
         </DialogContent>
       </Dialog>
       <Dialog open={expenseDialogOpen} onOpenChange={setExpenseDialogOpen}>
