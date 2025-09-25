@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { AlertTriangle, ListTodo, MessageCircle, LogOut } from "lucide-react";
+import { ListTodo, LogOut } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useRole } from '../context/RoleContext';
@@ -128,7 +128,7 @@ export function CustomHeader({ missedClockOut }: CustomHeaderProps) {
           </span>
         </div>
 
-        {/* Right: Warning, Tasks, Notifications, Logo, Activities, Role Switcher */}
+        {/* Right: Tasks, Logo, Activities, Role Switcher */}
         <div className="flex items-center space-x-2 lg:space-x-6">
           {/* Company Selector - Hidden on mobile */}
           {roles.length > 1 && companies.length > 0 && (
@@ -146,28 +146,6 @@ export function CustomHeader({ missedClockOut }: CustomHeaderProps) {
                 </SelectContent>
               </Select>
             </div>
-          )}
-
-          {/* Missed Clock Out Warning */}
-          {missedClockOut ? (
-            <Popover open={showMissedPopover} onOpenChange={setShowMissedPopover}>
-              <PopoverTrigger asChild>
-                <button title="Missed Clock Out" className="relative transition-colors" onClick={() => setShowMissedPopover(true)}>
-                  <AlertTriangle className="h-5 w-5 lg:h-6 lg:w-6 text-red-600 animate-pulse" />
-                  <span className="absolute -top-1 -right-1 h-2 w-2 lg:h-3 lg:w-3 rounded-full bg-red-500 border-2 border-white animate-ping" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-64 text-sm text-red-900 bg-red-50 border-red-400">
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">⚠️</span>
-                  <span>You missed your clock out for today! Please update your attendance.</span>
-                </div>
-              </PopoverContent>
-            </Popover>
-          ) : (
-            <span title="No missed clock out" className="relative">
-              <AlertTriangle className="h-5 w-5 lg:h-6 lg:w-6 text-gray-400" />
-            </span>
           )}
 
           {/* Activities - Hidden on small mobile */}
@@ -204,11 +182,6 @@ export function CustomHeader({ missedClockOut }: CustomHeaderProps) {
               </PopoverContent>
             </Popover>
           </div>
-
-          {/* Chat - Hidden on small mobile */}
-          <button title="Chat" className="hidden sm:block hover:text-blue-600 transition-colors" onClick={() => alert('Open chat!')}>
-            <MessageCircle className="h-5 w-5 lg:h-6 lg:w-6" />
-          </button>
 
           {/* Logout */}
           <button
