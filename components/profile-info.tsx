@@ -96,7 +96,7 @@ export default function ProfileInfo() {
   }, []);
 
   if (loading) {
-    return <div>Loading profile...</div>;
+    return <div className="flex items-center justify-center w-full py-8 text-center">Loading profile...</div>;
   }
   if (error) {
     return <Card><CardContent className="text-red-600">{error}</CardContent></Card>;

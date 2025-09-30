@@ -62,7 +62,7 @@ export function DiscussSidebar() {
       <div className="mb-4">
         <div className="text-xs font-semibold text-gray-500 px-2 mb-2">CHANNELS</div>
         {loading ? (
-          <div className="text-gray-400 px-2">Loading...</div>
+          <div className="text-gray-400 px-2 text-center">Loading...</div>
         ) : error ? (
           <div className="text-red-500 px-2">{error}</div>
         ) : publicChannels.length === 0 ? (
@@ -88,7 +88,7 @@ export function DiscussSidebar() {
         <button className="text-gray-400 hover:text-gray-600 text-lg" title="New direct message">+</button>
       </div>
       {loading ? (
-        <div className="text-gray-400 px-2">Loading...</div>
+        <div className="text-gray-400 px-2 text-center">Loading...</div>
       ) : error ? (
         <div className="text-red-500 px-2">{error}</div>
       ) : directMessages.length === 0 ? (

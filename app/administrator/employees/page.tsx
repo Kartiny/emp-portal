@@ -151,7 +151,7 @@ export default function HREmployeesPage() {
           </div>
 
           {isLoading ? (
-            <p>Loading...</p>
+            <p className="w-full text-center py-4">Loading...</p>
           ) : error ? (
             <p className="text-red-500">{error}</p>
           ) : view === 'list' ? (

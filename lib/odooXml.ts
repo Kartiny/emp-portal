@@ -184,7 +184,7 @@ export class OdooClient {
           'job_title',
           'department_id',
           'parent_id',
-         
+          'image_1920',
           'leave_manager_id',
           'attendance_manager_id',
           'contract_id',
@@ -236,7 +236,7 @@ export class OdooClient {
       id: emp.id,
       name: user.name,
       email: user.login,
-      image_1920: user.image_1920,
+      image_1920: (emp as any).image_1920 || user.image_1920,
       job_title: emp.job_title,
       department: Array.isArray(emp.department_id) ? emp.department_id[1] : '',
       phone: emp.work_phone || emp.mobile_phone,
@@ -1562,7 +1562,7 @@ export class OdooClient {
         }
       );
 
-      return requests.map(req => ({
+      return requests.map((req: any) => ({
         ...req,
         current_data: JSON.parse(req.current_data || '{}'),
         requested_changes: JSON.parse(req.requested_changes || '{}')

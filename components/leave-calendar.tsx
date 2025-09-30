@@ -42,8 +42,8 @@ export default function LeaveCalendar() {
           allDay: true,
         }));
         setEvents(formattedEvents);
-      } catch (err) {
-        setError(err.message);
+      } catch (err: any) {
+        setError(err?.message || 'Failed to fetch approved leaves');
       } finally {
         setLoading(false);
       }
@@ -53,7 +53,7 @@ export default function LeaveCalendar() {
   }, []);
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <div className="flex items-center justify-center w-full py-8 text-center">Loading...</div>;
   }
 
   if (error) {

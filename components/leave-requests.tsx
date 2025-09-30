@@ -42,8 +42,8 @@ export default function LeaveRequests() {
         }
         const data = await response.json();
         setLeaveRequests(data);
-      } catch (err) {
-        setError(err.message);
+      } catch (err: any) {
+        setError(err?.message || 'Failed to fetch leave requests');
       } finally {
         setLoading(false);
       }
@@ -76,8 +76,8 @@ export default function LeaveRequests() {
         )
       );
       toast.success(`Leave request has been ${status === 'validate' ? 'approved' : 'rejected'}.`);
-    } catch (err) {
-      setError(err.message);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to update leave request.');
       toast.error('Failed to update leave request.');
     }
   };
@@ -91,7 +91,7 @@ export default function LeaveRequests() {
   };
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <div className="flex items-center justify-center w-full py-8 text-center">Loading...</div>;
   }
 
   if (error) {

@@ -447,7 +447,7 @@ export default function DashboardPage() {
   };
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <div className="flex items-center justify-center w-full py-8 text-center">Loading...</div>;
   }
 
   return (

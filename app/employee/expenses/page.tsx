@@ -135,8 +135,8 @@ export default function ExpensesPage() {
   if (loading) {
     return (
       <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <p>Loading expenses...</p>
+        <div className="flex items-center justify-center w-full h-[60vh]">
+          <p className="text-center">Loading expenses...</p>
         </div>
       </MainLayout>
     );

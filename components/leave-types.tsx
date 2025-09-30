@@ -23,7 +23,7 @@ export default function LeaveTypes() {
         const data = await response.json();
         setLeaveTypes(data);
       } catch (err) {
-        setError(err.message);
+        setError((err as any)?.message || 'Failed to fetch leave types');
       } finally {
         setLoading(false);
       }
@@ -33,7 +33,7 @@ export default function LeaveTypes() {
   }, []);
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <div className="flex items-center justify-center w-full py-8 text-center">Loading...</div>;
   }
 
   if (error) {

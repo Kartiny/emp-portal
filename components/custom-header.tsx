@@ -165,7 +165,7 @@ export function CustomHeader({ missedClockOut }: CustomHeaderProps) {
               <PopoverContent className="w-72">
                 <div className="font-semibold mb-2">Your Activities</div>
                 {activitiesLoading ? (
-                  <div>Loading...</div>
+                  <div className="text-center py-2">Loading...</div>
                 ) : activities.length === 0 ? (
                   <div className="text-muted-foreground">No activities found.</div>
                 ) : (

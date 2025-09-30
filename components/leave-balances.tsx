@@ -25,8 +25,8 @@ export default function LeaveBalances() {
         }
         const data = await response.json();
         setLeaveBalances(data);
-      } catch (err) {
-        setError(err.message);
+      } catch (err: any) {
+        setError(err?.message || 'Failed to fetch leave balances');
       } finally {
         setLoading(false);
       }
@@ -36,7 +36,7 @@ export default function LeaveBalances() {
   }, []);
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <div className="flex items-center justify-center w-full py-8 text-center">Loading...</div>;
   }
 
   if (error) {
