@@ -359,7 +359,7 @@ export default function LeavePage() {
   // ───── Main JSX ───────────────────────────────────────────────────────────
   return (
     <MainLayout>
-      <div className="space-y-6">
+     <div className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         {/* Top bar with Tabs + Request Button */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">

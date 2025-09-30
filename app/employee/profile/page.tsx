@@ -356,167 +356,171 @@ export default function ProfilePage() {
         </div>
 
         <Tabs defaultValue="basic" className="w-full">
-  <div className="mb-3">
-    <TabsList className="grid w-full grid-cols-2 lg:grid-cols-6">
-      <TabsTrigger value="basic">Basic Info</TabsTrigger>
-      <TabsTrigger value="work">Work Info</TabsTrigger>
-      <TabsTrigger value="private">Private Info</TabsTrigger>
-      <TabsTrigger value="bank">Bank Details</TabsTrigger>
-      <TabsTrigger value="status">Status History</TabsTrigger>
-      <TabsTrigger value="requests">Change Requests</TabsTrigger>
-    </TabsList>
-  </div>
+          <div className="mb-20 sm:mb-24">
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+              <TabsTrigger value="basic">Basic Info</TabsTrigger>
+              <TabsTrigger value="work">Work Info</TabsTrigger>
+              <TabsTrigger value="private">Private Info</TabsTrigger>
+              <TabsTrigger value="bank">Bank Details</TabsTrigger>
+              <TabsTrigger value="status">Status History</TabsTrigger>
+              <TabsTrigger value="requests">Change Requests</TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="basic" >
+            
+            <div className="mt-6 sm:mt-0">
               <Card>
-              <CardHeader>
-                <CardTitle>Basic Information</CardTitle>
-                <CardDescription>Your personal details</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Profile Image */}
-                <div className="flex flex-col sm:flex-row items-center gap-4">
-                  <div className="relative">
-                    <Avatar className="h-20 w-20 lg:h-24 lg:w-24">
-                      {profile.image_1920 ? (
-                        <AvatarImage src={`data:image/jpeg;base64,${profile.image_1920}`} alt={profile.name} />
-                      ) : null}
-                      <AvatarFallback className="text-lg lg:text-xl">
-                        {profile.name?.split(' ').map(n => n[0]).join('').toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    {isEditing && (
-                      <label className="absolute bottom-0 right-0 bg-white rounded-full p-1 shadow-md cursor-pointer">
-                        <Camera className="w-4 h-4 text-gray-600" />
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleImageUpload}
-                          className="hidden"
-                        />
-                      </label>
-                    )}
+                <CardHeader>
+                  <CardTitle>Basic Information</CardTitle>
+                  <CardDescription>Your personal details</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Profile Image */}
+                  <div className="flex flex-col sm:flex-row items-center gap-4">
+                    <div className="relative">
+                      <Avatar className="h-20 w-20 lg:h-24 lg:w-24">
+                        {profile.image_1920 ? (
+                          <AvatarImage src={`data:image/jpeg;base64,${profile.image_1920}`} alt={profile.name} />
+                        ) : null}
+                        <AvatarFallback className="text-lg lg:text-xl">
+                          {profile.name?.split(' ').map(n => n[0]).join('').toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      {isEditing && (
+                        <label className="absolute bottom-0 right-0 bg-white rounded-full p-1 shadow-md cursor-pointer">
+                          <Camera className="w-4 h-4 text-gray-600" />
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageUpload}
+                            className="hidden"
+                          />
+                        </label>
+                      )}
+                    </div>
+                    <div className="text-center sm:text-left">
+                      <h3 className="text-lg lg:text-xl font-semibold">{profile.name}</h3>
+                      <p className="text-sm text-muted-foreground">Employee ID: {profile.id}</p>
+                    </div>
                   </div>
-                  <div className="text-center sm:text-left">
-                    <h3 className="text-lg lg:text-xl font-semibold">{profile.name}</h3>
-                    <p className="text-sm text-muted-foreground">Employee ID: {profile.id}</p>
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Name */}
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Name</Label>
-                    <Input
-                      id="name"
-                      value={isEditing ? (editedProfile.name !== undefined ? editedProfile.name : profile.name || '') : profile.name || ''}
-                      onChange={(e) => setEditedProfile((p) => ({ ...p, name: e.target.value }))}
-                      readOnly={!isEditing}
-                      className={!isEditing ? 'bg-muted' : ''}
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Name */}
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Name</Label>
+                      <Input
+                        id="name"
+                        value={isEditing ? (editedProfile.name !== undefined ? editedProfile.name : profile.name || '') : profile.name || ''}
+                        onChange={(e) => setEditedProfile((p) => ({ ...p, name: e.target.value }))}
+                        readOnly={!isEditing}
+                        className={!isEditing ? 'bg-muted' : ''}
+                      />
+                    </div>
+                    {/* Mobile Phone */}
+                    <div className="space-y-2">
+                      <Label htmlFor="mobile_phone">Mobile Phone</Label>
+                      <Input
+                        id="mobile_phone"
+                        value={isEditing ? (editedProfile.mobile_phone !== undefined ? editedProfile.mobile_phone : profile.mobile_phone || '') : profile.mobile_phone || ''}
+                        onChange={(e) => setEditedProfile((p) => ({ ...p, mobile_phone: e.target.value }))}
+                        readOnly={!isEditing}
+                        className={!isEditing ? 'bg-muted' : ''}
+                      />
+                    </div>
+                    {/* Work Phone */}
+                    <div className="space-y-2">
+                      <Label htmlFor="work_phone">Work Phone</Label>
+                      <Input
+                        id="work_phone"
+                        value={isEditing ? (editedProfile.work_phone !== undefined ? editedProfile.work_phone : profile.work_phone || '') : profile.work_phone || ''}
+                        onChange={(e) => setEditedProfile((p) => ({ ...p, work_phone: e.target.value }))}
+                        readOnly={!isEditing}
+                        className={!isEditing ? 'bg-muted' : ''}
+                      />
+                    </div>
+                    {/* Work Email */}
+                    <div className="space-y-2">
+                      <Label htmlFor="work_email">Work Email</Label>
+                      <Input
+                        id="work_email"
+                        value={isEditing ? (editedProfile.work_email !== undefined ? editedProfile.work_email : profile.work_email || '') : profile.work_email || ''}
+                        onChange={(e) => setEditedProfile((p) => ({ ...p, work_email: e.target.value }))}
+                        readOnly={!isEditing}
+                        className={!isEditing ? 'bg-muted' : ''}
+                      />
+                    </div>
+                    {/* Badge ID */}
+                    <div className="space-y-2">
+                      <Label htmlFor="barcode">Badge ID</Label>
+                      <Input
+                        id="barcode"
+                        value={profile.barcode || ''}
+                        readOnly
+                        className="bg-muted"
+                      />
+                    </div>
+                    {/* Gender */}
+                    <div className="space-y-2">
+                      <Label htmlFor="gender">Gender</Label>
+                      <Input
+                        id="gender"
+                        value={GENDER_OPTIONS.find((o) => o.value === profile.gender)?.label || ''}
+                        readOnly
+                        className="bg-muted"
+                      />
+                    </div>
+                    {/* Date of Birth */}
+                    <div className="space-y-2">
+                      <Label htmlFor="birthday">Date of Birth</Label>
+                      <Input
+                        id="birthday"
+                        type="text"
+                        value={profile.birthday ? format(new Date(profile.birthday), 'dd/MM/yyyy') : ''}
+                        readOnly
+                        className="bg-muted"
+                      />
+                    </div>
+                    {/* Age */}
+                    <div className="space-y-2">
+                      <Label htmlFor="age">Age</Label>
+                      <Input
+                        id="age"
+                        type="number"
+                        value={profile.age || ''}
+                        readOnly
+                        className="bg-muted"
+                      />
+                    </div>
+                    {/* Place of Birth */}
+                    <div className="space-y-2">
+                      <Label htmlFor="place_of_birth">Place of Birth</Label>
+                      <Input
+                        id="place_of_birth"
+                        value={isEditing ? (editedProfile.place_of_birth !== undefined ? editedProfile.place_of_birth : profile.place_of_birth || '') : profile.place_of_birth || ''}
+                        onChange={(e) => setEditedProfile((p) => ({ ...p, place_of_birth: e.target.value }))}
+                        readOnly={!isEditing}
+                        className={!isEditing ? 'bg-muted' : ''}
+                      />
+                    </div>
+                    {/* Country of Birth */}
+                    <div className="space-y-2">
+                      <Label htmlFor="country_of_birth">Country of Birth</Label>
+                      <Input
+                        id="country_of_birth"
+                        value={profile.country_of_birth?.[1] || ''}
+                        readOnly
+                        className="bg-muted"
+                      />
+                    </div>
                   </div>
-                  {/* Mobile Phone */}
-                  <div className="space-y-2">
-                    <Label htmlFor="mobile_phone">Mobile Phone</Label>
-                    <Input
-                      id="mobile_phone"
-                      value={isEditing ? (editedProfile.mobile_phone !== undefined ? editedProfile.mobile_phone : profile.mobile_phone || '') : profile.mobile_phone || ''}
-                      onChange={(e) => setEditedProfile((p) => ({ ...p, mobile_phone: e.target.value }))}
-                      readOnly={!isEditing}
-                      className={!isEditing ? 'bg-muted' : ''}
-                    />
-                  </div>
-                  {/* Work Phone */}
-                  <div className="space-y-2">
-                    <Label htmlFor="work_phone">Work Phone</Label>
-                    <Input
-                      id="work_phone"
-                      value={isEditing ? (editedProfile.work_phone !== undefined ? editedProfile.work_phone : profile.work_phone || '') : profile.work_phone || ''}
-                      onChange={(e) => setEditedProfile((p) => ({ ...p, work_phone: e.target.value }))}
-                      readOnly={!isEditing}
-                      className={!isEditing ? 'bg-muted' : ''}
-                    />
-                  </div>
-                  {/* Work Email */}
-                  <div className="space-y-2">
-                    <Label htmlFor="work_email">Work Email</Label>
-                    <Input
-                      id="work_email"
-                      value={isEditing ? (editedProfile.work_email !== undefined ? editedProfile.work_email : profile.work_email || '') : profile.work_email || ''}
-                      onChange={(e) => setEditedProfile((p) => ({ ...p, work_email: e.target.value }))}
-                      readOnly={!isEditing}
-                      className={!isEditing ? 'bg-muted' : ''}
-                    />
-                  </div>
-                  {/* Badge ID */}
-                  <div className="space-y-2">
-                    <Label htmlFor="barcode">Badge ID</Label>
-                    <Input
-                      id="barcode"
-                      value={profile.barcode || ''}
-                      readOnly
-                      className="bg-muted"
-                    />
-                  </div>
-                  {/* Gender */}
-                  <div className="space-y-2">
-                    <Label htmlFor="gender">Gender</Label>
-                    <Input
-                      id="gender"
-                      value={GENDER_OPTIONS.find((o) => o.value === profile.gender)?.label || ''}
-                      readOnly
-                      className="bg-muted"
-                    />
-                  </div>
-                  {/* Date of Birth */}
-                  <div className="space-y-2">
-                    <Label htmlFor="birthday">Date of Birth</Label>
-                    <Input
-                      id="birthday"
-                      type="text"
-                      value={profile.birthday ? format(new Date(profile.birthday), 'dd/MM/yyyy') : ''}
-                      readOnly
-                      className="bg-muted"
-                    />
-                  </div>
-                  {/* Age */}
-                  <div className="space-y-2">
-                    <Label htmlFor="age">Age</Label>
-                    <Input
-                      id="age"
-                      type="number"
-                      value={profile.age || ''}
-                      readOnly
-                      className="bg-muted"
-                    />
-                  </div>
-                  {/* Place of Birth */}
-                  <div className="space-y-2">
-                    <Label htmlFor="place_of_birth">Place of Birth</Label>
-                    <Input
-                      id="place_of_birth"
-                      value={isEditing ? (editedProfile.place_of_birth !== undefined ? editedProfile.place_of_birth : profile.place_of_birth || '') : profile.place_of_birth || ''}
-                      onChange={(e) => setEditedProfile((p) => ({ ...p, place_of_birth: e.target.value }))}
-                      readOnly={!isEditing}
-                      className={!isEditing ? 'bg-muted' : ''}
-                    />
-                  </div>
-                  {/* Country of Birth */}
-                  <div className="space-y-2">
-                    <Label htmlFor="country_of_birth">Country of Birth</Label>
-                    <Input
-                      id="country_of_birth"
-                      value={profile.country_of_birth?.[1] || ''}
-                      readOnly
-                      className="bg-muted"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="work" >            {/* Work Information Section */}
+            <div className="mt-6 sm:mt-0">
             <Card>
               <CardHeader>
                 <CardTitle>Work Information</CardTitle>
@@ -597,9 +601,11 @@ export default function ProfilePage() {
                 </div>
               </CardContent>
             </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="private" >
+            <div className="mt-6 sm:mt-0">
             {/* Private Information Section */}
             <Card>
               <CardHeader>
@@ -705,9 +711,11 @@ export default function ProfilePage() {
                 </div>
               </CardContent>
             </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="bank" >
+            <div className="mt-6 sm:mt-0">
             {/* Bank Details Section */}
             <Card>
               <CardHeader>
@@ -720,9 +728,11 @@ export default function ProfilePage() {
                 </div>
               </CardContent>
             </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="status">
+            <div className="mt-6 sm:mt-0">
             {/* Status History Section */}
             <Card className="mt-6 sm:mt-0">
               <CardHeader>
@@ -735,9 +745,11 @@ export default function ProfilePage() {
                 </div>
               </CardContent>
             </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="requests">
+            <div className="mt-6 sm:mt-0">
             {/* Change Requests Section */}
             <Card>
               <CardHeader>
@@ -786,6 +798,7 @@ export default function ProfilePage() {
                 </div>
               </CardContent>
             </Card>
+            </div>
           </TabsContent>
         </Tabs>
 
