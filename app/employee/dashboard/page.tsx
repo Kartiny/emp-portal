@@ -457,10 +457,6 @@ export default function DashboardPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Employee Dashboard</h1>
-            <p className="text-gray-600 mt-1">Welcome back, {profile?.name || 'Employee'}</p>
-          </div>
-          <div className="text-sm text-gray-500">
-            {format(new Date(), 'EEEE, MMMM do, yyyy')}
           </div>
         </div>
 
@@ -472,13 +468,24 @@ export default function DashboardPage() {
 
         {/* Main Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          <Card className="shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => setAttendanceDialogOpen(true)}>
+          <Card>
             <CardHeader className="flex flex-row items-center gap-2 pb-2">
               <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
               <CardTitle className="text-sm sm:text-base">Total Hours</CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
               <div className="text-xl sm:text-2xl font-bold text-blue-600">{totalHours.toFixed(1)}h</div>
+              <p className="text-xs sm:text-sm text-gray-500 mt-1">This month</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center gap-2 pb-2">
+              <ReceiptText className="w-4 h-4 sm:w-5 sm:h-5 text-green-500" />
+              <CardTitle className="text-sm sm:text-base">Attendance Rate</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="text-xl sm:text-2xl font-bold text-green-600">{attendanceRate.toFixed(1)}%</div>
               <p className="text-xs sm:text-sm text-gray-500 mt-1">This month</p>
             </CardContent>
           </Card>
@@ -494,21 +501,10 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => setLeaveBalanceDialogOpen(true)}>
-            <CardHeader className="flex flex-row items-center gap-2 pb-2">
-              <ReceiptText className="w-4 h-4 sm:w-5 sm:h-5 text-green-500" />
-              <CardTitle className="text-sm sm:text-base">Attendance Rate</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="text-xl sm:text-2xl font-bold text-green-600">{attendanceRate.toFixed(1)}%</div>
-              <p className="text-xs sm:text-sm text-gray-500 mt-1">This month</p>
-            </CardContent>
-          </Card>
-
           <Card className="shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => setOvertimeDialogOpen(true)}>
             <CardHeader className="flex flex-row items-center gap-2 pb-2">
               <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5 text-purple-500" />
-              <CardTitle className="text-sm sm:text-base">Overtime Requests</CardTitle>
+              <CardTitle className="text-sm sm:text-base">OT Requests</CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
               <div className="text-xl sm:text-2xl font-bold text-purple-600">{overtimeRequests}</div>

@@ -149,22 +149,10 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-20 items-center px-8">
-          <div className="flex items-center space-x-4">
-            <Image
-              src="/logo.png"
-              alt="KPRJ Logo"
-              width={100}
-              height={100}
-              className="rounded-lg"
-            />
-          </div>
-        </div>
-      </header>
-      <main className="flex-1 flex items-center justify-center bg-gray-50/50">
-        <Card className="w-[400px] shadow-lg">
+    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2">
+      {/* Left: Login Card */}
+      <div className="flex items-center justify-center p-6 sm:p-10 bg-gray-50/50">
+        <Card className="w-full max-w-md shadow-lg">
           <CardHeader>
             <CardTitle className="text-2xl">Employee Login</CardTitle>
             <CardDescription>Enter your credentials to access your account</CardDescription>
@@ -210,7 +198,22 @@ export default function LoginPage() {
             </form>
           </CardContent>
         </Card>
-      </main>
+      </div>
+
+      {/* Right: Logo + Title */}
+      <div className="hidden lg:flex items-center justify-center p-6 bg-white">
+        <div className="text-center">
+          <Image
+            src="/logo.png"
+            alt="Company Logo"
+            width={260}
+            height={260}
+            className="mx-auto"
+          />
+          <h1 className="mt-6 text-3xl font-bold tracking-tight text-gray-900">Employee Portal</h1>
+          <p className="mt-2 text-gray-500">Welcome. Please log in to continue.</p>
+        </div>
+      </div>
     </div>
   );
 }
